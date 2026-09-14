@@ -1,6 +1,7 @@
 rootProject.name = "Drafts"
 
 pluginManagement {
+    includeBuild("build-logic")
     repositories {
         google {
             mavenContent {
@@ -31,6 +32,55 @@ plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
-include(":androidApp")
-include(":desktopApp")
-include(":shared")
+// Module graph per specifications/appthere-drafts.md 3.
+//
+// Dependency direction is app-* -> editor-* -> core-*, and :core-model depends on nothing.
+// That direction is asserted, not merely intended: see
+// tools/architecture-tests/src/test/kotlin/.../ModuleDependencyTest.kt.
+//
+// Modules are empty in Phase 0. That is deliberate -- the gates exist before the code they gate,
+// so the detekt baseline starts empty and stays empty (engineering-conventions.md 3).
+
+// --- core: pure commonMain, no platform code ---------------------------------------------
+include(":core-model")
+include(":core-parse-markdown")
+include(":core-parse-fountain")
+include(":core-serialise")
+
+// Export backends are write-only. appthere-drafts.md 3 writes these as the glob ":core-export-*";
+// the concrete split follows export-pipeline.md "Module layout", renamed into the 3 scheme.
+// :core-export-package holds the ZIP and XML writing shared by the three backends -- it exists in
+// export-pipeline.md but has no counterpart in 3. See the Phase 0 report, item 5.
+include(":core-export-package")
+include(":core-export-xhtml")
+include(":core-export-odf")
+include(":core-export-ooxml")
+
+// --- editor ---------------------------------------------------------------------------------
+include(":editor-engine")
+include(":editor-ui")
+
+// --- cross-cutting, still pure commonMain ---------------------------------------------------
+include(":design-system")
+include(":i18n")
+include(":a11y")
+
+// --- platform: the only modules where expect/actual appears ---------------------------------
+include(":platform-files")
+include(":platform-windows")
+include(":platform-intents")
+
+// --- app ------------------------------------------------------------------------------------
+include(":app-shared")
+include(":app-android")
+include(":app-android-xr")
+include(":app-ios")
+include(":app-desktop")
+
+// --- tooling: not part of the 3 product graph ----------------------------------------------
+// Custom detekt rules and the Konsist architecture assertions. These are build infrastructure
+// that happens to be Gradle projects; they are excluded from the product dependency assertions.
+include(":tools-detekt-rules")
+include(":tools-architecture-tests")
+project(":tools-detekt-rules").projectDir = file("tools/detekt-rules")
+project(":tools-architecture-tests").projectDir = file("tools/architecture-tests")

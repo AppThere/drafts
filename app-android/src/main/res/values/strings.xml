@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  appthere-drafts.md 11.1: user-facing strings live in resources, never in code. The custom
+  detekt rule HardcodedUserFacingString enforces that; this file is where the strings it redirects
+  people to actually go.
+-->
+<resources>
+    <string name="app_name">Drafts</string>
+</resources>

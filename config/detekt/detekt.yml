@@ -1,0 +1,301 @@
+## detekt configuration -- FAIL thresholds.
+##
+## This is the gating config: any finding here fails the build (`build.maxIssues: 0`).
+## Its sibling config/detekt/detekt-warn.yml carries the WARN column from
+## engineering-conventions.md 2 and never fails anything; it is wired to the `detektWarn` task.
+##
+## Two files because engineering-conventions.md 1 defines warn and fail as genuinely different
+## outcomes -- "Warn: build succeeds, a comment appears in the PR" versus "Fail: build fails" --
+## and detekt 1.x has one threshold per rule per config. One config cannot express both columns.
+##
+## Thresholds are transcribed from engineering-conventions.md 2. Do not edit them here to make a
+## build pass; AGENTS.md 3 lists that as prohibited. If a threshold is genuinely wrong, change it
+## in the spec first, as a reviewable decision.
+
+build:
+  # Any finding at fail level breaks the build. There is no allowance and no baseline.
+  maxIssues: 0
+  excludeCorrectable: false
+
+config:
+  validation: true
+  warningsAsErrors: false
+  # The custom ruleset's properties are not known to detekt's config validator.
+  excludes: 'drafts,.*>.*>.*'
+
+## ---------------------------------------------------------------------------------------------
+## Path exemptions -- engineering-conventions.md 2, "Exemptions"
+##
+## An exemption is a config entry with a comment explaining why. It is never a @Suppress added to
+## make a build pass, and it is never widened to cover a file someone is currently working on.
+## These are repeated per-rule below where detekt requires it; this block is the canonical list.
+##
+##   **/build/**                        generated
+##   **/generated/**                    generated
+##   **/*.g.kt                          generated
+##   **/test/**/fixtures/**             conformance corpora (the 652 CommonMark examples, etc.)
+##   **/commonTest/**/*Spec*.kt         table-driven spec tests are legitimately long
+##   :core-export-ooxml/**/StyleMap.kt  large flat mapping tables -- see 2.2
+## ---------------------------------------------------------------------------------------------
+
+complexity:
+  active: true
+
+  # engineering-conventions.md 2: cognitive complexity 12 warn / 20 fail.
+  # "Better signal than cyclomatic; prefer it" -- so it is switched on, unlike the detekt default.
+  CognitiveComplexMethod:
+    active: true
+    threshold: 20
+    ignoreAnnotated: ['Composable']
+
+  # Cyclomatic complexity 10 warn / 15 fail. 15 is also the detekt default.
+  CyclomaticComplexMethod:
+    active: true
+    threshold: 15
+    ignoreAnnotated: ['Composable']
+    ignoreSingleWhenExpression: true
+    # 2.2: a long flat `when` is data, not branching logic. Simple entries do not count.
+    ignoreSimpleWhenEntries: true
+
+  # Class / object body 200 warn / 300 fail.
+  LargeClass:
+    active: true
+    threshold: 300
+    excludes:
+      - '**/build/**'
+      - '**/generated/**'
+      - '**/*.g.kt'
+      - '**/test/**/fixtures/**'
+      - '**/commonTest/**/*Spec*.kt'
+      - '**/core-export-ooxml/**/StyleMap.kt'
+
+  # Function length 40 warn / 60 fail.
+  # Composables are excluded here and covered by drafts>LongComposableFunction at 100, per 2.1:
+  # applying generic thresholds to Compose produces constant false positives, which trains
+  # everyone to ignore the tool.
+  LongMethod:
+    active: true
+    threshold: 60
+    ignoreAnnotated: ['Composable']
+    excludes:
+      - '**/build/**'
+      - '**/generated/**'
+      - '**/*.g.kt'
+      - '**/test/**/fixtures/**'
+      - '**/commonTest/**/*Spec*.kt'
+
+  # Parameter count 5 warn / 7 fail; constructor / type parameters 3 warn / 5 fail.
+  # Composable parameter lists are excluded here and covered by drafts>ComposableParameterList
+  # at 10, because state hoisting legitimately widens those signatures.
+  LongParameterList:
+    active: true
+    functionThreshold: 7
+    constructorThreshold: 5
+    ignoreDefaultParameters: false
+    ignoreDataClasses: true
+    ignoreAnnotated: ['Composable']
+
+  # Nesting depth 3 warn / 4 fail.
+  NestedBlockDepth:
+    active: true
+    threshold: 4
+
+  # Functions per class 15 warn / 25 fail.
+  TooManyFunctions:
+    active: true
+    thresholdInFiles: 25
+    thresholdInClasses: 25
+    thresholdInInterfaces: 25
+    thresholdInObjects: 25
+    thresholdInEnums: 25
+    ignorePrivate: false
+    ignoreOverridden: true
+    excludes:
+      - '**/build/**'
+      - '**/generated/**'
+      - '**/test/**/fixtures/**'
+      - '**/commonTest/**/*Spec*.kt'
+      - '**/core-export-ooxml/**/StyleMap.kt'
+
+## ---------------------------------------------------------------------------------------------
+## 4.1 Mechanically detectable smells. "Configure detekt to fail on these. Non-negotiable."
+## ---------------------------------------------------------------------------------------------
+
+potential-bugs:
+  active: true
+  # `!!`. NOTE: requires type resolution to fire. See the Phase 0 report, item 5 -- with empty
+  # modules there is nothing for it to analyse yet, and the type-resolved task wiring for KMP is
+  # deferred to Phase 1 when there is real code to resolve against.
+  UnsafeCallOnNullableType:
+    active: true
+
+exceptions:
+  active: true
+  SwallowedException:
+    active: true
+  TooGenericExceptionCaught:
+    active: true
+    exceptionNames:
+      - 'Exception'
+      - 'RuntimeException'
+      - 'Throwable'
+
+empty-blocks:
+  active: true
+  EmptyCatchBlock:
+    active: true
+    allowedExceptionNameRegex: '_|(ignore|expected).*'
+
+coroutines:
+  active: true
+  GlobalCoroutineUsage:
+    active: true
+
+naming:
+  active: true
+  TopLevelPropertyNaming:
+    active: true
+    constantPattern: '[A-Z][_A-Z0-9]*'
+    propertyPattern: '[a-z][A-Za-z0-9]*'
+    privatePropertyPattern: '_?[a-z][A-Za-z0-9]*'
+
+style:
+  active: true
+
+  # `println` / `print` -- use the logging abstraction.
+  # NOTE: ForbiddenMethodCall requires type resolution. Same caveat as UnsafeCallOnNullableType.
+  ForbiddenMethodCall:
+    active: true
+    methods:
+      - reason: 'Use the logging abstraction, not stdout (engineering-conventions.md 4.1).'
+        value: 'kotlin.io.println'
+      - reason: 'Use the logging abstraction, not stdout (engineering-conventions.md 4.1).'
+        value: 'kotlin.io.print'
+
+  MagicNumber:
+    active: true
+    ignoreNumbers: ['-1', '0', '1', '2']
+    ignoreHashCodeFunction: true
+    ignorePropertyDeclaration: true
+    ignoreAnnotation: true
+    ignoreEnums: true
+    # Compose dimension literals (8.dp, 16.sp) are design tokens, not magic numbers.
+    # 2 excludes "Compose dimension literals" explicitly.
+    ignoreNamedArgument: true
+    excludes:
+      - '**/build/**'
+      - '**/generated/**'
+      - '**/test/**/fixtures/**'
+      - '**/commonTest/**/*Spec*.kt'
+      - '**/design-system/**'
+
+  UnusedPrivateMember:
+    active: true
+
+  WildcardImport:
+    active: true
+    excludeImports: []
+
+  MaxLineLength:
+    active: true
+    maxLineLength: 120
+    excludes:
+      - '**/build/**'
+      - '**/generated/**'
+      - '**/test/**/fixtures/**'
+
+## ---------------------------------------------------------------------------------------------
+## formatting (detekt-formatting)
+##
+## Present because engineering-conventions.md 3 requires the plugin. Its rules are OFF, and that
+## is a deliberate, reviewable decision rather than a gate being quietly weakened:
+##
+## detekt-formatting 1.23.8 embeds ktlint 0.50.0 (verified from its POM). Spotless runs ktlint
+## 1.8.0. The two disagree about real formatting -- trailing commas and function signature
+## wrapping changed between those releases -- so with both active, `spotlessApply` produces code
+## that `detekt` then rejects, and there is no ordering of the two that converges.
+##
+## engineering-conventions.md 3 assigns formatting to "Spotless / ktlint -- auto-fixed, never
+## argued about", so Spotless wins the overlap and detekt-formatting stands down. Re-enabling this
+## ruleset requires either detekt 2.x (which embeds a current ktlint) or pinning Spotless back to
+## ktlint 0.50.0. Both are decisions for a human; see the Phase 0 report, item 5.
+## ---------------------------------------------------------------------------------------------
+formatting:
+  active: false
+
+## ---------------------------------------------------------------------------------------------
+## drafts -- the project's own rules (:tools-detekt-rules)
+##
+## Each rule has a test that deliberately violates it and asserts it fires. An unverified custom
+## rule is usually a rule that never fires.
+## ---------------------------------------------------------------------------------------------
+drafts:
+  active: true
+
+  # File length 400 warn / 600 fail. detekt 1.23.8 ships no file-length rule, so this is ours.
+  # Counted excluding imports, licence header and blank lines, per 2.
+  FileLength:
+    active: true
+    maxLines: 600
+    excludes:
+      - '**/build/**'
+      - '**/generated/**'
+      - '**/*.g.kt'
+      - '**/test/**/fixtures/**'
+      - '**/commonTest/**/*Spec*.kt'
+      - '**/core-export-ooxml/**/StyleMap.kt'
+
+  # Composable function length 60 warn / 100 fail (2.1).
+  LongComposableFunction:
+    active: true
+    maxLines: 100
+
+  # Composable parameter count 7 warn / 10 fail (2.1).
+  ComposableParameterList:
+    active: true
+    maxParameters: 10
+
+  # 4.1: `runBlocking` outside tests.
+  # Test source sets are excluded by path -- runBlocking is ordinary and correct in a test. This
+  # is the same mechanism detekt's own rules use to mean "not in tests"; the rule itself has no
+  # notion of test-ness, so that the exclusion is visible here with every other exemption.
+  RunBlockingOutsideTests:
+    active: true
+    excludes:
+      - '**/test/**'
+      - '**/androidTest/**'
+      - '**/commonTest/**'
+      - '**/jvmTest/**'
+      - '**/androidUnitTest/**'
+      - '**/androidInstrumentedTest/**'
+      - '**/iosTest/**'
+
+  # 4.4: a string literal passed to Text(), contentDescription =, or a title parameter.
+  HardcodedUserFacingString:
+    active: true
+
+  # 4.4: text sized in dp rather than sp.
+  TextSizeInDp:
+    active: true
+
+  # 4.4: left/right padding instead of start/end.
+  DirectionalPadding:
+    active: true
+
+  # 4.2: every export backend uses a real XML writer, never string concatenation.
+  # Scoped to the export backends with `includes`. Outside :core-export-*, a string containing
+  # markup is usually a test fixture or a doc comment, and flagging those would make the rule
+  # noise. :core-export-package is included too -- it holds the XML writer, but the writer builds
+  # markup through an API, not by concatenating literals.
+  XmlByStringConcatenation:
+    active: true
+    includes:
+      - '**/core-export-package/**'
+      - '**/core-export-xhtml/**'
+      - '**/core-export-odf/**'
+      - '**/core-export-ooxml/**'
+    excludes:
+      - '**/test/**'
+      - '**/commonTest/**'
+      - '**/jvmTest/**'
+      - '**/test/**/fixtures/**'

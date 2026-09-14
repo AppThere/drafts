@@ -1,0 +1,153 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GRADLE_OPTS: -Dorg.gradle.daemon=false
+
+jobs:
+  # ---------------------------------------------------------------------------------------------
+  # The baseline assertion runs first, alone, and takes seconds.
+  #
+  # engineering-conventions.md 3 permits exactly one detekt baseline, spent when tooling first
+  # meets existing code. Phase 0 exists so that moment never arrives. AGENTS.md 4 calls
+  # regenerating the baseline "the single most common way an agent makes a quality gate
+  # meaningless", so this is a separate job rather than a step inside another one: it cannot be
+  # skipped by a failure earlier in a longer job, and its name appears on its own in the checks
+  # list where a human will notice it turning red.
+  # ---------------------------------------------------------------------------------------------
+  baseline:
+    name: detekt baseline must not exist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert no detekt baseline
+        run: |
+          set -euo pipefail
+          found=$(find . -name 'detekt-baseline*.xml' -not -path './build/*' -not -path '*/build/*' || true)
+          if [ -n "$found" ]; then
+            echo "::error::A detekt baseline exists. engineering-conventions.md 3 permits exactly"
+            echo "::error::one, and Phase 0 was done first so it would not be spent. Fix the findings."
+            echo "$found"
+            exit 1
+          fi
+          echo "No detekt baseline. Correct."
+
+      # The file not existing is the primary assertion. If a baseline is ever deliberately
+      # introduced, this second check is what stops it growing afterwards -- the spec requires it
+      # to shrink monotonically.
+      - name: Assert baseline has not grown
+        run: |
+          set -euo pipefail
+          base="detekt-baseline.xml"
+          if [ ! -f "$base" ]; then
+            echo "No baseline to compare. Nothing to do."
+            exit 0
+          fi
+          current=$(grep -c '<ID>' "$base" || echo 0)
+          git fetch --depth=2 origin "${{ github.base_ref || github.ref_name }}" || true
+          previous=$(git show "origin/${{ github.base_ref || github.ref_name }}:$base" 2>/dev/null | grep -c '<ID>' || echo 0)
+          echo "baseline entries: previous=$previous current=$current"
+          if [ "$current" -gt "$previous" ]; then
+            echo "::error::The detekt baseline grew from $previous to $current entries."
+            exit 1
+          fi
+
+  # ---------------------------------------------------------------------------------------------
+  # JVM, Android and the tooling projects. This is the bulk of `check`.
+  # ---------------------------------------------------------------------------------------------
+  check-jvm-android:
+    name: check (JVM, Android, tooling)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Spotless
+        run: ./gradlew spotlessCheck --stacktrace
+
+      - name: detekt
+        run: ./gradlew detekt --stacktrace
+
+      - name: Custom detekt rules and architecture assertions
+        run: ./gradlew :tools-detekt-rules:test :tools-architecture-tests:test --stacktrace
+
+      - name: check
+        run: ./gradlew check --stacktrace
+
+      - name: Warn-threshold report
+        # Never fails: engineering-conventions.md 1 makes a warn crossing information, not a
+        # verdict. It is uploaded so a reviewer can act on it, per AGENTS.md 5 item 4.
+        if: always()
+        run: ./gradlew detektWarn --stacktrace
+
+      - name: dependency-analysis
+        # Reported, not enforced, while the modules are empty -- an empty module cannot use the
+        # dependency it declares. See the note in build.gradle.kts.
+        if: always()
+        run: ./gradlew buildHealth --stacktrace
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-jvm-android
+          path: |
+            **/build/reports/detekt/**
+            **/build/reports/tests/**
+            build/reports/dependency-analysis/**
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------------------------
+  # Apple targets.
+  #
+  # A separate job on macOS because Kotlin/Native cannot cross-compile to iOS from anywhere else:
+  # it needs the Xcode toolchain. Declaring iosArm64/iosSimulatorArm64/iosX64 and never building
+  # them would mean the first person on a Mac discovers whatever has rotted since Phase 0, so the
+  # targets are compiled on every push instead.
+  # ---------------------------------------------------------------------------------------------
+  check-apple:
+    name: check (iOS targets)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Compile Apple targets
+        run: |
+          ./gradlew \
+            compileKotlinIosArm64 \
+            compileKotlinIosSimulatorArm64 \
+            compileKotlinIosX64 \
+            --stacktrace
+
+      - name: Apple tests
+        run: ./gradlew iosSimulatorArm64Test --stacktrace
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-apple
+          path: '**/build/reports/tests/**'
+          if-no-files-found: ignore

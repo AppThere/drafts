@@ -1,0 +1,35 @@
+# Formatting is owned by Spotless/ktlint (engineering-conventions.md 3: "Auto-fixed, never argued
+# about"). This file is where ktlint reads its settings, so it is the single source of truth for
+# what "formatted" means -- the IDE and the build agree because they read the same file.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{kt,kts}]
+ktlint_code_style = ktlint_official
+max_line_length = 120
+
+# Trailing commas make diffs of parameter lists one line long instead of two, which matters a lot
+# for Compose signatures -- exactly the wide, frequently-edited lists that 2.1 is about.
+ij_kotlin_allow_trailing_comma = true
+ij_kotlin_allow_trailing_comma_on_call_site = true
+
+# detekt's WildcardImport rule and ktlint's no-wildcard-imports both forbid these. Keeping the
+# two tools agreeing is the reason this is stated rather than left to defaults.
+ij_kotlin_packages_to_use_import_on_demand = unset
+
+[*.{yml,yaml,json,toml}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[gradle/wrapper/gradle-wrapper.properties]
+insert_final_newline = false

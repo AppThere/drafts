@@ -4,8 +4,42 @@ A LyX-style What You See Is What You Mean editor for Markdown and Fountain docum
 distraction-free interface. Kotlin Multiplatform with Compose UI on every target: desktop,
 Android, iOS/iPadOS, and Android XR.
 
-This repository currently contains the design documents. Implementation follows
-[`IMPLEMENTATION-PLAN.md`](IMPLEMENTATION-PLAN.md).
+Implementation follows [`IMPLEMENTATION-PLAN.md`](IMPLEMENTATION-PLAN.md). **Phase 0 (Foundation)
+is complete**: the module skeleton and every quality gate are in place, and the modules are
+deliberately empty. Phase 1 adds the first code, to `:core-model`.
+
+---
+
+## Building
+
+Requires a JDK to launch Gradle; the daemon JVM (Azul Zulu 21) is provisioned automatically from
+`gradle/gradle-daemon-jvm.properties`, and the Android SDK location comes from `local.properties`
+or `ANDROID_HOME`.
+
+```sh
+./gradlew check          # detekt, Spotless, Konsist, tests -- the gate
+./gradlew detektWarn     # warn-threshold report; never fails
+./gradlew spotlessApply  # fix formatting
+./gradlew buildHealth    # unused / misdeclared dependencies
+```
+
+The iOS targets (`iosArm64`, `iosSimulatorArm64`, `iosX64`) are declared everywhere they belong but
+can only be **compiled on macOS** -- Kotlin/Native needs the Xcode toolchain. CI runs them on a
+macOS runner; `./gradlew check` on Linux or Windows covers the JVM and Android halves.
+
+### Layout
+
+| Path | What it is |
+|---|---|
+| `core-*`, `editor-*`, `design-system`, `i18n`, `a11y`, `platform-*`, `app-*` | The product modules, per [`appthere-drafts.md` 3](specifications/appthere-drafts.md) |
+| `build-logic/` | Convention plugins. One place where the target set and the quality gates are configured |
+| `config/detekt/` | `detekt.yml` (fail thresholds, gates the build) and `detekt-warn.yml` (report only) |
+| `tools/detekt-rules/` | The project's own detekt rules, each with a test that deliberately violates it |
+| `tools/architecture-tests/` | Konsist architecture assertions, plus fixtures proving they fire |
+
+There is no `detekt-baseline.xml`, and CI fails if one appears.
+[`engineering-conventions.md` 3](specifications/engineering-conventions.md) permits exactly one
+baseline; Phase 0 was done first so that it would never be spent.
 
 ---
 

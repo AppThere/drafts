@@ -1,0 +1,155 @@
+## detekt configuration -- WARN thresholds.
+##
+## Report-only. This config never fails a build; it is wired to the `detektWarn` task, which is
+## not a dependency of `check`. engineering-conventions.md 1:
+##
+##   Warn | Build succeeds. A comment appears in the PR. Someone should look.
+##
+## Only the graduated size and complexity rules from the 2 table appear here, set to the WARN
+## column. Every other ruleset is off, because the binary smells in 4.1 have no warn level --
+## a swallowed exception is a defect at any size -- and duplicating them here would make the warn
+## report a copy of the fail report rather than a list of things approaching a limit.
+##
+## The gap between warn and fail is deliberately wide (1). Crossing the warn line is information,
+## not a verdict. AGENTS.md 5 item 4 asks for warn crossings to be listed in the report with a
+## justification; this task is how they are found.
+
+build:
+  # Report-only: the task sets ignoreFailures, and this ceiling is a second belt on the same
+  # braces. The warn run must never be what breaks a build.
+  maxIssues: 2147483647
+  excludeCorrectable: false
+
+config:
+  validation: true
+  warningsAsErrors: false
+  excludes: 'drafts,.*>.*>.*'
+
+comments:
+  active: false
+coroutines:
+  active: false
+empty-blocks:
+  active: false
+exceptions:
+  active: false
+naming:
+  active: false
+performance:
+  active: false
+potential-bugs:
+  active: false
+formatting:
+  active: false
+
+style:
+  active: false
+
+complexity:
+  active: true
+
+  # Cognitive complexity: 12 warn (fail is 20).
+  CognitiveComplexMethod:
+    active: true
+    threshold: 12
+    ignoreAnnotated: ['Composable']
+
+  # Cyclomatic complexity: 10 warn (fail is 15).
+  CyclomaticComplexMethod:
+    active: true
+    threshold: 10
+    ignoreAnnotated: ['Composable']
+    ignoreSingleWhenExpression: true
+    ignoreSimpleWhenEntries: true
+
+  # Class / object body: 200 warn (fail is 300).
+  LargeClass:
+    active: true
+    threshold: 200
+    excludes:
+      - '**/build/**'
+      - '**/generated/**'
+      - '**/*.g.kt'
+      - '**/test/**/fixtures/**'
+      - '**/commonTest/**/*Spec*.kt'
+      - '**/core-export-ooxml/**/StyleMap.kt'
+
+  # Function length: 40 warn (fail is 60).
+  LongMethod:
+    active: true
+    threshold: 40
+    ignoreAnnotated: ['Composable']
+    excludes:
+      - '**/build/**'
+      - '**/generated/**'
+      - '**/*.g.kt'
+      - '**/test/**/fixtures/**'
+      - '**/commonTest/**/*Spec*.kt'
+
+  # Parameter count: 5 warn (fail is 7). Constructor / type parameters: 3 warn (fail is 5).
+  LongParameterList:
+    active: true
+    functionThreshold: 5
+    constructorThreshold: 3
+    ignoreDefaultParameters: false
+    ignoreDataClasses: true
+    ignoreAnnotated: ['Composable']
+
+  # Nesting depth: 3 warn (fail is 4).
+  NestedBlockDepth:
+    active: true
+    threshold: 3
+
+  # Functions per class: 15 warn (fail is 25).
+  TooManyFunctions:
+    active: true
+    thresholdInFiles: 15
+    thresholdInClasses: 15
+    thresholdInInterfaces: 15
+    thresholdInObjects: 15
+    thresholdInEnums: 15
+    ignorePrivate: false
+    ignoreOverridden: true
+    excludes:
+      - '**/build/**'
+      - '**/generated/**'
+      - '**/test/**/fixtures/**'
+      - '**/commonTest/**/*Spec*.kt'
+      - '**/core-export-ooxml/**/StyleMap.kt'
+
+drafts:
+  active: true
+
+  # File length: 400 warn (fail is 600).
+  FileLength:
+    active: true
+    maxLines: 400
+    excludes:
+      - '**/build/**'
+      - '**/generated/**'
+      - '**/*.g.kt'
+      - '**/test/**/fixtures/**'
+      - '**/commonTest/**/*Spec*.kt'
+      - '**/core-export-ooxml/**/StyleMap.kt'
+
+  # Composable function length: 60 warn (fail is 100).
+  LongComposableFunction:
+    active: true
+    maxLines: 60
+
+  # Composable parameter count: 7 warn (fail is 10).
+  ComposableParameterList:
+    active: true
+    maxParameters: 7
+
+  # Binary rules have no warn level; they gate in detekt.yml only.
+  RunBlockingOutsideTests:
+    active: false
+  HardcodedUserFacingString:
+    active: false
+  TextSizeInDp:
+    active: false
+  DirectionalPadding:
+    active: false
+  XmlByStringConcatenation:
+    active: false
