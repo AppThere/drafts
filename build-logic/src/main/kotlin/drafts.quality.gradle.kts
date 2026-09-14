@@ -10,6 +10,10 @@ import io.gitlab.arturbosch.detekt.extensions.DetektExtension
 plugins {
     id("io.gitlab.arturbosch.detekt")
     id("com.diffplug.spotless")
+    // Applied per-module, not just at the root. Verified the hard way: with the plugin only on
+    // the root project, `buildHealth` reports "No project health reports found" and no module has
+    // a `projectHealth` task -- the gate looks configured and analyses nothing.
+    id("com.autonomousapps.dependency-analysis")
 }
 
 private val versions = extensions.getByType<VersionCatalogsExtension>().named("libs")

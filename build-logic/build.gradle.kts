@@ -10,4 +10,5 @@ dependencies {
     implementation(libs.plugin.composeCompiler.gradle)
     implementation(libs.plugin.detekt.gradle)
     implementation(libs.plugin.spotless.gradle)
+    implementation(libs.plugin.dependencyAnalysis.gradle)
 }
