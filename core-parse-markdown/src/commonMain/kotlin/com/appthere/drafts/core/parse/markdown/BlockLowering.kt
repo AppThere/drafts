@@ -15,6 +15,7 @@ import org.intellij.markdown.MarkdownElementTypes
 import org.intellij.markdown.MarkdownTokenTypes
 import org.intellij.markdown.ast.ASTNode
 import org.intellij.markdown.ast.getTextInNode
+import org.intellij.markdown.flavours.gfm.GFMElementTypes
 
 /**
  * Lowers block-level CST nodes to [Block].
@@ -31,6 +32,7 @@ internal class BlockLowering(
     private val inlines: InlineLowering,
 ) {
     private val lists = ListLowering(source, ::lowerAll)
+    private val tables = TableLowering(source, inlines::lowerAll)
     private val code = CodeLowering(source)
 
     fun lowerAll(nodes: List<ASTNode>): List<Block> = nodes.mapNotNull { lower(it) }
@@ -45,6 +47,7 @@ internal class BlockLowering(
             MarkdownElementTypes.CODE_BLOCK -> code.indented(node)
             MarkdownElementTypes.HTML_BLOCK -> RawPassthrough(node.text(), Origin.RAW_HTML, source = node.span())
             MarkdownElementTypes.LINK_DEFINITION -> linkDefinition(node)
+            GFMElementTypes.TABLE -> tables.lower(node)
             MarkdownTokenTypes.HORIZONTAL_RULE -> ThematicBreak(source = node.span())
             in ATX_LEVELS.keys -> heading(node, ATX_LEVELS.getValue(node.type), HeadingStyle.ATX)
             in SETEXT_LEVELS.keys -> heading(node, SETEXT_LEVELS.getValue(node.type), HeadingStyle.SETEXT)

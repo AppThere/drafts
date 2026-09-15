@@ -124,6 +124,30 @@ class RoundTripTest {
     }
 
     @Test
+    fun `a table round-trips byte for byte`() {
+        assertRoundTrips("| A | B |\n|:--|--:|\n| 1 | 2 |\n")
+    }
+
+    @Test
+    fun `a table with irregular cell padding is not tidied up`() {
+        // A renderer would happily align these columns. An editor must not: the author's spacing is
+        // their file, and re-aligning it turns one edited cell into a whole-table diff.
+        assertRoundTrips("|A|Long header|\n|---|---|\n|1|   padded   |\n")
+    }
+
+    @Test
+    fun `strikethrough tilde counts are preserved`() {
+        assertRoundTrips("Some ~~double~~ and some ~single~ strikethrough.\n")
+    }
+
+    @Test
+    fun `a linkified bare url is not rewritten as an explicit autolink`() {
+        // The https default applies to the href, not to the text. Writing back `<https://...>`
+        // would put a scheme on screen that the author never typed.
+        assertRoundTrips("Visit www.example.com and https://x.test today.\n")
+    }
+
+    @Test
     fun `non-ASCII content round-trips`() {
         // Offsets are UTF-16 code units; an astral-plane character is two of them. A span that
         // counted wrong would slice mid-surrogate and corrupt the text here.

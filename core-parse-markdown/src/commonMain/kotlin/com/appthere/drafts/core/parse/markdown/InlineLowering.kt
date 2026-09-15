@@ -8,11 +8,14 @@ import com.appthere.drafts.core.model.LineBreak
 import com.appthere.drafts.core.model.Origin
 import com.appthere.drafts.core.model.RawInline
 import com.appthere.drafts.core.model.SourceSpan
+import com.appthere.drafts.core.model.Strikethrough
 import com.appthere.drafts.core.model.Text
 import org.intellij.markdown.MarkdownElementTypes
 import org.intellij.markdown.MarkdownTokenTypes
 import org.intellij.markdown.ast.ASTNode
 import org.intellij.markdown.ast.getTextInNode
+import org.intellij.markdown.flavours.gfm.GFMElementTypes
+import org.intellij.markdown.flavours.gfm.GFMTokenTypes
 
 /**
  * Lowers inline CST nodes to [Inline].
@@ -47,6 +50,8 @@ internal class InlineLowering(
             MarkdownElementTypes.FULL_REFERENCE_LINK -> links.referenceLink(node, short = false)
             MarkdownElementTypes.SHORT_REFERENCE_LINK -> links.referenceLink(node, short = true)
             MarkdownElementTypes.AUTOLINK -> links.autolink(node)
+            GFMElementTypes.STRIKETHROUGH -> strikethrough(node)
+            GFMTokenTypes.GFM_AUTOLINK -> links.linkified(node)
             MarkdownElementTypes.IMAGE -> links.image(node)
             MarkdownTokenTypes.HARD_LINE_BREAK -> LineBreak(hard = true, source = node.span())
             MarkdownTokenTypes.EOL -> LineBreak(hard = false, source = node.span())
@@ -80,6 +85,24 @@ internal class InlineLowering(
             strong = strong,
             children = lowerAll(node.children.filterNot { it.type == MarkdownTokenTypes.EMPH }),
             delimiter = delimiter,
+            source = node.span(),
+        )
+    }
+
+    /**
+     * `~~struck~~` or `~single~` (`markdown-dialect.md` 2).
+     *
+     * The tildes arrive as individual tokens, one per character, so the run length is half the
+     * count. Three or more tildes are not strikethrough at all under this dialect -- the parser
+     * does not produce a STRIKETHROUGH node for them -- but the count is clamped anyway, because an
+     * IR invariant that throws is a crash in an editor rather than a caught mistake.
+     */
+    private fun strikethrough(node: ASTNode): Inline {
+        val tildes = node.children.count { it.type == GFMTokenTypes.TILDE }
+
+        return Strikethrough(
+            children = lowerAll(node.children.filterNot { it.type == GFMTokenTypes.TILDE }),
+            tildeCount = (tildes / 2).coerceIn(1, 2),
             source = node.span(),
         )
     }

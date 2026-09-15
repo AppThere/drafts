@@ -5,7 +5,7 @@ import org.intellij.markdown.IElementType
 import org.intellij.markdown.MarkdownElementTypes
 import org.intellij.markdown.ast.ASTNode
 import org.intellij.markdown.ast.getTextInNode
-import org.intellij.markdown.flavours.commonmark.CommonMarkFlavourDescriptor
+import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
 import org.intellij.markdown.parser.MarkdownParser
 
 /**
@@ -19,10 +19,14 @@ import org.intellij.markdown.parser.MarkdownParser
  * definition to appear after the reference that uses it, so an href cannot be resolved in document
  * order. The second lowers the tree.
  *
- * Scope note: this is the CommonMark core. The dialect's GFM-derived extensions (tables,
- * strikethrough, linkify) and the four written for this project (footnotes, definition lists,
- * attribute syntax, and the shortcode/front-matter pre-pass) are separate tasks; the `when`
- * dispatch in [BlockLowering] and [InlineLowering] is where they attach.
+ * Scope note: CommonMark core plus the three GFM-derived extensions the dialect inherits --
+ * tables, strikethrough, and linkify with the `https` default. The four written for this project
+ * (footnotes, definition lists, attribute syntax, and the shortcode/front-matter pre-pass) are
+ * separate tasks; the `when` dispatch in [BlockLowering] and [InlineLowering] is where they attach.
+ *
+ * The GFM flavour also recognises task-list checkboxes and math, which this dialect does not
+ * include. Those lower as literal text, which is round-trip contract item 5 working as intended:
+ * unrecognised constructs are retained rather than dropped.
  */
 class MarkdownDocumentParser {
     /**
@@ -88,6 +92,6 @@ class MarkdownDocumentParser {
     }
 
     private companion object {
-        val FLAVOUR = CommonMarkFlavourDescriptor()
+        val FLAVOUR = GFMFlavourDescriptor()
     }
 }

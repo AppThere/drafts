@@ -86,6 +86,27 @@ internal class LinkLowering(
         )
     }
 
+    /**
+     * A bare URL promoted to a link by linkify (`markdown-dialect.md` 3).
+     *
+     * This is the dialect's one deliberate divergence from GFM: a bare `www.` host gets `https`
+     * prepended, following Goldmark's `linkifyProtocol` default, where GFM uses `http`. The
+     * flavour descriptor has a `makeHttpsAutoLinks` flag, but it is read only by the library's own
+     * HTML generator -- which this project never calls -- so the rule belongs here, where the href
+     * is actually derived.
+     */
+    fun linkified(node: ASTNode): Inline {
+        val text = node.text()
+        val href = if (text.startsWith(BARE_HOST_PREFIX)) HTTPS_SCHEME + text else text
+
+        return Link(
+            href = href,
+            children = listOf(Text(text)),
+            form = LinkForm.Autolink(linkified = true),
+            source = node.span(),
+        )
+    }
+
     /** `![alt](/src "title")` -- an IMAGE wraps an INLINE_LINK carrying the parts. */
     fun image(node: ASTNode): Inline {
         val link = node.child(MarkdownElementTypes.INLINE_LINK) ?: node
@@ -117,6 +138,9 @@ internal class LinkLowering(
     private fun ASTNode.child(type: IElementType): ASTNode? = children.firstOrNull { it.type == type }
 
     private companion object {
+        const val BARE_HOST_PREFIX = "www."
+        const val HTTPS_SCHEME = "https://"
+
         val BRACKETS = setOf(MarkdownTokenTypes.LBRACKET, MarkdownTokenTypes.RBRACKET)
     }
 }
