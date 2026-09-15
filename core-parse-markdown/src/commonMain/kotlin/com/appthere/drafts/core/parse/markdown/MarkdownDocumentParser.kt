@@ -1,6 +1,7 @@
 package com.appthere.drafts.core.parse.markdown
 
 import com.appthere.drafts.core.model.Document
+import com.appthere.drafts.core.model.FrontMatter
 import org.intellij.markdown.IElementType
 import org.intellij.markdown.MarkdownElementTypes
 import org.intellij.markdown.ast.ASTNode
@@ -15,9 +16,13 @@ import org.intellij.markdown.parser.MarkdownParser
  * outside sees an `ASTNode`, which is what keeps `export-pipeline.md`'s contract -- "backends
  * never see Markdown or Fountain concepts; parsers never see output concepts".
  *
- * Two passes. The first collects link reference definitions, because CommonMark allows a
- * definition to appear after the reference that uses it, so an href cannot be resolved in document
- * order. The second lowers the tree.
+ * Front matter comes off first. `markdown-dialect.md` is explicit that it has to: YAML's `---`
+ * delimiter is also CommonMark's thematic break, so a document that opens with metadata would
+ * otherwise lose it to a horizontal rule.
+ *
+ * Then two passes over the tree. The first collects link reference definitions, because CommonMark
+ * allows a definition to appear after the reference that uses it, so an href cannot be resolved in
+ * document order. The second lowers the tree.
  *
  * Scope note: CommonMark core plus the three GFM-derived extensions the dialect inherits --
  * tables, strikethrough, and linkify with the `https` default. The four written for this project
@@ -36,11 +41,38 @@ class MarkdownDocumentParser {
      * reported -- see `:core-model`'s `Offsets.kt` for why that unit.
      */
     fun parse(source: String): Document {
-        val tree = MarkdownParser(FLAVOUR).buildMarkdownTreeFromString(source)
-        val definitions = collectDefinitions(tree, source)
-        val blocks = BlockLowering(source, InlineLowering(source, definitions)).lowerAll(tree.children)
+        val frontMatter = FrontMatterExtractor.extract(source)
+        val forParser = maskFrontMatter(source, frontMatter)
 
-        return Document(blocks = blocks)
+        val tree = MarkdownParser(FLAVOUR).buildMarkdownTreeFromString(forParser)
+        val definitions = collectDefinitions(tree, forParser)
+        val blocks = BlockLowering(forParser, InlineLowering(forParser, definitions)).lowerAll(tree.children)
+
+        return Document(blocks = blocks, frontMatter = frontMatter)
+    }
+
+    /**
+     * Blanks the front matter region so the parser cannot see it, keeping the length identical.
+     *
+     * Masked rather than stripped, and masked with newlines specifically. Stripping would shift
+     * every offset in the document by the length of the front matter, so no span would index into
+     * the original string any more -- and the source spans are the whole basis of byte-preserving
+     * serialisation. Newlines are the inert choice: a run of them is blank lines, which the parser
+     * discards. Spaces would not do, because four of them start an indented code block.
+     *
+     * The serialiser needs no knowledge of any of this. The front matter sits before the first
+     * block's span, so it is copied verbatim as part of the leading gap.
+     */
+    private fun maskFrontMatter(
+        source: String,
+        frontMatter: FrontMatter?,
+    ): String {
+        val span = frontMatter?.source ?: return source
+
+        return buildString(source.length) {
+            repeat(span.endExclusive.value - span.start.value) { append('\n') }
+            append(source, span.endExclusive.value, source.length)
+        }
     }
 
     /**

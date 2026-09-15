@@ -148,6 +148,24 @@ class RoundTripTest {
     }
 
     @Test
+    fun `YAML front matter round-trips verbatim`() {
+        // The serialiser needs no knowledge of front matter: it sits before the first block's span
+        // and is copied as part of the leading gap. This test is what proves that reasoning.
+        assertRoundTrips("---\ntitle: Test\nauthor: Someone\n---\n\n# Heading\n")
+    }
+
+    @Test
+    fun `TOML front matter keeps its key order and spacing`() {
+        // markdown-dialect.md: preserved "including whitespace and key order", never normalised.
+        assertRoundTrips("+++\nzebra  =  1\nalpha=2\n\ngamma = 3\n+++\n\nBody.\n")
+    }
+
+    @Test
+    fun `JSON front matter round-trips`() {
+        assertRoundTrips("{\n  \"title\": \"Test\"\n}\n\nBody.\n")
+    }
+
+    @Test
     fun `non-ASCII content round-trips`() {
         // Offsets are UTF-16 code units; an astral-plane character is two of them. A span that
         // counted wrong would slice mid-surrogate and corrupt the text here.
