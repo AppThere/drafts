@@ -113,9 +113,18 @@ complexity:
     excludes:
       - '**/build/**'
       - '**/generated/**'
-      - '**/test/**/fixtures/**'
-      - '**/commonTest/**/*Spec*.kt'
       - '**/core-export-ooxml/**/StyleMap.kt'
+      # Test sources, matching detekt's own default for this rule and the fail config. A test class
+      # with one method per case is the rule working, not a smell -- warning about it on every test
+      # class is precisely the constant false positive that 2.1 says trains people to ignore the
+      # tool.
+      - '**/test/**'
+      - '**/androidTest/**'
+      - '**/commonTest/**'
+      - '**/jvmTest/**'
+      - '**/androidUnitTest/**'
+      - '**/androidInstrumentedTest/**'
+      - '**/iosTest/**'
 
 drafts:
   active: true

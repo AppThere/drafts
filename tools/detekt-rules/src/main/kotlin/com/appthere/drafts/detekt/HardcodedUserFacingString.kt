@@ -8,18 +8,25 @@ import io.gitlab.arturbosch.detekt.api.Issue
 import io.gitlab.arturbosch.detekt.api.Rule
 import io.gitlab.arturbosch.detekt.api.Severity
 import org.jetbrains.kotlin.psi.KtCallExpression
+import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtStringTemplateExpression
 import org.jetbrains.kotlin.psi.KtValueArgument
+import org.jetbrains.kotlin.psi.psiUtil.getStrictParentOfType
 
 /**
  * Hardcoded user-facing string (`engineering-conventions.md` 4.4, `appthere-drafts.md` 11.1).
  *
- * Fires on a string literal passed to `Text(`, or to a `contentDescription =` or title argument.
- * Those three are where user-visible text actually enters the UI, and a literal there cannot be
- * translated, cannot be adjusted for a screen reader, and cannot be changed without a rebuild.
+ * Fires on a string literal passed to `Text(`, or to a `contentDescription =` or title argument,
+ * **inside a `@Composable`**. Those are where user-visible text enters the UI, and a literal there
+ * cannot be translated, cannot be adjusted for a screen reader, and cannot be changed without a
+ * rebuild.
  *
- * Deliberately narrow. A rule that flagged every string literal in a composable would fire on test
- * tags, log keys and format specifiers, and would be suppressed everywhere within a week.
+ * Deliberately narrow, in two directions. The `@Composable` requirement is explained at the call
+ * site below -- in short, the same parameter names appear all over `:core-model` and flagging them
+ * would make the rule noise. And within a composable it looks only at the arguments that carry
+ * user-visible text, not at every literal, because test tags, log keys and format specifiers are
+ * all legitimately literal.
+ *
  * Interpolated templates are allowed through because a template that reads a resource and
  * substitutes a value -- `"$count words"` built from a resource -- is the correct pattern, and the
  * literal parts of it are the resource's problem, not this rule's.
@@ -39,6 +46,20 @@ class HardcodedUserFacingString(
 
     override fun visitCallExpression(expression: KtCallExpression) {
         super.visitCallExpression(expression)
+
+        // The whole rule is scoped to composables, and that is load-bearing rather than cautious.
+        //
+        // Without type resolution this rule sees short names only, and every name it looks for is
+        // also an ordinary parameter name elsewhere in this codebase: :core-model has
+        // `CodeBlock(text = ...)`, `Link(title = ...)`, `FootnoteRef(label = ...)` and an inline IR
+        // node called `Text`. A rule that flagged those would be suppressed within a week, and a
+        // suppressed rule catches nothing. A hardcoded *user-facing* string is by definition in UI
+        // code, so requiring a @Composable ancestor is not a narrowing of intent -- it is the
+        // intent.
+        //
+        // Checked once per call rather than per argument: it is a property of the enclosing
+        // function, not of any one argument.
+        if (!expression.isInsideComposable()) return
 
         val callee = expression.calleeExpression?.text
         val arguments = expression.valueArguments.filterIsInstance<KtValueArgument>()
@@ -62,10 +83,11 @@ class HardcodedUserFacingString(
                 ?.takeIf { !it.hasInterpolation() && it.entries.isNotEmpty() } ?: return
 
         val argumentName = argument.getArgumentName()?.asName?.asString()
-        val isPositionalTextArgument =
-            argumentName == null && callee in TEXT_COMPOSABLES && isFirstArgument
+        val isUserFacing =
+            argumentName in USER_FACING_PARAMETERS ||
+                (argumentName == null && callee in TEXT_COMPOSABLES && isFirstArgument)
 
-        if (!isPositionalTextArgument && argumentName !in USER_FACING_PARAMETERS) return
+        if (!isUserFacing) return
 
         report(
             CodeSmell(
@@ -76,6 +98,12 @@ class HardcodedUserFacingString(
         )
     }
 
+    /** True when the nearest enclosing function is annotated `@Composable`. */
+    private fun KtCallExpression.isInsideComposable(): Boolean =
+        getStrictParentOfType<KtNamedFunction>()
+            ?.annotationEntries
+            ?.any { it.shortName?.asString() == COMPOSABLE } == true
+
     private fun buildMessage(
         callee: String?,
         argumentName: String?,
@@ -85,6 +113,7 @@ class HardcodedUserFacingString(
     }
 
     private companion object {
+        const val COMPOSABLE = "Composable"
         val TEXT_COMPOSABLES = setOf("Text", "BasicText")
         val USER_FACING_PARAMETERS =
             setOf(

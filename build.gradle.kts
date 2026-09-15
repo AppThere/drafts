@@ -23,7 +23,10 @@ plugins {
 // every one of them as unused.
 //
 // So the advice is reported, not enforced, for exactly as long as the modules are empty. Phase 1
-// adds the first real code to :core-model; the severity flips to "fail" in the same change.
+// has begun filling them -- :core-model has real code now -- but the modules that *declare*
+// dependencies (:editor-*, :app-*) are still empty, so flipping to "fail" today would fail on
+// every one of them. The flip belongs in the change that gives :app-shared its composition root,
+// which is the first point at which a declared dependency is actually used.
 // This is a dated, scoped exception, not a permanent relaxation -- see the Phase 0 report.
 dependencyAnalysis {
     issues {

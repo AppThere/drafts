@@ -113,9 +113,15 @@ complexity:
     excludes:
       - '**/build/**'
       - '**/generated/**'
-      - '**/test/**/fixtures/**'
-      - '**/commonTest/**/*Spec*.kt'
       - '**/core-export-ooxml/**/StyleMap.kt'
+      # Test sources, restoring detekt's own default for this rule.
+      - '**/test/**'
+      - '**/androidTest/**'
+      - '**/commonTest/**'
+      - '**/jvmTest/**'
+      - '**/androidUnitTest/**'
+      - '**/androidInstrumentedTest/**'
+      - '**/iosTest/**'
 
 ## ---------------------------------------------------------------------------------------------
 ## 4.1 Mechanically detectable smells. "Configure detekt to fail on these. Non-negotiable."
@@ -185,9 +191,17 @@ style:
     excludes:
       - '**/build/**'
       - '**/generated/**'
-      - '**/test/**/fixtures/**'
-      - '**/commonTest/**/*Spec*.kt'
       - '**/design-system/**'
+      # Test sources, restoring detekt's own default for this rule. Overriding `excludes` replaces
+      # the default list rather than adding to it, and dropping these made every offset in an
+      # arithmetic test a "magic number" -- in a test, the number is the point.
+      - '**/test/**'
+      - '**/androidTest/**'
+      - '**/commonTest/**'
+      - '**/jvmTest/**'
+      - '**/androidUnitTest/**'
+      - '**/androidInstrumentedTest/**'
+      - '**/iosTest/**'
 
   UnusedPrivateMember:
     active: true

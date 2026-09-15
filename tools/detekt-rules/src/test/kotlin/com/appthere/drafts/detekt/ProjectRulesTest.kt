@@ -111,6 +111,65 @@ class HardcodedUserFacingStringTest {
     }
 
     @Test
+    fun `does not report a Text node outside a composable`() {
+        // :core-model's inline-text IR node is also called Text (export-pipeline.md's Document IR).
+        // Without type resolution the rule sees only the short name, so it requires a @Composable
+        // ancestor. Otherwise every parser test constructing IR would be a finding.
+        val code =
+            """
+            fun buildIr(): List<Inline> = listOf(Text("plain literal"))
+            """.trimIndent()
+
+        val findings = HardcodedUserFacingString(Config.empty).lint(code)
+
+        assertEquals(0, findings.size, "An IR node is not a UI string")
+    }
+
+    @Test
+    fun `does not report IR parameters that share a name with UI ones`() {
+        // :core-model has CodeBlock(text = ...), Link(title = ...) and FootnoteRef(label = ...).
+        // Without type resolution the rule cannot tell those from Compose parameters by name
+        // alone, which is exactly why it requires a @Composable ancestor.
+        val code =
+            """
+            fun buildIr(): List<Block> =
+                listOf(
+                    CodeBlock(text = "fun main() {}", language = "kotlin"),
+                    LinkReferenceDefinition(label = "ref", href = "/url", title = "A title"),
+                )
+            """.trimIndent()
+
+        val findings = HardcodedUserFacingString(Config.empty).lint(code)
+
+        assertEquals(0, findings.size, "IR construction is not UI text")
+    }
+
+    @Test
+    fun `does not report IR construction inside a test class member function`() {
+        // Mirrors the exact shape of a real :core-model test file, which this rule once flagged
+        // three times. Kept as a regression test: the shape (class + @Test member + calls nested
+        // in assertions and lambdas) is what the parent-walk has to see through.
+        val code =
+            """
+            class BlockTreeTest {
+                @Test
+                fun `leaves have no children`() {
+                    assertTrue(CodeBlock(text = "x").children.isEmpty())
+                }
+
+                @Test
+                fun `a code span needs at least one backtick`() {
+                    assertFailsWith<IllegalArgumentException> { CodeSpan(text = "x", backtickCount = 0) }
+                }
+            }
+            """.trimIndent()
+
+        val findings = HardcodedUserFacingString(Config.empty).lint(code)
+
+        assertEquals(0, findings.size, "Findings: ${findings.map { it.message }}")
+    }
+
+    @Test
     fun `does not report a non user-facing argument`() {
         val code =
             """

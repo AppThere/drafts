@@ -38,6 +38,16 @@ configure<KotlinMultiplatformExtension> {
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
+
+        // Without this there is no Android test source set at all, and `check` runs commonTest on
+        // the JVM target only -- which looks like passing tests and is actually one target's worth
+        // of evidence. Phase 1's acceptance asks for the conformance corpus to pass "on JVM,
+        // Android, iOS, and native", so the Android half has to be runnable before that lands.
+        //
+        // Host tests, not device tests: they run on the JVM against the Android variant, so they
+        // catch Android-specific compilation and stdlib differences without needing an emulator in
+        // CI. Instrumented tests come with the first code that needs a real device.
+        withHostTest {}
     }
 
     // Apple targets are declared unconditionally so that the build file is honest about the
