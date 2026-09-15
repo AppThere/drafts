@@ -76,6 +76,27 @@ class FrontMatterTest {
     }
 
     @Test
+    fun `a leading Hugo shortcode is not mistaken for JSON front matter`() {
+        // A real bug, found where the two features meet. `{{< figure >}}` starts with a brace and
+        // its braces balance, so brace-counting alone detected it as JSON front matter, masked it
+        // out, and left an empty document.
+        val document = parser.parse("{{< figure src=\"a.png\" >}}\n\nBody.\n")
+
+        assertNull(document.frontMatter, "A shortcode is not front matter")
+        assertTrue(document.blocks.isNotEmpty(), "The document was swallowed")
+    }
+
+    @Test
+    fun `a leading brace that is not a JSON object is not front matter`() {
+        assertNull(parser.parse("{not json at all}\n").frontMatter)
+    }
+
+    @Test
+    fun `an empty JSON object is still front matter`() {
+        assertEquals(FrontMatterFormat.JSON, requireNotNull(parser.parse("{}\n\nBody.\n").frontMatter).format)
+    }
+
+    @Test
     fun `a document with no front matter has none`() {
         assertNull(parser.parse("# Just a heading\n").frontMatter)
     }

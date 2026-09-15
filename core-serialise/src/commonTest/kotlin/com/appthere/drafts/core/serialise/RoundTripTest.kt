@@ -166,6 +166,28 @@ class RoundTripTest {
     }
 
     @Test
+    fun `shortcodes round-trip verbatim`() {
+        assertRoundTrips("{{< figure src=\"a.png\" >}}\n\nBody text.\n")
+    }
+
+    @Test
+    fun `an inline shortcode keeps the text either side of it`() {
+        assertRoundTrips("Text before {{% notice %}} and after.\n")
+    }
+
+    @Test
+    fun `a shortcode inside a code fence is not touched`() {
+        assertRoundTrips("```\n{{< figure src=\"a.png\" >}}\n```\n")
+    }
+
+    @Test
+    fun `front matter and shortcodes together round-trip`() {
+        assertRoundTrips(
+            "---\ntitle: Test\n---\n\n{{< figure src=\"a.png\" >}}\n\nProse with {{% x %}} inline.\n",
+        )
+    }
+
+    @Test
     fun `non-ASCII content round-trips`() {
         // Offsets are UTF-16 code units; an astral-plane character is two of them. A span that
         // counted wrong would slice mid-surrogate and corrupt the text here.

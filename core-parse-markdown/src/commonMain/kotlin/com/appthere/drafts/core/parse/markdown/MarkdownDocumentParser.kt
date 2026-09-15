@@ -16,6 +16,9 @@ import org.intellij.markdown.parser.MarkdownParser
  * outside sees an `ASTNode`, which is what keeps `export-pipeline.md`'s contract -- "backends
  * never see Markdown or Fountain concepts; parsers never see output concepts".
  *
+ * Shortcodes are collapsed last, after parsing rather than before it -- see [ShortcodeScanner]
+ * for why that ordering is deliberate.
+ *
  * Front matter comes off first. `markdown-dialect.md` is explicit that it has to: YAML's `---`
  * delimiter is also CommonMark's thematic break, so a document that opens with metadata would
  * otherwise lose it to a horizontal rule.
@@ -48,7 +51,10 @@ class MarkdownDocumentParser {
         val definitions = collectDefinitions(tree, forParser)
         val blocks = BlockLowering(forParser, InlineLowering(forParser, definitions)).lowerAll(tree.children)
 
-        return Document(blocks = blocks, frontMatter = frontMatter)
+        return ShortcodeRestorer.apply(
+            Document(blocks = blocks, frontMatter = frontMatter),
+            ShortcodeScanner.find(source),
+        )
     }
 
     /**

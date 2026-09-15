@@ -118,6 +118,9 @@ data class SourceSpan(
     fun overlaps(other: SourceSpan): Boolean =
         !isEmpty && !other.isEmpty && start < other.endExclusive && other.start < endExclusive
 
+    /** True when [other] lies entirely within this span. */
+    fun covers(other: SourceSpan): Boolean = other.start >= start && other.endExclusive <= endExclusive
+
     /**
      * The same span, moved by [codeUnits].
      *

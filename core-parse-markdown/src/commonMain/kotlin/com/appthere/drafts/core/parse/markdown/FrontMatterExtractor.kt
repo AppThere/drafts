@@ -37,7 +37,7 @@ internal object FrontMatterExtractor {
                 fenced(source, FrontMatterFormat.YAML)
             }
 
-            source.startsWith(FrontMatterFormat.JSON.openingDelimiter) -> {
+            looksLikeJsonObject(source) -> {
                 json(source)
             }
 
@@ -95,6 +95,25 @@ internal object FrontMatterExtractor {
 
     /** The end of the line starting at [from]: the next newline, or the end of the string. */
     private fun String.lineEndFrom(from: Int): Int = indexOf('\n', from).takeIf { it >= 0 } ?: length
+
+    /**
+     * True when the document opens with something that is actually a JSON object.
+     *
+     * A leading `{` is not enough, and assuming it was is a bug this cost real debugging to find:
+     * a Hugo shortcode at the top of a file -- `{{< figure src="a.png" >}}` -- also starts with a
+     * brace, and its braces balance. It was being detected as JSON front matter, masked out, and
+     * the whole document came back empty.
+     *
+     * So the first non-whitespace character after the brace has to be a `"` (the first key) or a
+     * closing `}` (an empty object). A shortcode's second character is another `{`, which is not
+     * valid at the start of a JSON object.
+     */
+    private fun looksLikeJsonObject(source: String): Boolean {
+        if (!source.startsWith(FrontMatterFormat.JSON.openingDelimiter)) return false
+
+        val next = source.drop(1).firstOrNull { !it.isWhitespace() }
+        return next == '"' || next == '}'
+    }
 
     /**
      * JSON front matter, where the braces are the delimiters and part of the content.
