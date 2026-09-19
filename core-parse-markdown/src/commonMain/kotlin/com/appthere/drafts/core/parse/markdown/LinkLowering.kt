@@ -30,7 +30,12 @@ internal class LinkLowering(
     /** `[text](/url "title")` */
     fun inlineLink(node: ASTNode): Inline =
         Link(
-            href = node.child(MarkdownElementTypes.LINK_DESTINATION)?.text().orEmpty(),
+            href =
+                node
+                    .child(MarkdownElementTypes.LINK_DESTINATION)
+                    ?.text()
+                    ?.stripAngles()
+                    .orEmpty(),
             children = linkTextChildren(node),
             title = node.child(MarkdownElementTypes.LINK_TITLE)?.text()?.unquote(),
             form = LinkForm.Inline,
@@ -56,6 +61,12 @@ internal class LinkLowering(
                 .orEmpty()
         val definition = definitions[normaliseLinkLabel(label)]
 
+        // CommonMark: a reference with no definition is not a link at all, it is literal text --
+        // brackets included. The CST commits to a link node before definitions are known, so the
+        // decision has to be unmade here. Returning a Link with an empty href would render `[foo]`
+        // as a link to nowhere, and strip the brackets the author actually typed.
+        if (definition == null) return Text(node.text(), node.span())
+
         val form =
             when {
                 short -> LinkForm.Shortcut(label)
@@ -67,9 +78,9 @@ internal class LinkLowering(
             }
 
         return Link(
-            href = definition?.href.orEmpty(),
-            children = if (short) lowerInlines(node.children) else linkTextChildren(node),
-            title = definition?.title,
+            href = definition.href,
+            children = if (short) labelChildren(node) else linkTextChildren(node),
+            title = definition.title,
             form = form,
             source = node.span(),
         )
@@ -109,14 +120,59 @@ internal class LinkLowering(
 
     /** `![alt](/src "title")` -- an IMAGE wraps an INLINE_LINK carrying the parts. */
     fun image(node: ASTNode): Inline {
-        val link = node.child(MarkdownElementTypes.INLINE_LINK) ?: node
+        val link =
+            node.child(MarkdownElementTypes.INLINE_LINK)
+                ?: node.child(MarkdownElementTypes.FULL_REFERENCE_LINK)
+                ?: node.child(MarkdownElementTypes.SHORT_REFERENCE_LINK)
+                ?: node
+        val reference = referenceTargetOf(link)
+
         return Image(
-            src = link.child(MarkdownElementTypes.LINK_DESTINATION)?.text().orEmpty(),
-            alt = linkTextOf(link),
-            title = link.child(MarkdownElementTypes.LINK_TITLE)?.text()?.unquote(),
+            src =
+                link.child(MarkdownElementTypes.LINK_DESTINATION)?.text()?.stripAngles()
+                    ?: reference?.href.orEmpty(),
+            alt = altTextOf(link),
+            title = link.child(MarkdownElementTypes.LINK_TITLE)?.text()?.unquote() ?: reference?.title,
             source = node.span(),
         )
     }
+
+    /** The definition an image's reference form points at, if it uses one. */
+    private fun referenceTargetOf(link: ASTNode): LinkDefinition? {
+        val label =
+            link
+                .child(MarkdownElementTypes.LINK_LABEL)
+                ?.text()
+                ?.trimBrackets()
+                ?: link.child(MarkdownElementTypes.LINK_TEXT)?.text()?.trimBrackets()
+
+        return label?.let { definitions[normaliseLinkLabel(it)] }
+    }
+
+    /**
+     * Alt text: the rendered text of the image's content, with markup removed.
+     *
+     * Not the source slice. `![foo ![bar](/url)](/url2)` has alt "foo bar" -- the nested image
+     * contributes its own alt -- and `![foo *bar*]` has alt "foo bar", without the asterisks.
+     */
+    private fun altTextOf(link: ASTNode): String {
+        val content = labelChildren(link).ifEmpty { linkTextChildren(link) }
+        return content.joinToString("") { it.altText() }
+    }
+
+    private fun Inline.altText(): String =
+        when (this) {
+            is Text -> value
+            is Image -> alt
+            else -> children.joinToString("") { it.altText() }
+        }
+
+    /** The label's own content, which for a shortcut reference is the link text. */
+    private fun labelChildren(node: ASTNode): List<Inline> =
+        node
+            .child(MarkdownElementTypes.LINK_LABEL)
+            ?.let { lowerInlines(it.children.filterNot { child -> child.type in BRACKETS }) }
+            .orEmpty()
 
     private fun linkTextChildren(node: ASTNode): List<Inline> =
         node
@@ -146,6 +202,10 @@ internal class LinkLowering(
 }
 
 private fun String.trimBrackets(): String = removePrefix("[").removeSuffix("]")
+
+/** `<...>` around a destination is a delimiter; `[link](<>)` has an empty href, not "<>". */
+private fun String.stripAngles(): String =
+    if (length >= 2 && first() == '<' && last() == '>') substring(1, length - 1) else this
 
 private fun String.unquote(): String =
     when {

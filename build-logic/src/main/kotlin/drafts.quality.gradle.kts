@@ -112,7 +112,14 @@ tasks.matching { it.name == "check" }.configureEach {
 spotless {
     kotlin {
         target("src/**/*.kt")
-        targetExclude("**/build/**", "**/generated/**", "**/resources/**")
+        targetExclude(
+            "**/build/**",
+            "**/generated/**",
+            "**/resources/**",
+            // Generated conformance corpora. engineering-conventions.md 2 exempts these by path;
+            // reformatting 4,000 lines of generated fixtures on every run is pure churn.
+            "**/fixtures/CommonMarkExamples*.kt",
+        )
         ktlint(version("ktlint"))
         trimTrailingWhitespace()
         endWithNewline()

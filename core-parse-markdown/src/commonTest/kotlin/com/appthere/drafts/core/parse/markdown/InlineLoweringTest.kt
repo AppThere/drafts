@@ -6,6 +6,7 @@ import com.appthere.drafts.core.model.EmphasisDelimiter
 import com.appthere.drafts.core.model.Image
 import com.appthere.drafts.core.model.Link
 import com.appthere.drafts.core.model.LinkForm
+import com.appthere.drafts.core.model.Paragraph
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -93,13 +94,21 @@ class InlineLoweringTest {
     }
 
     @Test
-    fun `an unresolved reference keeps its form and an empty href`() {
-        // Not an error in CommonMark. Keeping the form is what lets the serialiser write it back
-        // exactly as it was found rather than inventing a target.
-        val link = parser.parse("[text][missing]").firstInline<Link>()
+    fun `an unresolved reference stays literal text`() {
+        // CommonMark: a reference with no definition is not a link, it is text -- brackets and all.
+        // The CST commits to a link node before definitions are known, so the lowering unmakes that
+        // decision. An earlier version of this test asserted the opposite; it was wrong, and the
+        // conformance run is what showed it.
+        val document = parser.parse("[text][missing]")
 
-        assertEquals("", link.href)
-        assertEquals(LinkForm.Reference("missing"), link.form)
+        assertTrue(
+            document.blocks
+                .flatMap { it.inlinesOf() }
+                .filterIsInstance<Link>()
+                .isEmpty(),
+            "An unresolved reference must not become a link",
+        )
+        assertEquals("[text][missing]", (document.blocks.single() as Paragraph).plainText())
     }
 
     @Test

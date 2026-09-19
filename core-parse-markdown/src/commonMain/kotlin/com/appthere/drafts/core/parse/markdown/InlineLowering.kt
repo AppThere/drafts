@@ -39,7 +39,20 @@ internal class InlineLowering(
 ) {
     private val links = LinkLowering(source, definitions, ::lowerAll)
 
-    fun lowerAll(nodes: List<ASTNode>): List<Inline> = coalesceText(nodes.mapNotNull { lower(it) })
+    fun lowerAll(nodes: List<ASTNode>): List<Inline> = coalesceText(nodes.dropBreakEols().mapNotNull { lower(it) })
+
+    /**
+     * Drops the newline that follows a hard line break.
+     *
+     * `foo  \nbaz` is a HARD_LINE_BREAK *and* an EOL in the CST, because the concrete tree accounts
+     * for every character. Lowering both gives two line breaks where the author wrote one, which
+     * renders as a `<br />` followed by a stray blank line.
+     */
+    private fun List<ASTNode>.dropBreakEols(): List<ASTNode> =
+        filterIndexed { index, node ->
+            node.type != MarkdownTokenTypes.EOL ||
+                getOrNull(index - 1)?.type != MarkdownTokenTypes.HARD_LINE_BREAK
+        }
 
     private fun lower(node: ASTNode): Inline? =
         when (node.type) {

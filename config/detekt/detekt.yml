@@ -66,6 +66,7 @@ complexity:
       - '**/generated/**'
       - '**/*.g.kt'
       - '**/test/**/fixtures/**'
+      - '**/commonTest/**/fixtures/**'
       - '**/commonTest/**/*Spec*.kt'
       - '**/core-export-ooxml/**/StyleMap.kt'
 
@@ -82,6 +83,7 @@ complexity:
       - '**/generated/**'
       - '**/*.g.kt'
       - '**/test/**/fixtures/**'
+      - '**/commonTest/**/fixtures/**'
       - '**/commonTest/**/*Spec*.kt'
 
   # Parameter count 5 warn / 7 fail; constructor / type parameters 3 warn / 5 fail.
@@ -217,6 +219,7 @@ style:
       - '**/build/**'
       - '**/generated/**'
       - '**/test/**/fixtures/**'
+      - '**/commonTest/**/fixtures/**'
 
 ## ---------------------------------------------------------------------------------------------
 ## formatting (detekt-formatting)
@@ -256,6 +259,7 @@ drafts:
       - '**/generated/**'
       - '**/*.g.kt'
       - '**/test/**/fixtures/**'
+      - '**/commonTest/**/fixtures/**'
       - '**/commonTest/**/*Spec*.kt'
       - '**/core-export-ooxml/**/StyleMap.kt'
 
@@ -313,3 +317,4 @@ drafts:
       - '**/commonTest/**'
       - '**/jvmTest/**'
       - '**/test/**/fixtures/**'
+      - '**/commonTest/**/fixtures/**'
