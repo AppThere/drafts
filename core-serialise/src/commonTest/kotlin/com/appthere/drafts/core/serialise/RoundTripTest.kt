@@ -201,6 +201,26 @@ class RoundTripTest {
     }
 
     @Test
+    fun `a definition list round-trips`() {
+        assertRoundTrips("Term\n: Definition text\n")
+    }
+
+    @Test
+    fun `a loose definition list round-trips`() {
+        assertRoundTrips("Term\n\n: Definition text\n")
+    }
+
+    @Test
+    fun `heading attributes round-trip`() {
+        assertRoundTrips("## Heading text {#custom-id .highlight}\n")
+    }
+
+    @Test
+    fun `image attributes round-trip`() {
+        assertRoundTrips("![Alt](/img.png)\n{.rounded width=400}\n")
+    }
+
+    @Test
     fun `non-ASCII content round-trips`() {
         // Offsets are UTF-16 code units; an astral-plane character is two of them. A span that
         // counted wrong would slice mid-surrogate and corrupt the text here.

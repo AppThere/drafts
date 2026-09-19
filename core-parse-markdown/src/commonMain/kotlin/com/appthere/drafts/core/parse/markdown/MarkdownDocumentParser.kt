@@ -58,9 +58,14 @@ class MarkdownDocumentParser {
                 source,
             )
 
-        // Footnotes last: they lift definition blocks out of the document, and doing that before
-        // the shortcode pass would hide a shortcode sitting inside a footnote body.
-        return FootnoteRestorer.apply(withShortcodes, source)
+        // Footnotes before the structural passes: they lift definition blocks out of the document,
+        // and a `[^1]:` line would otherwise look like a definition-list definition -- both open
+        // with a colon-ish marker on their own line.
+        val withFootnotes = FootnoteRestorer.apply(withShortcodes, source)
+
+        // Definition lists restructure paragraphs, attributes read the last text run of a heading.
+        // Attributes go last so it sees headings in their final shape.
+        return AttributeRestorer.apply(DefinitionListRestorer.apply(withFootnotes))
     }
 
     /**
