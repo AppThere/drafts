@@ -35,9 +35,15 @@ internal class LinkLowering(
                     .child(MarkdownElementTypes.LINK_DESTINATION)
                     ?.text()
                     ?.stripAngles()
+                    ?.let(MarkdownText::unescape)
                     .orEmpty(),
             children = linkTextChildren(node),
-            title = node.child(MarkdownElementTypes.LINK_TITLE)?.text()?.unquote(),
+            title =
+                node
+                    .child(MarkdownElementTypes.LINK_TITLE)
+                    ?.text()
+                    ?.unquote()
+                    ?.let(MarkdownText::unescape),
             form = LinkForm.Inline,
             source = node.span(),
         )
@@ -129,10 +135,20 @@ internal class LinkLowering(
 
         return Image(
             src =
-                link.child(MarkdownElementTypes.LINK_DESTINATION)?.text()?.stripAngles()
+                link
+                    .child(MarkdownElementTypes.LINK_DESTINATION)
+                    ?.text()
+                    ?.stripAngles()
+                    ?.let(MarkdownText::unescape)
                     ?: reference?.href.orEmpty(),
             alt = altTextOf(link),
-            title = link.child(MarkdownElementTypes.LINK_TITLE)?.text()?.unquote() ?: reference?.title,
+            title =
+                link
+                    .child(MarkdownElementTypes.LINK_TITLE)
+                    ?.text()
+                    ?.unquote()
+                    ?.let(MarkdownText::unescape)
+                    ?: reference?.title,
             source = node.span(),
         )
     }

@@ -27,29 +27,42 @@ internal object ShortcodeRestorer {
     fun apply(
         document: Document,
         regions: List<ShortcodeRegion>,
+        source: String,
     ): Document =
         if (regions.isEmpty()) {
             document
         } else {
-            document.copy(blocks = document.blocks.map { restore(it, regions) })
+            document.copy(blocks = document.blocks.map { restore(it, regions, source) })
         }
 
     private fun restore(
         block: Block,
         regions: List<ShortcodeRegion>,
+        source: String,
     ): Block =
         when (block) {
             // A shortcode alone on its line parses as a paragraph whose whole extent is the
             // shortcode. That is a block-level passthrough, not inline content.
-            is Paragraph -> block.wholeRegion(regions)?.asPassthrough() ?: block.withRestoredInlines(regions)
+            is Paragraph -> {
+                block.wholeRegion(regions)?.asPassthrough()
+                    ?: block.copy(inlines = collapse(block.inlines, regions, source))
+            }
 
-            is Heading -> block.copy(inlines = collapse(block.inlines, regions))
+            is Heading -> {
+                block.copy(inlines = collapse(block.inlines, regions, source))
+            }
 
-            is BlockQuote -> block.copy(children = block.children.map { restore(it, regions) })
+            is BlockQuote -> {
+                block.copy(children = block.children.map { restore(it, regions, source) })
+            }
 
-            is ListBlock -> block.copy(items = block.items.map { item -> item.map { restore(it, regions) } })
+            is ListBlock -> {
+                block.copy(items = block.items.map { item -> item.map { restore(it, regions, source) } })
+            }
 
-            else -> block
+            else -> {
+                block
+            }
         }
 
     /** The region this block is entirely made of, if there is one. */
@@ -57,9 +70,6 @@ internal object ShortcodeRestorer {
         source?.let { span -> regions.firstOrNull { it.span == span || it.covers(span) } }
 
     private fun ShortcodeRegion.asPassthrough(): Block = RawPassthrough(text = text, origin = origin, source = span)
-
-    private fun Paragraph.withRestoredInlines(regions: List<ShortcodeRegion>): Block =
-        copy(inlines = collapse(inlines, regions))
 
     /**
      * Rewrites inline content so every shortcode becomes one opaque node.
@@ -72,6 +82,7 @@ internal object ShortcodeRestorer {
     private fun collapse(
         inlines: List<Inline>,
         regions: List<ShortcodeRegion>,
+        source: String,
     ): List<Inline> {
         val consumed = mutableSetOf<SourceSpan>()
 
@@ -84,7 +95,7 @@ internal object ShortcodeRestorer {
                 // made of its innards.
                 enclosing != null -> if (consumed.add(enclosing.span)) listOf(enclosing.raw()) else emptyList()
 
-                inline is Text && span != null -> splitAroundShortcodes(inline, span, regions, consumed)
+                inline is Text && span != null -> splitAroundShortcodes(span, regions, consumed, source)
 
                 else -> listOf(inline)
             }
@@ -94,17 +105,19 @@ internal object ShortcodeRestorer {
     /**
      * Splits a text run around the shortcodes inside it.
      *
-     * The value of a parsed [Text] is exactly its span's slice of the source, so the pieces can be
-     * cut from the value itself without going back to the document.
+     * The surviving pieces are cut from the **source**, not from the node's value. They were the
+     * same string until literal text began carrying resolved escapes and character references; a
+     * `&amp;` earlier in the paragraph now makes the value four characters shorter than its span,
+     * and slicing the value by absolute offsets would cut in the wrong place.
      */
     private fun splitAroundShortcodes(
-        text: Text,
         span: SourceSpan,
         regions: List<ShortcodeRegion>,
         consumed: MutableSet<SourceSpan>,
+        source: String,
     ): List<Inline> {
         val inside = regions.filter { span.covers(it.span) }
-        if (inside.isEmpty()) return listOf(text)
+        if (inside.isEmpty()) return listOf(sliceText(source, span))
 
         val pieces = mutableListOf<Inline>()
         var cursor = span.start.value
@@ -112,7 +125,7 @@ internal object ShortcodeRestorer {
         inside.forEach { region ->
             val regionStart = region.span.start.value
             if (regionStart > cursor) {
-                pieces.add(text.slice(span, cursor, regionStart))
+                pieces.add(sliceText(source, SourceSpan.of(cursor, regionStart)))
             }
             if (consumed.add(region.span)) {
                 pieces.add(region.raw())
@@ -121,19 +134,19 @@ internal object ShortcodeRestorer {
         }
 
         if (cursor < span.endExclusive.value) {
-            pieces.add(text.slice(span, cursor, span.endExclusive.value))
+            pieces.add(sliceText(source, SourceSpan.of(cursor, span.endExclusive.value)))
         }
         return pieces
     }
 
-    private fun Text.slice(
+    /** A text node for one span of the source, with escapes resolved as the lowering would. */
+    private fun sliceText(
+        source: String,
         span: SourceSpan,
-        from: Int,
-        to: Int,
     ): Text =
         Text(
-            value = value.substring(from - span.start.value, to - span.start.value),
-            source = SourceSpan.of(from, to),
+            value = MarkdownText.unescape(source.substring(span.start.value, span.endExclusive.value)),
+            source = span,
         )
 
     private fun ShortcodeRegion.raw(): Inline = RawInline(text, origin, span)

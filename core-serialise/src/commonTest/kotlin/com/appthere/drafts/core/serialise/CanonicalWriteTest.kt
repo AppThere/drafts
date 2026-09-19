@@ -181,6 +181,30 @@ class CanonicalWriteTest {
     }
 
     @Test
+    fun `text is re-escaped so it does not re-parse as markup`() {
+        // The IR holds semantic text: the parser resolved `\*` to `*`. Writing that back unescaped
+        // would turn the author's literal asterisks into emphasis on the next open.
+        assertWrites("""\*not emphasis\*""", Paragraph(inlines = listOf(Text("*not emphasis*"))))
+    }
+
+    @Test
+    fun `a literal backslash is written back as an escape`() {
+        assertWrites("""\\""", Paragraph(inlines = listOf(Text("""\"""))))
+    }
+
+    @Test
+    fun `an ampersand is escaped so it cannot start a character reference`() {
+        // Only the ampersand needs escaping; the rest of the text is not markup.
+        assertWrites("""\&amp;""", Paragraph(inlines = listOf(Text("&amp;"))))
+    }
+
+    @Test
+    fun `code span content is not escaped`() {
+        // Code is literal on the way in and on the way out. Escaping it would corrupt the sample.
+        assertWrites("""`\!`""", Paragraph(inlines = listOf(CodeSpan(text = """\!"""))))
+    }
+
+    @Test
     fun `blocks are separated by a blank line`() {
         val document =
             Document(blocks = listOf(Heading(level = 1, inlines = listOf(Text("T"))), paragraph("Body")))

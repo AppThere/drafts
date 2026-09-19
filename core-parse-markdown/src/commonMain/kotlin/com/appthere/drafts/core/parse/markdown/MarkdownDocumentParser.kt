@@ -55,6 +55,7 @@ class MarkdownDocumentParser {
             ShortcodeRestorer.apply(
                 Document(blocks = blocks, frontMatter = frontMatter),
                 ShortcodeScanner.find(source),
+                source,
             )
 
         // Footnotes last: they lift definition blocks out of the document, and doing that before
@@ -129,8 +130,11 @@ class MarkdownDocumentParser {
 
         return LinkDefinition(
             label = normaliseLinkLabel(label.removePrefix("[").removeSuffix("]")),
-            href = href,
-            title = childText(MarkdownElementTypes.LINK_TITLE)?.trim('"', '\'', '(', ')'),
+            href = MarkdownText.unescape(href.removeSurrounding("<", ">")),
+            title =
+                childText(MarkdownElementTypes.LINK_TITLE)
+                    ?.trim('"', '\'', '(', ')')
+                    ?.let(MarkdownText::unescape),
         )
     }
 

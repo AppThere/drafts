@@ -127,7 +127,7 @@ class CommonMarkSpecTest {
          * `intellij-markdown` performs when generating HTML rather than in the tree, so the work
          * has to happen in our lowering.
          */
-        const val CONFORMANCE_FLOOR = 437
+        const val CONFORMANCE_FLOOR = 463
         const val SAMPLE_SIZE = 2
         const val TRUNCATE = 120
         const val PERCENT = 100

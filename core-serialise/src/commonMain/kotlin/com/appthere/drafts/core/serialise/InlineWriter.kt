@@ -28,7 +28,7 @@ internal class InlineWriter {
 
     private fun write(inline: Inline): String =
         when (inline) {
-            is Text -> inline.value
+            is Text -> escape(inline.value)
             is Emphasis -> emphasis(inline)
             is Strikethrough -> strikethrough(inline)
             is CodeSpan -> codeSpan(inline)
@@ -37,6 +37,32 @@ internal class InlineWriter {
             is LineBreak -> if (inline.hard) HARD_BREAK else "\n"
             is RawInline -> inline.text
             else -> ""
+        }
+
+    /**
+     * Puts back the backslashes the lowering took out.
+     *
+     * [com.appthere.drafts.core.model.Text] holds *semantic* text: the parser resolved `\!` to `!`
+     * and `&amp;` to `&`, because that is what a backend needs. Writing that straight back out
+     * would re-parse as markup -- an asterisk the author escaped would become emphasis, and their
+     * sentence would change meaning on a save.
+     *
+     * Only the canonical path goes through here. A block that still has its source span is
+     * re-emitted byte for byte and never reaches this function, so ordinary prose is unaffected by
+     * how conservative this is.
+     *
+     * Conservative is what it is: every occurrence of a markup character is escaped, whether or not
+     * it would actually have been read as markup. That never changes meaning, and it can produce a
+     * backslash the author did not write -- in an edited block only. Narrowing it means deciding
+     * whether a given character would re-parse as markup in its exact context, which is a question
+     * only the parser can answer.
+     */
+    private fun escape(value: String): String =
+        buildString(value.length) {
+            value.forEach { char ->
+                if (char in MARKUP) append('\\')
+                append(char)
+            }
         }
 
     private fun emphasis(node: Emphasis): String {
@@ -75,5 +101,8 @@ internal class InlineWriter {
     private companion object {
         /** Two trailing spaces. The backslash form is equally valid; this one is the default. */
         const val HARD_BREAK = "  \n"
+
+        /** Characters that begin markup, and so change meaning if written unescaped. */
+        val MARKUP = charArrayOf('\\', '*', '_', '[', ']', '`', '<', '>', '&', '~').toSet()
     }
 }

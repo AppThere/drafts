@@ -41,14 +41,14 @@ internal object FootnoteRestorer {
             if (marker == null) {
                 remaining.add(block)
             } else {
-                definitions[marker.label] = listOf(block.bodyAfter(marker.markerEnd))
+                definitions[marker.label] = listOf(block.bodyAfter(marker.markerEnd, source))
             }
         }
 
         val references = FootnoteScanner.references(source, markers)
 
         return document.copy(
-            blocks = remaining.map { it.withReferences(references, definitions.keys) },
+            blocks = remaining.map { it.withReferences(references, definitions.keys, source) },
             footnotes = orderByFirstReference(definitions, references),
         )
     }
@@ -59,52 +59,52 @@ internal object FootnoteRestorer {
      * The marker is part of the paragraph the parser built, so it has to come off the front of the
      * inline content -- leaving the body, with its spans still pointing where they did.
      */
-    private fun Block.bodyAfter(markerEnd: Int): Block =
+    private fun Block.bodyAfter(
+        markerEnd: Int,
+        source: String,
+    ): Block =
         when (this) {
-            is Paragraph -> copy(inlines = inlines.dropBefore(markerEnd))
+            is Paragraph -> copy(inlines = inlines.dropBefore(markerEnd, source))
             else -> this
         }
 
     /**
      * Drops inline content lying before [offset], trimming the node that straddles it.
      *
-     * A parsed [Text] value is exactly its span's slice of the source, so the surviving part can be
-     * cut from the value without consulting the document.
+     * The surviving part is cut from the **source**, not from the node's value. The two were the
+     * same string until literal text began carrying resolved escapes and character references, and
+     * a value shortened by an earlier `&amp;` would be sliced in the wrong place.
      */
-    private fun List<Inline>.dropBefore(offset: Int): List<Inline> =
+    private fun List<Inline>.dropBefore(
+        offset: Int,
+        source: String,
+    ): List<Inline> =
         mapNotNull { inline ->
             val span = inline.source
             when {
                 span == null || span.start.value >= offset -> inline
                 span.endExclusive.value <= offset -> null
-                inline is Text -> inline.tail(span, offset)
+                inline is Text -> sliceText(source, SourceSpan.of(offset, span.endExclusive.value))
                 else -> inline
             }
         }
-
-    private fun Text.tail(
-        span: SourceSpan,
-        offset: Int,
-    ): Text =
-        Text(
-            value = value.substring(offset - span.start.value),
-            source = SourceSpan.of(offset, span.endExclusive.value),
-        )
 
     /** Replaces the inline nodes covering each reference with a [FootnoteRef]. */
     private fun Block.withReferences(
         references: List<FootnoteReference>,
         defined: Set<String>,
+        source: String,
     ): Block =
         when (this) {
-            is Paragraph -> copy(inlines = inlines.replaceReferences(references, defined))
-            is Heading -> copy(inlines = inlines.replaceReferences(references, defined))
+            is Paragraph -> copy(inlines = inlines.replaceReferences(references, defined, source))
+            is Heading -> copy(inlines = inlines.replaceReferences(references, defined, source))
             else -> this
         }
 
     private fun List<Inline>.replaceReferences(
         references: List<FootnoteReference>,
         defined: Set<String>,
+        source: String,
     ): List<Inline> {
         // An undefined label stays literal text, so only defined references are candidates.
         val live = references.filter { it.label in defined }
@@ -122,7 +122,7 @@ internal object FootnoteRestorer {
                 }
 
                 inline is Text && span != null -> {
-                    inline.splitAround(span, live, consumed)
+                    splitAround(span, live, consumed, source)
                 }
 
                 else -> {
@@ -132,36 +132,39 @@ internal object FootnoteRestorer {
         }
     }
 
-    private fun Text.splitAround(
+    private fun splitAround(
         span: SourceSpan,
         references: List<FootnoteReference>,
         consumed: MutableSet<SourceSpan>,
+        source: String,
     ): List<Inline> {
         val inside = references.filter { span.covers(it.span) }
-        if (inside.isEmpty()) return listOf(this)
+        if (inside.isEmpty()) return listOf(sliceText(source, span))
 
         val pieces = mutableListOf<Inline>()
         var cursor = span.start.value
 
         inside.forEach { reference ->
             val start = reference.span.start.value
-            if (start > cursor) pieces.add(slice(span, cursor, start))
+            if (start > cursor) pieces.add(sliceText(source, SourceSpan.of(cursor, start)))
             if (consumed.add(reference.span)) pieces.add(reference.ref())
             cursor = reference.span.endExclusive.value
         }
 
-        if (cursor < span.endExclusive.value) pieces.add(slice(span, cursor, span.endExclusive.value))
+        if (cursor < span.endExclusive.value) {
+            pieces.add(sliceText(source, SourceSpan.of(cursor, span.endExclusive.value)))
+        }
         return pieces
     }
 
-    private fun Text.slice(
+    /** A text node for one span of the source, with escapes resolved as the lowering would. */
+    private fun sliceText(
+        source: String,
         span: SourceSpan,
-        from: Int,
-        to: Int,
     ): Text =
         Text(
-            value = value.substring(from - span.start.value, to - span.start.value),
-            source = SourceSpan.of(from, to),
+            value = MarkdownText.unescape(source.substring(span.start.value, span.endExclusive.value)),
+            source = span,
         )
 
     private fun FootnoteReference.ref(): Inline = FootnoteRef(label, span)

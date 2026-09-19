@@ -80,7 +80,8 @@ internal class InlineLowering(
      * contract item 5: "anything the parser doesn't recognise is retained as literal text rather
      * than dropped."
      */
-    private fun literal(node: ASTNode): Inline? = node.text().takeIf { it.isNotEmpty() }?.let { Text(it, node.span()) }
+    private fun literal(node: ASTNode): Inline? =
+        node.text().takeIf { it.isNotEmpty() }?.let { Text(MarkdownText.unescape(it), node.span()) }
 
     private fun emphasis(
         node: ASTNode,
