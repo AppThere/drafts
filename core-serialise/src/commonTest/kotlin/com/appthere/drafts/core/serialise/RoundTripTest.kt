@@ -188,6 +188,19 @@ class RoundTripTest {
     }
 
     @Test
+    fun `footnotes round-trip even though definitions leave the block list`() {
+        // The definitions are lifted into Document.footnotes, so their source region becomes a gap
+        // between blocks -- and gaps are copied verbatim. This test is what proves that removing
+        // them costs nothing on the way back out.
+        assertRoundTrips("Text with a ref.[^1]\n\n[^1]: The footnote body.\n")
+    }
+
+    @Test
+    fun `an unreferenced footnote definition still round-trips`() {
+        assertRoundTrips("Just prose.\n\n[^unused]: Nobody points here.\n")
+    }
+
+    @Test
     fun `non-ASCII content round-trips`() {
         // Offsets are UTF-16 code units; an astral-plane character is two of them. A span that
         // counted wrong would slice mid-surrogate and corrupt the text here.

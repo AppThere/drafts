@@ -51,10 +51,15 @@ class MarkdownDocumentParser {
         val definitions = collectDefinitions(tree, forParser)
         val blocks = BlockLowering(forParser, InlineLowering(forParser, definitions)).lowerAll(tree.children)
 
-        return ShortcodeRestorer.apply(
-            Document(blocks = blocks, frontMatter = frontMatter),
-            ShortcodeScanner.find(source),
-        )
+        val withShortcodes =
+            ShortcodeRestorer.apply(
+                Document(blocks = blocks, frontMatter = frontMatter),
+                ShortcodeScanner.find(source),
+            )
+
+        // Footnotes last: they lift definition blocks out of the document, and doing that before
+        // the shortcode pass would hide a shortcode sitting inside a footnote body.
+        return FootnoteRestorer.apply(withShortcodes, source)
     }
 
     /**
