@@ -3,6 +3,7 @@ package com.appthere.drafts.core.parse.markdown
 import com.appthere.drafts.core.model.Align
 import com.appthere.drafts.core.model.Link
 import com.appthere.drafts.core.model.LinkForm
+import com.appthere.drafts.core.model.Paragraph
 import com.appthere.drafts.core.model.Strikethrough
 import com.appthere.drafts.core.model.Table
 import kotlin.test.Test
@@ -78,42 +79,48 @@ class GfmExtensionTest {
     }
 
     @Test
-    fun `single tilde strikethrough is not recognised -- known divergence from the dialect`() {
-        // markdown-dialect.md 2: "Single and double tilde both produce strikethrough." This does
-        // not hold with intellij-markdown 0.7.13, and the failure is inconsistent rather than
-        // absent:
-        //
-        //   ~single~        -> not strikethrough
-        //   a ~single~ b    -> not strikethrough
-        //   ~~a~~ and ~b~   -> BOTH are strikethrough
-        //
-        // So a single-tilde run is only recognised once a double-tilde run has appeared earlier in
-        // the same paragraph. GFM itself specifies only `~~`, so the library is arguably right and
-        // the dialect is asking for more -- but that third case is inconsistent under any reading.
-        //
-        // This test asserts what actually happens, so the divergence is visible rather than
-        // forgotten. It will fail if upstream changes, which is the point: that is a signal to
-        // revisit, not a regression. See the Phase 1 report -- this needs a decision, either to
-        // amend the spec or to write a delimiter parser alongside the other custom extensions.
-        val alone = parser.parse("~single~").blocks.flatMap { it.inlinesOf() }
+    fun `single tilde strikethrough is recognised`() {
+        // gfm.md 3: "One or two tildes: `~text~` or `~~text~~`." markdown-dialect.md 2 agrees, and
+        // so does Hugo via Goldmark. intellij-markdown is the one that does not -- it produces a
+        // single-tilde run only after a double-tilde run has appeared in the same paragraph -- so
+        // this dialect finds them itself.
+        val struck = parser.parse("~single~").firstInline<Strikethrough>()
 
-        assertTrue(
-            alone.filterIsInstance<Strikethrough>().isEmpty(),
-            "Upstream now recognises a lone single-tilde run. Revisit the dialect divergence.",
-        )
+        assertEquals(1, struck.tildeCount)
+        assertEquals("single", struck.children.plainText())
     }
 
     @Test
-    fun `single tilde is recognised after a double tilde in the same paragraph`() {
-        // The inconsistent half of the divergence above, pinned so it cannot change unnoticed.
+    fun `single tilde works mid-sentence`() {
+        val struck = parser.parse("a ~single~ b").firstInline<Strikethrough>()
+
+        assertEquals("single", struck.children.plainText())
+    }
+
+    @Test
+    fun `text either side of a single tilde run survives`() {
+        val paragraph = parser.parse("before ~struck~ after").blocks.single() as Paragraph
+
+        val rendered =
+            paragraph.inlines.joinToString("") { inline ->
+                if (inline is Strikethrough) "<del>" else listOf(inline).plainText()
+            }
+
+        assertEquals("before <del> after", rendered)
+    }
+
+    @Test
+    fun `a tilde with spaces inside is not strikethrough`() {
+        // Approximated flanking: an opening tilde must be followed by a non-space and a closing one
+        // preceded by a non-space.
         val struck =
             parser
-                .parse("~~a~~ and ~b~")
+                .parse("~ spaced ~")
                 .blocks
                 .flatMap { it.inlinesOf() }
                 .filterIsInstance<Strikethrough>()
 
-        assertEquals(listOf(2, 1), struck.map { it.tildeCount })
+        assertTrue(struck.isEmpty())
     }
 
     @Test

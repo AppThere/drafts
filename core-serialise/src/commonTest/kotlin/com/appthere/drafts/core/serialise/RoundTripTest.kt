@@ -221,6 +221,21 @@ class RoundTripTest {
     }
 
     @Test
+    fun `a multi-paragraph footnote round-trips`() {
+        assertRoundTrips("Ref.[^1]\n\n[^1]: First paragraph.\n\n    Second paragraph.\n")
+    }
+
+    @Test
+    fun `single tilde strikethrough round-trips`() {
+        assertRoundTrips("Some ~single~ and some ~~double~~ strikethrough.\n")
+    }
+
+    @Test
+    fun `a paired shortcode round-trips`() {
+        assertRoundTrips("{{% note %}}\nSome *emphasis* here.\n{{% /note %}}\n")
+    }
+
+    @Test
     fun `non-ASCII content round-trips`() {
         // Offsets are UTF-16 code units; an astral-plane character is two of them. A span that
         // counted wrong would slice mid-surrogate and corrupt the text here.

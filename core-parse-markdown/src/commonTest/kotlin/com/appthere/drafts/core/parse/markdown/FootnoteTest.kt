@@ -1,6 +1,8 @@
 package com.appthere.drafts.core.parse.markdown
 
+import com.appthere.drafts.core.model.CodeBlock
 import com.appthere.drafts.core.model.FootnoteRef
+import com.appthere.drafts.core.model.ListBlock
 import com.appthere.drafts.core.model.Paragraph
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -158,6 +160,70 @@ class FootnoteTest {
                 .isEmpty(),
         )
         assertTrue((document.blocks.single() as Paragraph).plainText().contains("^[footnote]"))
+    }
+
+    @Test
+    fun `a multi-paragraph body becomes several blocks`() {
+        // markdown-dialect.md 4: "Definition bodies may contain block content when continuation
+        // lines are indented." The indentation is what marks continuation -- CommonMark would
+        // otherwise read it as a code block, which is exactly what used to happen here.
+        val document =
+            parser.parse("Ref.[^1]\n\n[^1]: First paragraph.\n\n    Second paragraph.\n")
+
+        val body = document.footnotes.getValue("1")
+        assertEquals(2, body.size, "Expected two blocks, got: $body")
+        assertEquals("First paragraph.", (body[0] as Paragraph).plainText())
+        assertEquals("Second paragraph.", (body[1] as Paragraph).plainText())
+    }
+
+    @Test
+    fun `an indented continuation is not a code block`() {
+        val document = parser.parse("Ref.[^1]\n\n[^1]: Body.\n\n    More body.\n")
+
+        assertTrue(
+            document.footnotes.getValue("1").none { it is CodeBlock },
+            "Continuation lines were read as code: ${document.footnotes.getValue("1")}",
+        )
+    }
+
+    @Test
+    fun `a footnote body may contain block structure`() {
+        val document =
+            parser.parse("Ref.[^1]\n\n[^1]: Intro.\n\n    - one\n    - two\n")
+
+        val body = document.footnotes.getValue("1")
+        assertTrue(
+            body.any { it is ListBlock },
+            "Expected a list inside the footnote body, got: $body",
+        )
+    }
+
+    @Test
+    fun `a footnote body keeps inline markup`() {
+        val document = parser.parse("Ref.[^1]\n\n[^1]: Some *emphasis* here.\n")
+
+        assertEquals("Some emphasis here.", (document.footnotes.getValue("1").single() as Paragraph).plainText())
+    }
+
+    @Test
+    fun `footnote body spans point into the original document`() {
+        // The body is parsed dedented, on its own, so its offsets index that extracted string. They
+        // are mapped back -- otherwise they would be quietly wrong rather than obviously broken.
+        val source = "Ref.[^1]\n\n[^1]: First paragraph.\n\n    Second paragraph.\n"
+        val body = parser.parse(source).footnotes.getValue("1")
+
+        val second = requireNotNull((body[1] as Paragraph).source)
+        assertTrue(
+            source.substring(second.start.value, second.endExclusive.value).contains("Second paragraph"),
+            "Span pointed at: '${source.substring(second.start.value, second.endExclusive.value)}'",
+        )
+    }
+
+    @Test
+    fun `the document body does not contain the footnote definition`() {
+        val document = parser.parse("Prose.[^1]\n\n[^1]: Footnote.\n\n    Continued.\n")
+
+        assertEquals(1, document.blocks.size, "Definition leaked into the document: ${document.blocks}")
     }
 
     @Test

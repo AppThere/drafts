@@ -22,16 +22,19 @@ internal data class ShortcodeRegion(
 /**
  * Finds the shortcodes in a document.
  *
- * Deliberately a scan over the raw source rather than a masking pre-pass. Masking -- substituting
- * inert characters of the same length before parsing -- is the obvious implementation of
- * "tokenised before parsing" and it has a sharp edge: a code fence containing shortcode syntax
- * would come back with the mask characters in its text, because a code block's text is read from
- * whatever string the parser saw.
+ * `hugo-markdown.md` describes Hugo's pipeline: shortcodes are extracted *before* Goldmark sees the
+ * text, replaced with placeholder tokens, and substituted back afterwards -- "if you're building an
+ * editor, mirror this: treat shortcodes as opaque atomic spans."
  *
- * Scanning afterwards avoids that entirely. The parser sees the real document, code blocks keep
- * their real contents, and the shortcode regions are collapsed into opaque nodes once parsing is
- * done. What the parser makes of the shortcode's *innards* in the meantime does not matter,
- * because [ShortcodeRestorer] discards those nodes wholesale.
+ * Mirrored by scanning the source and collapsing the nodes that cover each region, rather than by
+ * masking before the parse. The two differ only in what the parser makes of a shortcode's innards
+ * in the meantime, and [ShortcodeRestorer] discards those nodes wholesale either way.
+ *
+ * **Known divergence from Hugo, inside code.** Hugo extracts shortcodes everywhere, code fences
+ * included -- which is why a Hugo author has to escape one to show it literally. This parser leaves
+ * the contents of a code block alone, because `CodeBlock.text` is a string and cannot hold an
+ * opaque span. For an editor that is the right thing to display: the author sees what they typed.
+ * It will matter when export exists, and Phase 10 is where the two have to be reconciled.
  */
 internal object ShortcodeScanner {
     fun find(source: String): List<ShortcodeRegion> =

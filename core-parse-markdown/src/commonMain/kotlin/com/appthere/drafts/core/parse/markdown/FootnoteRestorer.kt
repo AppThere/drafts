@@ -25,69 +25,31 @@ import com.appthere.drafts.core.model.Text
  *   as the parser produced it, rather than becoming a [FootnoteRef] pointing at nothing.
  */
 internal object FootnoteRestorer {
+    /**
+     * @param parseBody parses a footnote body. Supplied by [MarkdownDocumentParser] rather than
+     *   constructed here: a body is an ordinary block sequence and deserves the whole pipeline --
+     *   emphasis, lists, even nested shortcodes -- not a reduced copy of it.
+     */
     fun apply(
         document: Document,
         source: String,
+        definitions: List<FootnoteDefinition>,
+        parseBody: (String) -> List<Block>,
     ): Document {
-        val markers = FootnoteScanner.definitions(source)
-        if (markers.isEmpty()) return document
+        if (definitions.isEmpty()) return document
 
-        val bodies = markers.associateBy { it.start }
-        val remaining = mutableListOf<Block>()
-        val definitions = mutableMapOf<String, List<Block>>()
-
-        document.blocks.forEach { block ->
-            val marker = block.source?.let { bodies[it.start.value] }
-            if (marker == null) {
-                remaining.add(block)
-            } else {
-                definitions[marker.label] = listOf(block.bodyAfter(marker.markerEnd, source))
+        val bodies =
+            definitions.associate { definition ->
+                definition.label to SpanRemapper.remap(parseBody(definition.body.text), definition.body)
             }
-        }
 
-        val references = FootnoteScanner.references(source, markers)
+        val references = FootnoteScanner.references(source, definitions.map { it.span.start.value })
 
         return document.copy(
-            blocks = remaining.map { it.withReferences(references, definitions.keys, source) },
-            footnotes = orderByFirstReference(definitions, references),
+            blocks = document.blocks.map { it.withReferences(references, bodies.keys, source) },
+            footnotes = orderByFirstReference(bodies, references),
         )
     }
-
-    /**
-     * The definition block with its `[^label]:` marker removed.
-     *
-     * The marker is part of the paragraph the parser built, so it has to come off the front of the
-     * inline content -- leaving the body, with its spans still pointing where they did.
-     */
-    private fun Block.bodyAfter(
-        markerEnd: Int,
-        source: String,
-    ): Block =
-        when (this) {
-            is Paragraph -> copy(inlines = inlines.dropBefore(markerEnd, source))
-            else -> this
-        }
-
-    /**
-     * Drops inline content lying before [offset], trimming the node that straddles it.
-     *
-     * The surviving part is cut from the **source**, not from the node's value. The two were the
-     * same string until literal text began carrying resolved escapes and character references, and
-     * a value shortened by an earlier `&amp;` would be sliced in the wrong place.
-     */
-    private fun List<Inline>.dropBefore(
-        offset: Int,
-        source: String,
-    ): List<Inline> =
-        mapNotNull { inline ->
-            val span = inline.source
-            when {
-                span == null || span.start.value >= offset -> inline
-                span.endExclusive.value <= offset -> null
-                inline is Text -> sliceText(source, SourceSpan.of(offset, span.endExclusive.value))
-                else -> inline
-            }
-        }
 
     /** Replaces the inline nodes covering each reference with a [FootnoteRef]. */
     private fun Block.withReferences(

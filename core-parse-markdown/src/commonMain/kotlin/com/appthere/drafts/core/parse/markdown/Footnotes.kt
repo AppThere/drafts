@@ -2,18 +2,6 @@ package com.appthere.drafts.core.parse.markdown
 
 import com.appthere.drafts.core.model.SourceSpan
 
-/**
- * A `[^label]:` definition found in the source.
- *
- * @param markerEnd offset of the first character after `[^label]:` and its trailing space, which is
- *   where the footnote's own content begins.
- */
-internal data class FootnoteDefinitionMarker(
-    val label: String,
-    val start: Int,
-    val markerEnd: Int,
-)
-
 /** A `[^label]` reference found in the source. */
 internal data class FootnoteReference(
     val label: String,
@@ -34,18 +22,6 @@ internal data class FootnoteReference(
  * scanning the source instead, and whichever IR nodes cover them are replaced.
  */
 internal object FootnoteScanner {
-    /** Definition markers, in document order. */
-    fun definitions(source: String): List<FootnoteDefinitionMarker> =
-        definitionLine
-            .findAll(source)
-            .map { match ->
-                FootnoteDefinitionMarker(
-                    label = normaliseLinkLabel(match.groupValues[LABEL_GROUP]),
-                    start = match.range.first,
-                    markerEnd = match.range.last + 1,
-                )
-            }.toList()
-
     /**
      * References, excluding the `[^label]` that opens a definition.
      *
@@ -54,13 +30,13 @@ internal object FootnoteScanner {
      */
     fun references(
         source: String,
-        definitions: List<FootnoteDefinitionMarker>,
+        definitionStarts: List<Int>,
     ): List<FootnoteReference> {
-        val definitionStarts = definitions.map { it.start }.toSet()
+        val starts = definitionStarts.toSet()
 
         return reference
             .findAll(source)
-            .filterNot { match -> definitionStarts.any { it == match.range.first || it == match.range.first - 1 } }
+            .filterNot { match -> starts.any { it == match.range.first || it == match.range.first - 1 } }
             .map { match ->
                 FootnoteReference(
                     label = normaliseLinkLabel(match.groupValues[LABEL_GROUP]),
@@ -71,14 +47,6 @@ internal object FootnoteScanner {
 
     private const val LABEL_GROUP = 1
 }
-
-/**
- * `[^label]:` at the start of a line, plus the whitespace after it.
- *
- * Up to three leading spaces, matching CommonMark's tolerance elsewhere; four would be an indented
- * code block. The match covers only the marker, so the body begins where the match ends.
- */
-private val definitionLine = Regex("""(?m)^ {0,3}\[\^([^\]\s]+)\]:[ \t]*""")
 
 /** `[^label]`, the reference form. Labels may not contain whitespace or a closing bracket. */
 private val reference = Regex("""\[\^([^\]\s]+)\]""")

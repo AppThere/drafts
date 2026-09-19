@@ -1,7 +1,7 @@
 package com.appthere.drafts.core.parse.markdown
 
 import com.appthere.drafts.core.model.Document
-import com.appthere.drafts.core.model.FrontMatter
+import com.appthere.drafts.core.model.SourceSpan
 import org.intellij.markdown.IElementType
 import org.intellij.markdown.MarkdownElementTypes
 import org.intellij.markdown.ast.ASTNode
@@ -45,7 +45,12 @@ class MarkdownDocumentParser {
      */
     fun parse(source: String): Document {
         val frontMatter = FrontMatterExtractor.extract(source)
-        val forParser = maskFrontMatter(source, frontMatter)
+        val footnotes = FootnoteBodyScanner.findAll(source)
+
+        // Footnote definitions are masked along with the front matter, for the same reason: their
+        // indented continuation lines would otherwise parse as code blocks in the middle of the
+        // document. Masked, not removed, so every offset outside them still indexes the original.
+        val forParser = maskRegions(source, listOfNotNull(frontMatter?.source) + footnotes.map { it.span })
 
         val tree = MarkdownParser(FLAVOUR).buildMarkdownTreeFromString(forParser)
         val definitions = collectDefinitions(tree, forParser)
@@ -58,46 +63,26 @@ class MarkdownDocumentParser {
                 source,
             )
 
-        // Footnotes before the structural passes: they lift definition blocks out of the document,
-        // and a `[^1]:` line would otherwise look like a definition-list definition -- both open
-        // with a colon-ish marker on their own line.
-        val withFootnotes = FootnoteRestorer.apply(withShortcodes, source)
+        // Footnotes before the structural passes: a `[^1]:` line would otherwise look like a
+        // definition-list definition, both opening with a colon-ish marker on their own line.
+        val withFootnotes =
+            FootnoteRestorer.apply(withShortcodes, source, footnotes) { body -> parse(body).blocks }
+
+        // Single-tilde strikethrough, which the library does not produce. Before the structural
+        // passes so a struck term in a definition list is still a term.
+        val withStrikethrough = StrikethroughRestorer.apply(withFootnotes, source)
 
         // Definition lists restructure paragraphs, attributes read the last text run of a heading.
         // Attributes go last so it sees headings in their final shape.
-        return AttributeRestorer.apply(DefinitionListRestorer.apply(withFootnotes))
-    }
-
-    /**
-     * Blanks the front matter region so the parser cannot see it, keeping the length identical.
-     *
-     * Masked rather than stripped, and masked with newlines specifically. Stripping would shift
-     * every offset in the document by the length of the front matter, so no span would index into
-     * the original string any more -- and the source spans are the whole basis of byte-preserving
-     * serialisation. Newlines are the inert choice: a run of them is blank lines, which the parser
-     * discards. Spaces would not do, because four of them start an indented code block.
-     *
-     * The serialiser needs no knowledge of any of this. The front matter sits before the first
-     * block's span, so it is copied verbatim as part of the leading gap.
-     */
-    private fun maskFrontMatter(
-        source: String,
-        frontMatter: FrontMatter?,
-    ): String {
-        val span = frontMatter?.source ?: return source
-
-        return buildString(source.length) {
-            repeat(span.endExclusive.value - span.start.value) { append('\n') }
-            append(source, span.endExclusive.value, source.length)
-        }
+        return AttributeRestorer.apply(DefinitionListRestorer.apply(withStrikethrough))
     }
 
     /**
      * Walks the whole tree for `[label]: /url "title"`.
      *
-     * Definitions nest -- one can sit inside a block quote or a list item -- so this recurses
-     * rather than reading only the top level. Later definitions do not overwrite earlier ones:
-     * CommonMark says the first definition of a label wins.
+     * Definitions nest -- one can sit inside a block quote or a list item -- so this recurses rather
+     * than reading only the top level. Later definitions do not overwrite earlier ones: CommonMark
+     * says the first definition of a label wins.
      */
     private fun collectDefinitions(
         node: ASTNode,
@@ -109,7 +94,6 @@ class MarkdownDocumentParser {
             .descendants()
             .filter { it.type == MarkdownElementTypes.LINK_DEFINITION }
             .mapNotNull { definitionOf(it, source) }
-            // First definition of a label wins, per CommonMark.
             .forEach { definition -> collected.getOrPut(definition.label) { definition } }
 
         return collected
@@ -141,6 +125,44 @@ class MarkdownDocumentParser {
                     ?.trim('"', '\'', '(', ')')
                     ?.let(MarkdownText::unescape),
         )
+    }
+
+    /**
+     * Blanks a region so the parser cannot see it, keeping the length identical.
+     *
+     * Masked rather than stripped, and masked with newlines specifically. Stripping would shift
+     * every offset in the document by the length of the front matter, so no span would index into
+     * the original string any more -- and the source spans are the whole basis of byte-preserving
+     * serialisation. Newlines are the inert choice: a run of them is blank lines, which the parser
+     * discards. Spaces would not do, because four of them start an indented code block.
+     *
+     * The serialiser needs no knowledge of any of this. The front matter sits before the first
+     * block's span, so it is copied verbatim as part of the leading gap.
+     */
+    private fun maskRegions(
+        source: String,
+        regions: List<SourceSpan>,
+    ): String {
+        if (regions.isEmpty()) return source
+
+        val masked = StringBuilder(source)
+        regions.forEach { span -> masked.blank(span) }
+        return masked.toString()
+    }
+
+    /**
+     * Replaces a region with newlines, keeping its length.
+     *
+     * Newlines specifically: a run of them is blank lines, which the parser discards. Spaces would
+     * not do, because four of them start an indented code block.
+     *
+     * `set`, not the deprecated `setCharAt` -- Kotlin/Native treats that deprecation as an error, so
+     * the JVM target compiled it happily and iOS did not.
+     */
+    private fun StringBuilder.blank(span: SourceSpan) {
+        for (index in span.start.value until minOf(span.endExclusive.value, length)) {
+            if (this[index] != '\n') this[index] = '\n'
+        }
     }
 
     private companion object {

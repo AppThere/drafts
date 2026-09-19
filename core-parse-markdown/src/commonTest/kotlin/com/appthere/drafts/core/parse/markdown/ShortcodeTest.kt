@@ -1,6 +1,7 @@
 package com.appthere.drafts.core.parse.markdown
 
 import com.appthere.drafts.core.model.CodeBlock
+import com.appthere.drafts.core.model.Emphasis
 import com.appthere.drafts.core.model.Origin
 import com.appthere.drafts.core.model.Paragraph
 import com.appthere.drafts.core.model.RawInline
@@ -85,10 +86,11 @@ class ShortcodeTest {
     }
 
     @Test
-    fun `a shortcode inside a code fence is left alone`() {
-        // It is being shown, not invoked. Rewriting it would be the editor deciding it knew better
-        // than the author -- and this is the case that ruled out a masking pre-pass, because a mask
-        // would have put placeholder characters into the code block's text.
+    fun `a shortcode inside a code fence keeps its literal text -- known Hugo divergence`() {
+        // Hugo extracts shortcodes everywhere, code fences included, which is why a Hugo author has
+        // to escape one to show it literally. This parser leaves code contents alone: CodeBlock.text
+        // is a string and cannot hold an opaque span, and for an editor showing what the author
+        // typed is right. The divergence has to be reconciled when export exists, in Phase 10.
         val source = "```\n{{< figure src=\"a.png\" >}}\n```\n"
 
         val code = parser.parse(source).blocks.single() as CodeBlock
@@ -96,6 +98,29 @@ class ShortcodeTest {
             code.text.contains("{{< figure src=\"a.png\" >}}"),
             "Code block contents were rewritten: '${code.text}'",
         )
+    }
+
+    @Test
+    fun `a paired shortcode is two opaque spans with Markdown between them`() {
+        // hugo-markdown.md: both forms support a closing tag, and `{{% %}}` content "is processed
+        // as Markdown". Treating each tag as its own span is what leaves the content parseable.
+        val paragraph =
+            parser.parse("{{% note %}}\nSome *emphasis* here.\n{{% /note %}}\n").blocks.single() as Paragraph
+
+        val raws = paragraph.inlines.filterIsInstance<RawInline>()
+        assertEquals(listOf("{{% note %}}", "{{% /note %}}"), raws.map { it.text })
+        assertTrue(
+            paragraph.inlines.any { it is Emphasis },
+            "Content between paired tags should still parse as Markdown: ${paragraph.inlines}",
+        )
+    }
+
+    @Test
+    fun `a whitespace-trimming shortcode is recognised`() {
+        // hugo-markdown.md notes the `{{<-` and `->}}` variants.
+        val passthrough = parser.parse("{{<- figure ->}}\n").blocks.single() as RawPassthrough
+
+        assertEquals("{{<- figure ->}}", passthrough.text)
     }
 
     @Test
