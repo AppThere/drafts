@@ -86,6 +86,16 @@ class CommonMarkSpecTest {
                     )
                 }
 
+            val diverging = failures.filter { it.dialectDiverges() }
+            if (diverging.isNotEmpty()) {
+                appendLine()
+                appendLine(
+                    "Of those, ${diverging.size} involve syntax this dialect deliberately " +
+                        "redefines (tilde runs, bare URLs). Those examples cannot pass while the " +
+                        "dialect differs from CommonMark -- see markdown-dialect.md 2 and 3.",
+                )
+            }
+
             if (failures.isNotEmpty()) {
                 appendLine()
                 appendLine("Sample failures, up to $SAMPLE_SIZE per section:")
@@ -95,6 +105,16 @@ class CommonMarkSpecTest {
             }
         }
     }
+
+    /**
+     * True when the example uses syntax the dialect redefines.
+     *
+     * `~~x~~` is strikethrough here and literal text in the specification; a bare `www.host` is a
+     * link here and text there. An example resting on either can never match the reference output,
+     * so counting it as a conformance failure is misleading -- it is the dialect working.
+     */
+    private fun SpecExample.dialectDiverges(): Boolean =
+        markdown.contains('~') || markdown.contains("www.") || markdown.contains("://")
 
     private fun SpecExample.diff(): String {
         val actual = runCatching { renderer.render(parser.parse(markdown)) }
