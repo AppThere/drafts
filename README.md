@@ -23,7 +23,7 @@ or `ANDROID_HOME`.
 ./gradlew buildHealth    # unused / misdeclared dependencies
 ```
 
-The iOS targets (`iosArm64`, `iosSimulatorArm64`, `iosX64`) are declared everywhere they belong but
+The iOS targets (`iosArm64`, `iosSimulatorArm64`) are declared everywhere they belong but
 can only be **compiled on macOS** -- Kotlin/Native needs the Xcode toolchain. CI runs them on a
 macOS runner; `./gradlew check` on Linux or Windows covers the JVM and Android halves.
 

@@ -16,10 +16,10 @@ plugins {
 }
 
 kotlin {
+    // No iosX64 -- out of the target matrix. See drafts.kmp.gradle.kts for why.
     listOf(
         iosArm64(),
         iosSimulatorArm64(),
-        iosX64(),
     ).forEach { target ->
         target.binaries.framework {
             baseName = "Drafts"

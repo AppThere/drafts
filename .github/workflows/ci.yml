@@ -116,7 +116,7 @@ jobs:
   # Apple targets.
   #
   # A separate job on macOS because Kotlin/Native cannot cross-compile to iOS from anywhere else:
-  # it needs the Xcode toolchain. Declaring iosArm64/iosSimulatorArm64/iosX64 and never building
+  # it needs the Xcode toolchain. Declaring iosArm64/iosSimulatorArm64 and never building
   # them would mean the first person on a Mac discovers whatever has rotted since Phase 0, so the
   # targets are compiled on every push instead.
   # ---------------------------------------------------------------------------------------------
@@ -138,7 +138,6 @@ jobs:
           ./gradlew \
             compileKotlinIosArm64 \
             compileKotlinIosSimulatorArm64 \
-            compileKotlinIosX64 \
             --stacktrace
 
       - name: Apple tests

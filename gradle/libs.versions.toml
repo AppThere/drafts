@@ -46,8 +46,8 @@ androidxTestRunner = "1.6.2"
 
 # JetBrains/markdown (intellij-markdown). markdown-dialect.md's "Recommendation" section picks
 # this: the only candidate with institutional backing, and its ASTNode already carries exact
-# source offsets, which is the hard part for an editor. Publishes iosArm64, iosSimulatorArm64 and
-# iosX64 alongside JVM, so it covers the whole target matrix.
+# source offsets, which is the hard part for an editor. Publishes iosArm64 and iosSimulatorArm64
+# alongside JVM, so it covers the whole target matrix.
 intellijMarkdown = "0.7.13"
 androidx-activity = "1.13.0"
 

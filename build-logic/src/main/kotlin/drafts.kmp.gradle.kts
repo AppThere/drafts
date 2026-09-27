@@ -74,11 +74,10 @@ configure<KotlinMultiplatformExtension> {
     // needs the Xcode toolchain -- so CI runs the Apple half of `check` on a macOS runner.
     // See .github/workflows/ci.yml.
     //
-    // iosX64 -- the Intel-Mac simulator -- is deliberately absent, though Phase 0's deliverable
-    // list names it. Compose Multiplatform stopped publishing that target: `runtime-iosx64`'s last
-    // release is 1.11.0-alpha01, and 1.11.1 has no artifact for it. Keeping the target would mean
-    // no Compose on iOS at all, so the target matrix in IMPLEMENTATION-PLAN.md needs correcting
-    // rather than the build.
+    // iosX64 -- the Intel-Mac simulator -- is deliberately out of the target matrix. Two
+    // independent reasons, either of which would be enough: Compose Multiplatform stopped
+    // publishing it (`runtime-iosx64`'s last release is 1.11.0-alpha01 and 1.11.1 has no artifact
+    // at all), and there is no Intel Mac to run it on. Decided 2026-09-27.
     iosArm64()
     iosSimulatorArm64()
 

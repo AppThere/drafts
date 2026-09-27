@@ -100,7 +100,9 @@ Don't spend it.
 - Gradle multi-module KMP skeleton per `appthere-drafts.md` §3. Empty modules with correct
   dependency directions.
 - `gradle/libs.versions.toml` version catalog.
-- Targets configured: JVM desktop, Android, iOS (arm64, simulator arm64/x64).
+- Targets configured: JVM desktop, Android, iOS (arm64, simulator arm64).
+  `iosX64` -- the Intel-Mac simulator -- is deliberately out of the matrix: Compose Multiplatform
+  no longer publishes that target, and there is no Intel Mac to run it on.
 - detekt + `io.nlopez.compose.rules` + detekt-formatting, configured to the thresholds in
   `engineering-conventions.md` §2.
 - Spotless/ktlint, Konsist, Kover, dependency-analysis.
