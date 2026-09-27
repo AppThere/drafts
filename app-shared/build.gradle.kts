@@ -15,12 +15,14 @@ kotlin {
             api(project(":platform-intents"))
 
             implementation(compose.runtime)
+            implementation(libs.kotlinx.coroutines.core)
             implementation(compose.foundation)
         }
 
         commonTest.dependencies {
             @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
             implementation(compose.uiTest)
+            implementation(libs.kotlinx.coroutines.test)
         }
 
         // The panel is driven through a real composition, so it needs a runtime for the host it

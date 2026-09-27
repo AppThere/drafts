@@ -40,4 +40,21 @@ object Strings {
     // with them. "Licences" rather than "About": what this screen is for is the obligation.
     const val LICENCES = "Licences"
     const val CLOSE = "Close"
+
+    /**
+     * The five states of `appthere-drafts.md` 8.4, as the "short label" it asks for.
+     *
+     * Written from the reader's side. `conflicted` is a state name; "Changed on disk" is what
+     * happened. The one with no words is `clean` -- there is nothing to tell someone about a
+     * document that matches its file.
+     */
+    const val DOCUMENT_STATE = "Document"
+    const val STATE_CLEAN = "Saved"
+    const val STATE_DIRTY = "Unsaved"
+    const val STATE_CONFLICTED = "Changed on disk"
+    const val STATE_ORPHANED = "File missing"
+    const val STATE_READ_ONLY = "Read-only"
+
+    const val OPENING = "Opening\u2026"
+    const val COULD_NOT_OPEN = "Could not open this document"
 }

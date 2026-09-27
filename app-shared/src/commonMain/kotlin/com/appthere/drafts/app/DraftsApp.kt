@@ -10,6 +10,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,6 +32,7 @@ import com.appthere.drafts.editor.engine.DocumentSession
 import com.appthere.drafts.editor.ui.BlockEditor
 import com.appthere.drafts.editor.ui.EditorState
 import com.appthere.drafts.editor.ui.handleShortcut
+import kotlinx.coroutines.launch
 
 /**
  * The composition root (`appthere-drafts.md` 3: ":app-shared  Navigation, settings, composition
@@ -49,7 +51,56 @@ fun DraftsApp(
     modifier: Modifier = Modifier,
     initialSettings: ReaderSettings = ReaderSettings(),
 ) {
-    val state = remember(initialText) { EditorState(DocumentSession(initialText)) }
+    val editor = remember(initialText) { EditorState(DocumentSession(initialText)) }
+
+    // No badge. A buffer that came from a string is in none of 8.4's five states, because there is
+    // no file for it to be clean, dirty, conflicted, orphaned or read-only with respect to. Showing
+    // "Saved" over a document that has never been anywhere would be a lie in the window chrome.
+    DraftsWindow(editor = editor, initialSettings = initialSettings, onSave = null, modifier = modifier) {}
+}
+
+/**
+ * The same window, for a document that came from a file.
+ *
+ * The difference the [document] makes is the badge 8.4 asks for and a save that can happen at all.
+ */
+@Composable
+fun DraftsApp(
+    document: OpenDocument,
+    modifier: Modifier = Modifier,
+    initialSettings: ReaderSettings = ReaderSettings(),
+) {
+    val scope = rememberCoroutineScope()
+
+    DraftsWindow(
+        editor = document.editor,
+        initialSettings = initialSettings,
+        onSave = { scope.launch { document.save() } },
+        modifier = modifier,
+    ) {
+        DocumentStateBadge(document.lifecycle.state)
+    }
+}
+
+/**
+ * The composition root (`appthere-drafts.md` 3: ":app-shared  Navigation, settings, composition
+ * root").
+ *
+ * The settings are held here and not persisted. 5.5 says they are "persisted per document type",
+ * which needs somewhere to persist to -- still ahead, in 7.3's session file.
+ *
+ * `MaterialTheme` has gone. The surface here is a document, and the three things Material was
+ * providing -- a type scale, a colour scheme and a background -- are exactly what the design
+ * system now provides properly, from the spec's own numbers.
+ */
+@Composable
+private fun DraftsWindow(
+    editor: EditorState,
+    initialSettings: ReaderSettings,
+    onSave: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+    badge: @Composable () -> Unit,
+) {
     var settings by remember { mutableStateOf(initialSettings) }
     var showControls by remember { mutableStateOf(false) }
     var showLicences by remember { mutableStateOf(false) }
@@ -78,15 +129,27 @@ fun DraftsApp(
                             true
                         }
 
+                        saves(event) -> {
+                            onSave?.invoke()
+                            // Consumed either way. A document with nowhere to save to should not
+                            // pass Ctrl+S down to the text field, which would insert nothing and
+                            // leave the reader thinking the keystroke did something.
+                            true
+                        }
+
                         else -> {
-                            state.handleShortcut(event, clipboard)
+                            editor.handleShortcut(event, clipboard)
                         }
                     }
                 },
         ) {
             LaunchedEffect(Unit) { root.requestFocus() }
 
-            BlockEditor(state = state)
+            BlockEditor(state = editor)
+
+            // 8.4: "in the window chrome -- quietly". Top-start, away from the controls, and
+            // outside the measure so it never sits on top of a line of prose.
+            Box(Modifier.align(Alignment.TopStart).padding(controlsInset)) { badge() }
 
             if (showControls) {
                 ReaderControls(
@@ -109,6 +172,12 @@ fun DraftsApp(
 
 /** Far enough from the corner to read as a panel over the document rather than part of the frame. */
 private val controlsInset = 16.dp
+
+/** 8.2's explicit save, on the shortcut every editor uses for it. */
+private fun saves(event: KeyEvent): Boolean =
+    event.type == KeyEventType.KeyDown &&
+        (event.isCtrlPressed || event.isMetaPressed) &&
+        event.key == Key.S
 
 /** 5.5's settings, on the shortcut every editor uses for them. */
 private fun togglesControls(event: KeyEvent): Boolean =

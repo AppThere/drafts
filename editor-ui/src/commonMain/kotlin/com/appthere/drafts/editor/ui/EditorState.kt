@@ -3,6 +3,7 @@ package com.appthere.drafts.editor.ui
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
@@ -117,8 +118,38 @@ class EditorState(
     /** The raw source of a block, which is what its field shows in reveal state. */
     fun sourceOf(block: Block): String = session.sourceOf(block)
 
-    /** The whole document, which the narrowing in [replace] reads the old block text out of. */
-    private val text: String get() = session.text
+    /**
+     * The whole document. The narrowing in [replace] reads the old block text out of it, and saving
+     * writes it -- 8.2's digest is taken over exactly these bytes.
+     */
+    val text: String get() = session.text
+
+    /**
+     * Counts edits to the text, so that something outside can tell the document has changed.
+     *
+     * A counter and not a boolean, because the question a caller asks is "has it changed *since the
+     * point I care about*", and only the caller knows where that point is -- the moment of the last
+     * successful save, for 8.4's `dirty`.
+     *
+     * It never goes down. Undoing back to exactly what is on disk therefore still reads as changed,
+     * which is wrong in the safe direction: it offers a save that turns out to be a no-op, rather
+     * than withholding one that was needed. Making it exact means hashing the document on every
+     * keystroke to compare against `baseDigest`, and that cost is real while this inaccuracy is not.
+     */
+    var revision: Int by mutableIntStateOf(0)
+        private set
+
+/**
+     * Publishes the session's blocks and records that the text changed.
+     *
+     * Every text-changing method ends here. Bumping [revision] at each of those call sites instead
+     * would work until one of them forgot, and the symptom of forgetting is a document that reports
+     * itself saved while holding unsaved work -- which is the failure 8.1 and 8.2 exist to prevent.
+     */
+    private fun adopt() {
+        blocks = session.blocks
+        revision++
+    }
 
     private val rows = mutableMapOf<BlockId, CachedRow>()
 
@@ -168,7 +199,7 @@ class EditorState(
     /** Deletes the selection, against the source rather than against any field. */
     fun deleteSelection(): Boolean {
         val left = selection?.takeIf { !it.isCollapsed }?.let { session.delete(it, history) } ?: return false
-        blocks = session.blocks
+        adopt()
         selection = null
         caret = left
         return true
@@ -196,7 +227,7 @@ class EditorState(
             SourceSpan.of(span.start.value + change.start, span.start.value + change.endExclusive),
             change.replacement,
         )
-        blocks = session.blocks
+        adopt()
         caret = Caret(block, offset)
     }
 
@@ -204,14 +235,14 @@ class EditorState(
     fun split() {
         val from = caret ?: return
         val moved = session.split(from, history) ?: return
-        blocks = session.blocks
+        adopt()
         caret = moved
     }
 
     /** Backspace at offset 0. Null from the engine means there is nothing above to merge into. */
     fun mergeWithPrevious(): Boolean {
         val moved = caret?.let { session.mergeWithPrevious(it, history) } ?: return false
-        blocks = session.blocks
+        adopt()
         caret = moved
         return true
     }
@@ -225,7 +256,7 @@ class EditorState(
      */
     fun undo(): Boolean {
         val moved = session.undo(history) ?: return false
-        blocks = session.blocks
+        adopt()
         selection = null
         caret = moved
         return true
@@ -234,7 +265,7 @@ class EditorState(
     /** Redoes the last undone edit. */
     fun redo(): Boolean {
         val moved = session.redo(history) ?: return false
-        blocks = session.blocks
+        adopt()
         selection = null
         caret = moved
         return true
