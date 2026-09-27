@@ -21,6 +21,11 @@ max_line_length = 120
 ij_kotlin_allow_trailing_comma = true
 ij_kotlin_allow_trailing_comma_on_call_site = true
 
+# Composable functions are PascalCase by convention -- they read as declarations of a thing, not
+# calls to an action, and `appthere-drafts.md` 4.3 names them that way throughout. ktlint has no
+# built-in exception for this, so the annotation is listed here rather than suppressed per file.
+ktlint_function_naming_ignore_when_annotated_with = Composable
+
 # detekt's WildcardImport rule and ktlint's no-wildcard-imports both forbid these. Keeping the
 # two tools agreeing is the reason this is stated rather than left to defaults.
 ij_kotlin_packages_to_use_import_on_demand = unset

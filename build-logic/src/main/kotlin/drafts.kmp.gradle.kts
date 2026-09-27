@@ -47,16 +47,40 @@ configure<KotlinMultiplatformExtension> {
         // Host tests, not device tests: they run on the JVM against the Android variant, so they
         // catch Android-specific compilation and stdlib differences without needing an emulator in
         // CI. Instrumented tests come with the first code that needs a real device.
-        withHostTest {}
+        withHostTest {
+            // `android.util.Log` and its neighbours are stubs in a host test, and the default stub
+            // throws rather than returning. Anything that logs on the way past -- Compose
+            // Resources does, loading a font -- fails on Android and nowhere else, which reads as
+            // an Android bug rather than as the test harness refusing to be an Android device.
+            //
+            // Returning defaults is the documented remedy. It is safe *because* these are host
+            // tests: nothing here is asserting on logging, and anything that genuinely needs the
+            // platform belongs in a device test.
+            isReturnDefaultValues = true
+        }
+
+        // Device tests, for the things a host test cannot answer. Compose Resources reads through
+        // an Android `Context`, so "are the fonts actually in the APK" is unanswerable on the JVM
+        // -- it fails with "Android context is not initialized" whatever the resources contain.
+        // That question, and whether the platform's font fallback covers the scripts 5.1 warns
+        // about, need a real device.
+        withDeviceTest {
+            instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        }
     }
 
     // Apple targets are declared unconditionally so that the build file is honest about the
     // product's target matrix. They cannot be *compiled* anywhere but macOS -- Kotlin/Native
     // needs the Xcode toolchain -- so CI runs the Apple half of `check` on a macOS runner.
     // See .github/workflows/ci.yml.
+    //
+    // iosX64 -- the Intel-Mac simulator -- is deliberately absent, though Phase 0's deliverable
+    // list names it. Compose Multiplatform stopped publishing that target: `runtime-iosx64`'s last
+    // release is 1.11.0-alpha01, and 1.11.1 has no artifact for it. Keeping the target would mean
+    // no Compose on iOS at all, so the target matrix in IMPLEMENTATION-PLAN.md needs correcting
+    // rather than the build.
     iosArm64()
     iosSimulatorArm64()
-    iosX64()
 
     compilerOptions {
         // Warnings are not errors in Phase 0: there is no code to warn about, and turning this on

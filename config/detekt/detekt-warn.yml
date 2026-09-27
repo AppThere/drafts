@@ -165,3 +165,13 @@ drafts:
     active: false
   XmlByStringConcatenation:
     active: false
+
+# The same allowlist as the fail config. Without it the warn report carries three findings that are
+# a deliberate design decision, and a report full of known non-issues stops being read.
+Compose:
+  CompositionLocalAllowlist:
+    active: true
+    allowedCompositionLocals:
+      - LocalPalette
+      - LocalMotion
+      - LocalReaderSettings

@@ -42,6 +42,7 @@ ktlint = "1.8.0"
 
 # --- Libraries -------------------------------------------------------------------------------
 kotlinx-coroutines = "1.11.0"
+androidxTestRunner = "1.6.2"
 
 # JetBrains/markdown (intellij-markdown). markdown-dialect.md's "Recommendation" section picks
 # this: the only candidate with institutional backing, and its ASTNode already carries exact
@@ -69,6 +70,7 @@ konsist = { module = "com.lemonappdev:konsist", version.ref = "konsist" }
 # Coroutines: declared for the desktop dispatcher and for the runBlocking rule's test fixtures
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
+androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidxTestRunner" }
 
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
 

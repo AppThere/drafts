@@ -161,10 +161,21 @@ coroutines:
 
 naming:
   active: true
+
+  # Composable functions are PascalCase, as `appthere-drafts.md` 4.3 names them and as the Compose
+  # ecosystem writes them. The same exemption is set for ktlint in `.editorconfig`; the two tools
+  # have to agree or formatting and linting fight each other.
+  FunctionNaming:
+    active: true
+    ignoreAnnotated: ['Composable']
+
   TopLevelPropertyNaming:
     active: true
     constantPattern: '[A-Z][_A-Z0-9]*'
-    propertyPattern: '[a-z][A-Za-z0-9]*'
+    # `Local`-prefixed PascalCase is the Compose convention for a `CompositionLocal`, and
+    # compose-rules' own `CompositionLocalNaming` rule *requires* it. Without this the two tools
+    # contradict each other and one of them has to be suppressed at every declaration.
+    propertyPattern: '(Local[A-Z][A-Za-z0-9]*|[a-z][A-Za-z0-9]*)'
     privatePropertyPattern: '_?[a-z][A-Za-z0-9]*'
 
 style:
@@ -318,3 +329,19 @@ drafts:
       - '**/jvmTest/**'
       - '**/test/**/fixtures/**'
       - '**/commonTest/**/fixtures/**'
+
+# -------------------------------------------------------------------------------------------------
+# compose-rules.
+# -------------------------------------------------------------------------------------------------
+Compose:
+  # The rule is right in general -- a `CompositionLocal` is an implicit dependency, and a parameter
+  # says what it depends on. These three are the exception the rule exists to allow for: theme
+  # values, read almost everywhere, that would otherwise be threaded through every signature in the
+  # editor. `appthere-drafts.md` 5.5 makes them user-adjustable at runtime, so they have to be
+  # ambient rather than constants. Anything else needs a reason and a line here.
+  CompositionLocalAllowlist:
+    active: true
+    allowedCompositionLocals:
+      - LocalPalette
+      - LocalMotion
+      - LocalReaderSettings

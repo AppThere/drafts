@@ -109,6 +109,28 @@ tasks.matching { it.name == "check" }.configureEach {
     finalizedBy(detektWarn)
 }
 
+// ---------------------------------------------------------------------------------------------
+// `.editorconfig`, actually applied.
+//
+// Spotless's ktlint step does not read `.editorconfig` from disk. Verified: with
+// `ktlint_function_naming_ignore_when_annotated_with` set in the file, ktlint still rejected every
+// `@Composable`; moving the same property into `editorConfigOverride` silenced it. Adding
+// `setEditorConfigPath` changed nothing. Only the override reaches the engine.
+//
+// Left alone, the file would be documentation the build ignores while the IDE obeys it: the two
+// disagree silently, which is the one failure `.editorconfig` exists to prevent. So the Kotlin
+// section is parsed and handed over, and the file is the single source of truth it claims to be.
+//
+// Read through `providers.fileContents` so the configuration cache treats it as an input and a
+// change to it invalidates the cached configuration.
+// ---------------------------------------------------------------------------------------------
+val kotlinEditorConfig: Map<String, String> =
+    providers
+        .fileContents(rootProject.layout.projectDirectory.file(".editorconfig"))
+        .asText
+        .map { text -> kotlinSectionOf(text) }
+        .getOrElse(emptyMap())
+
 spotless {
     kotlin {
         target("src/**/*.kt")
@@ -120,14 +142,38 @@ spotless {
             // reformatting 4,000 lines of generated fixtures on every run is pure churn.
             "**/fixtures/CommonMarkExamples*.kt",
         )
-        ktlint(version("ktlint"))
+        ktlint(version("ktlint")).editorConfigOverride(kotlinEditorConfig)
         trimTrailingWhitespace()
         endWithNewline()
     }
     kotlinGradle {
         target("*.gradle.kts")
-        ktlint(version("ktlint"))
+        ktlint(version("ktlint")).editorConfigOverride(kotlinEditorConfig)
         trimTrailingWhitespace()
         endWithNewline()
     }
+}
+
+/**
+ * The `[*.{kt,kts}]` section of an `.editorconfig`, as a property map.
+ *
+ * Only that section: the `[*]` section carries file-level settings (`charset`, `end_of_line`) that
+ * ktlint does not model as rule properties, and handing it an unknown property is an error rather
+ * than something it ignores.
+ */
+fun kotlinSectionOf(text: String): Map<String, String> {
+    val properties = mutableMapOf<String, String>()
+    var inKotlinSection = false
+    text.lineSequence().forEach { raw ->
+        val line = raw.trim()
+        when {
+            line.startsWith("#") || line.isEmpty() -> Unit
+            line.startsWith("[") -> inKotlinSection = line == "[*.{kt,kts}]"
+            inKotlinSection && "=" in line -> {
+                val (key, value) = line.split("=", limit = 2)
+                properties[key.trim()] = value.trim()
+            }
+        }
+    }
+    return properties
 }
