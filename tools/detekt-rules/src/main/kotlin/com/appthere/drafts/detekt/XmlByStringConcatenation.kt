@@ -22,7 +22,7 @@ import org.jetbrains.kotlin.psi.KtStringTemplateExpression
  * element ordering wrong, which the schema enforces and which concatenation cannot express.
  *
  * The fix is never "escape more carefully" -- it is to use the real XML writer in
- * `:core-export-package`, which is what that module exists for.
+ * `:core-export-container`, which is what that module exists for.
  *
  * Matching is restricted to literals that look like markup (`<` followed by a name, `/`, `?` or
  * `!`), so that a string containing a comparison or an arrow is not flagged.
@@ -52,7 +52,7 @@ class XmlByStringConcatenation(
                 entity = Entity.from(expression),
                 message =
                     "String literal contains XML markup. Use the XML writer in " +
-                        ":core-export-package instead of building markup by hand.",
+                        ":core-export-container instead of building markup by hand.",
             ),
         )
     }

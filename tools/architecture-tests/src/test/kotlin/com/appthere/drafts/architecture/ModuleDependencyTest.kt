@@ -165,7 +165,7 @@ class ModuleDependencyTest {
                 "core-parse-markdown",
                 "core-parse-fountain",
                 "core-serialise",
-                "core-export-package",
+                "core-export-container",
                 "core-export-xhtml",
                 "core-export-odf",
                 "core-export-ooxml",

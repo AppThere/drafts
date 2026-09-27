@@ -49,9 +49,9 @@ include(":core-serialise")
 
 // Export backends are write-only. appthere-drafts.md 3 writes these as the glob ":core-export-*";
 // the concrete split follows export-pipeline.md "Module layout", renamed into the 3 scheme.
-// :core-export-package holds the ZIP and XML writing shared by the three backends -- it exists in
+// :core-export-container holds the ZIP and XML writing shared by the three backends -- it exists in
 // export-pipeline.md but has no counterpart in 3. See the Phase 0 report, item 5.
-include(":core-export-package")
+include(":core-export-container")
 include(":core-export-xhtml")
 include(":core-export-odf")
 include(":core-export-ooxml")

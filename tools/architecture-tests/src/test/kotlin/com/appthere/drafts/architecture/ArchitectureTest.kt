@@ -97,7 +97,7 @@ class ArchitectureTest {
     private companion object {
         val EXPORT_MODULES =
             listOf(
-                "core-export-package",
+                "core-export-container",
                 "core-export-xhtml",
                 "core-export-odf",
                 "core-export-ooxml",

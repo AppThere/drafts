@@ -74,11 +74,20 @@ model. Don't fight it. Lower to the IR and write real backends.
 
 Enough shape to pin down the design; not a final API.
 
+**Offsets are UTF-16 code units, not bytes, and the range is half-open.** Both were wrong in an
+earlier draft of this document. UTF-16 is what intellij-markdown reports for AST node ranges and
+what Compose reports for selection, so an offset crosses the parser/editor boundary without
+conversion — on a path that runs on every keystroke, over documents that are not all ASCII.
+`IntRange` is closed at both ends, which leaves two adjacent blocks both claiming the offset
+between them; that offset is exactly where the caret sits when someone presses Home. `:core-model`
+uses `SourceSpan(start, endExclusive)` with three distinct offset types, and this sketch now
+follows it rather than the other way round. (Corrected 2026-09-27.)
+
 ```kotlin
 sealed interface Block {
     val role: BlockRole          // open set — see below
     val attrs: Attributes        // id, classes, key-values
-    val source: IntRange?        // byte range in the original file, null if synthesised
+    val source: SourceSpan?     // half-open UTF-16 code-unit range, null if synthesised
 }
 
 data class Paragraph(val inlines: List<Inline>, ...) : Block
@@ -315,32 +324,53 @@ work — more than the XML generation itself.
 ## Round-trip serialisers
 
 The only formats with a *read* path are Markdown and Fountain, and they're the reason the IR
-carries `source: IntRange?`. ODT and DOCX have no serialiser counterpart here.
+carries `source: SourceSpan?`. ODT and DOCX have no serialiser counterpart here.
 
-Only re-serialise subtrees the user actually edited; emit original bytes for everything else. This
+Only re-serialise subtrees the user actually edited; emit the original text for everything else. This
 is what preserves emphasis delimiter choice, shortcode formatting, and front matter key order,
 per the round-trip contract in `markdown-dialect.md`. Fountain is easier here — it's its own
 canonical serialisation, so byte-preservation gives you perfect fidelity almost for free.
 
 ## Module layout
 
+These are the names in `appthere-drafts.md` §3, which is the one list the build follows. This
+document used to give the same modules different names — `:document-ir`, `:markdown-parser-dialect`,
+`:export-xhtml` and so on — and the disagreement was silent, because nothing reads a module name out
+of a specification. §3 wins for a concrete reason: `engineering-conventions.md` §2 already cites
+`:core-export-ooxml/**/StyleMap.kt` by path in its file-length exemption list, so §3's naming is
+load-bearing in a third document. (Corrected 2026-09-27.)
+
 ```
-:markdown-parser-dialect     intellij-markdown + the four custom extensions
-:fountain-parser             hand-written, ~500 lines
-:document-ir                 the IR, plus lowering from both parsers
-:export-package              ZIP + XML writing, shared by EPUB / ODT / DOCX  (write-only)
-:export-xhtml                XHTML + EPUB 3 packaging
-:export-odf                  FODT + ODT
-:export-ooxml                DOCX
-:serialise-markdown          IR → Markdown, source-preserving
-:serialise-fountain          IR → Fountain, source-preserving
+:core-parse-markdown         intellij-markdown + the four custom extensions
+:core-parse-fountain         hand-written, ~500 lines
+:core-model                  the IR, plus lowering from both parsers
+:core-export-container       ZIP + XML writing, shared by EPUB / ODT / DOCX  (write-only)
+:core-export-xhtml           XHTML + EPUB 3 packaging
+:core-export-odf             FODT + ODT
+:core-export-ooxml           DOCX
+:core-serialise              IR → Markdown / Fountain, source-preserving
 ```
+
+Two notes on that list.
+
+`:core-export-container` was `:export-package` here and `:core-export-package` in the build until
+the Android resource compiler refused it: `package` is a Java keyword, so the namespace the module
+name implies is not a legal package and the generated R file will not compile. *Container* is also
+the better word — EPUB calls this an OCF container and ODF and OOXML call it OPC, the Open
+Packaging *Conventions*. Renamed 2026-09-27.
+
+`:core-serialise` is **one** module here and was two — `:serialise-markdown` and
+`:serialise-fountain`. Whether to split it is genuinely open and is deliberately not being settled
+now. The question is whether the two serialisers share the round-trip fidelity machinery the IR
+carries (`Emphasis.delimiter`, `CodeBlock.fence`, `Heading.style`, `ListBlock.marker`): if they do,
+one module is right; if they turn out to share nothing, splitting later is cheap. Revisit at
+Phase 10, when both serialisers exist and the answer is a fact rather than a guess.
 
 All pure Kotlin in `commonMain` — no platform-specific code is needed for any of it. ZIP is the
 only dependency worth care; `korlibs-compression` or `kotlinx-io` based approaches work across
 targets, and you need stored-not-deflated support for the `mimetype` entry in both EPUB and ODT.
 
-Templates (`.dotx`, `.ott`) ship as resources in `:export-ooxml` and `:export-odf`.
+Templates (`.dotx`, `.ott`) ship as resources in `:core-export-ooxml` and `:core-export-odf`.
 
 ## Validation
 

@@ -314,12 +314,12 @@ drafts:
   # 4.2: every export backend uses a real XML writer, never string concatenation.
   # Scoped to the export backends with `includes`. Outside :core-export-*, a string containing
   # markup is usually a test fixture or a doc comment, and flagging those would make the rule
-  # noise. :core-export-package is included too -- it holds the XML writer, but the writer builds
+  # noise. :core-export-container is included too -- it holds the XML writer, but the writer builds
   # markup through an API, not by concatenating literals.
   XmlByStringConcatenation:
     active: true
     includes:
-      - '**/core-export-package/**'
+      - '**/core-export-container/**'
       - '**/core-export-xhtml/**'
       - '**/core-export-odf/**'
       - '**/core-export-ooxml/**'
