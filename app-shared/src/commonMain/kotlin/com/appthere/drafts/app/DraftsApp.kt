@@ -3,6 +3,7 @@ package com.appthere.drafts.app
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -32,6 +33,7 @@ import com.appthere.drafts.editor.engine.DocumentSession
 import com.appthere.drafts.editor.ui.BlockEditor
 import com.appthere.drafts.editor.ui.EditorState
 import com.appthere.drafts.editor.ui.handleShortcut
+import com.appthere.drafts.platform.files.WriteOutcome
 import kotlinx.coroutines.launch
 
 /**
@@ -56,7 +58,15 @@ fun DraftsApp(
     // No badge. A buffer that came from a string is in none of 8.4's five states, because there is
     // no file for it to be clean, dirty, conflicted, orphaned or read-only with respect to. Showing
     // "Saved" over a document that has never been anywhere would be a lie in the window chrome.
-    DraftsWindow(editor = editor, initialSettings = initialSettings, onSave = null, modifier = modifier) {}
+    // Ctrl+S is consumed and does nothing. A buffer that came from a string has nowhere to save
+    // to, and passing the keystroke down to the text field would insert nothing while leaving the
+    // reader thinking it had done something.
+    DraftsWindow(
+        editor = editor,
+        initialSettings = initialSettings,
+        onDocumentKey = ::saves,
+        modifier = modifier,
+    ) {}
 }
 
 /**
@@ -72,13 +82,57 @@ fun DraftsApp(
 ) {
     val scope = rememberCoroutineScope()
 
+    // A refusal, not a state. 8.4 puts the state in the chrome and allows "dialogs only on
+    // attempted write", so the dialog is driven by the outcome of a save and cleared by answering
+    // it. Driving it from `conflicted` instead would make Cancel do nothing -- the document is
+    // still conflicted afterwards, so the dialog would come straight back.
+    var refusal: WriteOutcome.Conflict? by remember(document) { mutableStateOf(null) }
+
     DraftsWindow(
         editor = document.editor,
         initialSettings = initialSettings,
-        onSave = { scope.launch { document.save() } },
+        onDocumentKey = { event ->
+            when {
+                // Escape answers the dialog the way Escape answers every dialog.
+                //
+                // The `refusal != null` guard is deliberate and currently untested: the editor
+                // does nothing with Escape yet, so claiming the key unconditionally would have no
+                // visible effect and no test can tell the difference. It stays because the day the
+                // editor does want Escape -- clearing a selection is the obvious candidate -- a
+                // handler that had been swallowing it since now would be a silent dead key.
+                refusal != null && dismisses(event) -> {
+                    refusal = null
+                    true
+                }
+
+                saves(event) -> {
+                    scope.launch { refusal = document.save() as? WriteOutcome.Conflict }
+                    true
+                }
+
+                else -> {
+                    false
+                }
+            }
+        },
         modifier = modifier,
     ) {
-        DocumentStateBadge(document.lifecycle.state)
+        Box(Modifier.align(Alignment.TopStart).padding(controlsInset)) {
+            DocumentStateBadge(document.lifecycle.state)
+        }
+
+        if (refusal != null) {
+            ConflictDialog(
+                onReload = {
+                    scope.launch {
+                        document.reload()
+                        refusal = null
+                    }
+                },
+                onCancel = { refusal = null },
+                modifier = Modifier.align(Alignment.Center).padding(controlsInset),
+            )
+        }
     }
 }
 
@@ -97,9 +151,9 @@ fun DraftsApp(
 private fun DraftsWindow(
     editor: EditorState,
     initialSettings: ReaderSettings,
-    onSave: (() -> Unit)?,
+    onDocumentKey: (KeyEvent) -> Boolean,
     modifier: Modifier = Modifier,
-    badge: @Composable () -> Unit,
+    chrome: @Composable BoxScope.() -> Unit,
 ) {
     var settings by remember { mutableStateOf(initialSettings) }
     var showControls by remember { mutableStateOf(false) }
@@ -129,11 +183,9 @@ private fun DraftsWindow(
                             true
                         }
 
-                        saves(event) -> {
-                            onSave?.invoke()
-                            // Consumed either way. A document with nowhere to save to should not
-                            // pass Ctrl+S down to the text field, which would insert nothing and
-                            // leave the reader thinking the keystroke did something.
+                        // Anything that depends on there being a file: saving, and answering
+                        // 8.2's refusal. The window does not know whether it has one, so it asks.
+                        onDocumentKey(event) -> {
                             true
                         }
 
@@ -147,9 +199,10 @@ private fun DraftsWindow(
 
             BlockEditor(state = editor)
 
-            // 8.4: "in the window chrome -- quietly". Top-start, away from the controls, and
-            // outside the measure so it never sits on top of a line of prose.
-            Box(Modifier.align(Alignment.TopStart).padding(controlsInset)) { badge() }
+            // Whatever belongs to a document that came from a file: 8.4's badge, and 8.2's
+            // refusal when there is one. Placed by the caller, because where they go depends on
+            // what they are and this function does not know.
+            chrome()
 
             if (showControls) {
                 ReaderControls(
@@ -172,6 +225,9 @@ private fun DraftsWindow(
 
 /** Far enough from the corner to read as a panel over the document rather than part of the frame. */
 private val controlsInset = 16.dp
+
+/** Escape, which cancels whatever is being asked. */
+private fun dismisses(event: KeyEvent): Boolean = event.type == KeyEventType.KeyDown && event.key == Key.Escape
 
 /** 8.2's explicit save, on the shortcut every editor uses for it. */
 private fun saves(event: KeyEvent): Boolean =

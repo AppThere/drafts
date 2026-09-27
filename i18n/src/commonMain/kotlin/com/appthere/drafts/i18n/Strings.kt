@@ -57,4 +57,23 @@ object Strings {
 
     const val OPENING = "Opening\u2026"
     const val COULD_NOT_OPEN = "Could not open this document"
+
+    /**
+     * 8.2's refusal, in its own words.
+     *
+     * "*This file has changed on disk since you opened it.* [ Save a copy... ] [ Reload and lose my
+     * changes ] [ Show differences ] [ Cancel ]"
+     *
+     * Two of those four are missing here on purpose. "Save a copy" needs a platform save dialog and
+     * "Show differences" needs a diff view; neither exists yet, and a button that does nothing is
+     * worse than one that is not offered. The two that are here are the two that work, and the
+     * refusal itself -- the part that protects the file -- does not depend on any of them.
+     *
+     * `RELOAD` keeps the spec's full phrasing rather than shortening to "Reload". What is being
+     * lost is the whole point of the sentence, and a reader clicking a button labelled "Reload"
+     * would not have been told.
+     */
+    const val CONFLICT = "This file has changed on disk since you opened it."
+    const val RELOAD = "Reload and lose my changes"
+    const val CANCEL = "Cancel"
 }

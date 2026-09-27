@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import com.appthere.drafts.editor.engine.DocumentSession
+import com.appthere.drafts.editor.engine.UndoHistory
 import com.appthere.drafts.editor.ui.EditorState
 import com.appthere.drafts.platform.files.DocumentRef
 import com.appthere.drafts.platform.files.DocumentSessionState
@@ -23,9 +24,20 @@ import com.appthere.drafts.platform.files.WriteOutcome
 @Stable
 class OpenDocument(
     private val store: DocumentStore,
-    val editor: EditorState,
+    editor: EditorState,
     opened: DocumentSessionState,
 ) {
+    /**
+     * Replaced wholesale by [reload], never edited in place.
+     *
+     * Reloading is 8.2's "lose my changes", and a fresh [EditorState] is what makes that true: a new
+     * [DocumentSession] parsed from the file's bytes and a new, empty [UndoHistory]. Reusing the old
+     * one would leave the reader able to press Ctrl+Z and resurrect the very changes they just chose
+     * to discard, on top of a document that is no longer the one they were made against.
+     */
+    var editor: EditorState by mutableStateOf(editor)
+        private set
+
     private var recorded by mutableStateOf(opened)
     private var savedRevision by mutableStateOf(editor.revision)
 
@@ -54,6 +66,30 @@ class OpenDocument(
         }
         recorded = recorded.wrote(outcome)
         return outcome
+    }
+
+    /**
+     * 8.2's "[ Reload and lose my changes ]".
+     *
+     * The only exit from `conflicted` that keeps the reader in the same document. It clears
+     * `orphaned` too, because a file that could be read is by definition no longer missing -- a
+     * sync client restoring a folder is ordinary, and making the reader close and reopen the
+     * document to escape a state they did not cause would be a poor reward for it.
+     *
+     * A reload that cannot read the file leaves the session unreachable rather than throwing. The
+     * reader asked to see what is on disk; being told there is nothing there is an answer.
+     */
+    suspend fun reload() {
+        val contents = runCatching { store.read(recorded.ref) }.getOrNull()
+
+        if (contents == null) {
+            recorded = recorded.wrote(WriteOutcome.Unavailable(WriteOutcome.Reason.Missing, "could not be re-read"))
+            return
+        }
+
+        editor = EditorState(DocumentSession(contents.text))
+        savedRevision = editor.revision
+        recorded = recorded.reloaded(contents)
     }
 }
 

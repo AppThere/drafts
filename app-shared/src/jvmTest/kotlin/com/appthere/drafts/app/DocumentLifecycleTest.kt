@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.pressKey
@@ -157,6 +158,124 @@ class DocumentLifecycleTest {
         }
     }
 
+    @Test
+    fun `the refusal is put to the reader as a dialog`() {
+        // 8.4: "Dialogs only on attempted write." This is that write.
+        runSkikoComposeUiTest(size = SIZE) {
+            val document = open(ORIGINAL)
+            setContent { DraftsApp(document = document) }
+            type(document, "Mine. ")
+            file().writeText(THEIRS)
+
+            save()
+            waitUntil(timeoutMillis = TIMEOUT) { asking() }
+
+            onNodeWithText(Strings.CONFLICT, useUnmergedTree = true).assertExists()
+            onNodeWithContentDescription(Strings.RELOAD).assertExists()
+            onNodeWithContentDescription(Strings.CANCEL).assertExists()
+        }
+    }
+
+    @Test
+    fun `a save that succeeds asks the reader nothing`() {
+        // The other half of "only on attempted write": most writes are not refused, and a dialog on
+        // every Ctrl+S would be the interruption 8.4 is written to avoid.
+        runSkikoComposeUiTest(size = SIZE) {
+            val document = open(ORIGINAL)
+            setContent { DraftsApp(document = document) }
+            type(document, "Mine. ")
+
+            save()
+            waitUntil(timeoutMillis = TIMEOUT) { file().readText() != ORIGINAL }
+
+            onNodeWithText(Strings.CONFLICT, useUnmergedTree = true).assertDoesNotExist()
+        }
+    }
+
+    @Test
+    fun `cancelling dismisses the dialog and changes nothing`() {
+        // Cancel is the choice that must be safe: the edits stay unsaved, the other version stays
+        // on disk, and the badge goes on saying so quietly.
+        runSkikoComposeUiTest(size = SIZE) {
+            val document = open(ORIGINAL)
+            setContent { DraftsApp(document = document) }
+            type(document, "Mine. ")
+            file().writeText(THEIRS)
+            save()
+            waitUntil(timeoutMillis = TIMEOUT) { asking() }
+
+            onNodeWithContentDescription(Strings.CANCEL).performClick()
+            waitForIdle()
+
+            onNodeWithText(Strings.CONFLICT, useUnmergedTree = true).assertDoesNotExist()
+            onNodeWithContentDescription(badge(Strings.STATE_CONFLICTED)).assertExists()
+            assertEquals(THEIRS, file().readText())
+            assertEquals("Mine. $ORIGINAL", document.editor.text)
+        }
+    }
+
+    @Test
+    fun `the dialog stays dismissed until the reader tries to save again`() {
+        // The reason the dialog is driven by the refusal and not by the state. The document is still
+        // conflicted after cancelling, so anything keyed off `conflicted` would put the dialog
+        // straight back and leave the reader unable to get on with anything.
+        runSkikoComposeUiTest(size = SIZE) {
+            val document = open(ORIGINAL)
+            setContent { DraftsApp(document = document) }
+            type(document, "Mine. ")
+            file().writeText(THEIRS)
+            save()
+            waitUntil(timeoutMillis = TIMEOUT) { asking() }
+            onNodeWithContentDescription(Strings.CANCEL).performClick()
+            waitForIdle()
+
+            type(document, "More. ")
+
+            onNodeWithText(Strings.CONFLICT, useUnmergedTree = true).assertDoesNotExist()
+        }
+    }
+
+    @Test
+    fun `reloading replaces the document with what is on disk`() {
+        // 8.2's "[ Reload and lose my changes ]", end to end.
+        runSkikoComposeUiTest(size = SIZE) {
+            val document = open(ORIGINAL)
+            setContent { DraftsApp(document = document) }
+            type(document, "Mine. ")
+            file().writeText(THEIRS)
+            save()
+            waitUntil(timeoutMillis = TIMEOUT) { asking() }
+
+            onNodeWithContentDescription(Strings.RELOAD).performClick()
+            waitUntil(timeoutMillis = TIMEOUT) { document.editor.text == THEIRS }
+
+            onNodeWithText(Strings.CONFLICT, useUnmergedTree = true).assertDoesNotExist()
+            onNodeWithContentDescription(badge(Strings.STATE_CLEAN)).assertExists()
+            onNodeWithText(THEIR_LINE).assertExists()
+        }
+    }
+
+    @Test
+    fun `the dialog can be answered without a pointer`() {
+        // 10.2: "Complete keyboard operation. Every action reachable without pointer." A dialog is
+        // the sharpest case -- it is asking a question, and a reader who cannot answer it cannot
+        // get back to their document at all.
+        runSkikoComposeUiTest(size = SIZE) {
+            val document = open(ORIGINAL)
+            setContent { DraftsApp(document = document) }
+            type(document, "Mine. ")
+            file().writeText(THEIRS)
+            save()
+            waitUntil(timeoutMillis = TIMEOUT) { asking() }
+
+            onRoot().performKeyInput { pressKey(Key.Escape) }
+            waitForIdle()
+
+            onNodeWithText(Strings.CONFLICT, useUnmergedTree = true).assertDoesNotExist()
+            assertEquals(THEIRS, file().readText(), "Escape wrote something")
+        }
+    }
+
     /** Writes [text] to the one file this test uses and hands back the ref for it. */
     private fun write(text: String): DocumentRef {
         file().writeText(text)
@@ -176,21 +295,22 @@ class DocumentLifecycleTest {
         }
     }
 
-    /** Types into the first block, through the field the reader would be typing into. */
+    /**
+     * Types into the first block, through the field the reader would be typing into.
+     *
+     * The field is found by the block's *current* source rather than by a constant. Despite
+     * describing itself as "contains", `onNodeWithText` matches exactly, so a second call looking
+     * for the original line finds nothing once the first call has changed it.
+     */
     private fun SkikoComposeUiTest.type(
         document: OpenDocument,
         text: String,
     ) {
-        document.editor.place(
-            Caret(
-                document.editor.blocks
-                    .first()
-                    .id,
-                0,
-            ),
-        )
+        val block = document.editor.blocks.first()
+        document.editor.place(Caret(block.id, 0))
         waitForIdle()
-        onNodeWithText(FIRST_LINE).performTextInput(text)
+
+        onNodeWithText(document.editor.sourceOf(block.block)).performTextInput(text)
         waitForIdle()
     }
 
@@ -202,6 +322,10 @@ class DocumentLifecycleTest {
             keyUp(Key.CtrlLeft)
         }
     }
+
+    /** True once 8.2's dialog is on screen. */
+    private fun SkikoComposeUiTest.asking(): Boolean =
+        onAllNodesWithContentDescription(Strings.RELOAD).fetchSemanticsNodes().isNotEmpty()
 
     private fun SkikoComposeUiTest.conflicted(): Boolean =
         onAllNodesWithContentDescription(badge(Strings.STATE_CONFLICTED)).fetchSemanticsNodes().isNotEmpty()
@@ -217,5 +341,6 @@ class DocumentLifecycleTest {
         const val ORIGINAL = "As opened.\n"
         const val FIRST_LINE = "As opened."
         const val THEIRS = "Someone else's edit.\n"
+        const val THEIR_LINE = "Someone else's edit."
     }
 }

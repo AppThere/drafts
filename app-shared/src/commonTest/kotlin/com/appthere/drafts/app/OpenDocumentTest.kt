@@ -11,6 +11,7 @@ import com.appthere.drafts.platform.files.sha256
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -154,6 +155,76 @@ class OpenDocumentTest {
             assertEquals(sha256("Theirs.\n".encodeToByteArray()), conflict.found)
         }
 
+    @Test
+    fun `reloading takes the version from disk and clears the conflict`() =
+        runTest {
+            // 8.2's "[ Reload and lose my changes ]". Both halves have to happen: the text becomes what
+            // is on disk, and the state stops being conflicted -- a document still marked conflicted
+            // after reloading would refuse its own next save against a digest it has already replaced.
+            val store = FakeDocumentStore(ORIGINAL)
+            val document = opened(store)
+            document.type("Mine.\n")
+            store.changeOnDisk(THEIRS)
+            document.save()
+
+            document.reload()
+
+            assertEquals(THEIRS, document.editor.text)
+            assertEquals(DocumentState.Clean, document.lifecycle.state)
+        }
+
+    @Test
+    fun `reloading discards the edits rather than keeping them undoable`() =
+        runTest {
+            // "lose my changes" has to mean it. A reader who reloads and then presses Ctrl+Z out of
+            // habit must not get their discarded changes back on top of a document they were never
+            // made against -- which is what reusing the editor and its history would do.
+            val store = FakeDocumentStore(ORIGINAL)
+            val document = opened(store)
+            document.type("Mine.\n")
+            store.changeOnDisk(THEIRS)
+            document.save()
+
+            document.reload()
+
+            assertFalse(document.editor.undo(), "Undo after a reload brought the discarded changes back")
+            assertEquals(THEIRS, document.editor.text)
+        }
+
+    @Test
+    fun `saving after a reload writes against the version that was reloaded`() =
+        runTest {
+            // The point of clearing the conflict. The digest recorded at reload is the one the next
+            // save compares against, so an ordinary save now goes through rather than being refused
+            // against a digest nobody has held since before the reload.
+            val store = FakeDocumentStore(ORIGINAL)
+            val document = opened(store)
+            document.type("Mine.\n")
+            store.changeOnDisk(THEIRS)
+            document.save()
+            document.reload()
+
+            document.type("Later.\n")
+
+            assertIs<WriteOutcome.Written>(document.save())
+            assertEquals(DocumentState.Clean, document.lifecycle.state)
+        }
+
+    @Test
+    fun `reloading a file that has gone leaves the document orphaned`() =
+        runTest {
+            // The reader asked to see what is on disk. Being told there is nothing there is an answer,
+            // and a better one than an exception that takes the window with it.
+            val store = FakeDocumentStore(ORIGINAL)
+            val document = opened(store)
+            document.type("Mine.\n")
+            store.remove()
+
+            document.reload()
+
+            assertEquals(DocumentState.Orphaned, document.lifecycle.state)
+        }
+
     /** Opens through the store the way [rememberOpenDocument] does, without a composition. */
     private suspend fun opened(store: FakeDocumentStore = FakeDocumentStore(ORIGINAL)): OpenDocument {
         val contents = store.read(REF)
@@ -174,6 +245,7 @@ class OpenDocumentTest {
     private companion object {
         val REF = DocumentRef("/documents/note.md")
         const val ORIGINAL = "As opened.\n"
+        const val THEIRS = "Someone else's edit.\n"
 
         /** Two saves: the second has nothing new to write but must still be allowed to try. */
         const val EXPECTED_WRITES = 2
