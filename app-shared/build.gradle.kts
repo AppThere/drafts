@@ -13,6 +13,20 @@ kotlin {
             api(project(":platform-files"))
             api(project(":platform-windows"))
             api(project(":platform-intents"))
+
+            implementation(compose.runtime)
+            implementation(compose.foundation)
+        }
+
+        commonTest.dependencies {
+            @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
+            implementation(compose.uiTest)
+        }
+
+        // The panel is driven through a real composition, so it needs a runtime for the host it
+        // runs on. JVM only: `runSkikoComposeUiTest` expects instrumentation on Android.
+        jvmTest.dependencies {
+            implementation(compose.desktop.currentOs)
         }
     }
 }
