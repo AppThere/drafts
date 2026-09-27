@@ -133,9 +133,16 @@ val kotlinEditorConfig: Map<String, String> =
 
 spotless {
     kotlin {
-        target("src/**/*.kt")
+        // Rooted at `src`, not at the project directory with a `src/**` filter.
+        //
+        // A string target is resolved as a file tree over the whole project, and Gradle snapshots
+        // that tree by walking it -- `build/` included, whatever `targetExclude` later removes. On
+        // CI that walk races the test tasks writing into `build/test-results`, and the build dies
+        // with "Could not read path .../output.bin" on a file that is not remotely a Kotlin source.
+        // Observed once, then passing on a straight re-run, which is exactly how this kind of flake
+        // presents. Rooting the tree at `src` means the walk never enters `build` at all.
+        target(fileTree("src") { include("**/*.kt") })
         targetExclude(
-            "**/build/**",
             "**/generated/**",
             "**/resources/**",
             // Generated conformance corpora. engineering-conventions.md 2 exempts these by path;
