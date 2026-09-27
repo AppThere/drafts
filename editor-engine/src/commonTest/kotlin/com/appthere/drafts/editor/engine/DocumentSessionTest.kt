@@ -161,6 +161,29 @@ class DocumentSessionTest {
         assertTrue(session.text.length > MIN_FIXTURE_LENGTH, "Only ${session.text.length} code units")
     }
 
+    @Test
+    fun `typing into an empty document works`() {
+        // There are no blocks to build a dirty window around, which the window arithmetic did not
+        // allow for: it produced a window over a list with nothing in it.
+        val session = DocumentSession("")
+
+        session.edit(SourceSpan.of(0, 0), "Hello.")
+
+        assertEquals("Hello.", session.text)
+        assertEquals(1, session.blocks.size)
+    }
+
+    @Test
+    fun `deleting everything and typing again works`() {
+        val session = DocumentSession("First para.\n")
+        val whole = session.blocks[0].block.source!!
+
+        session.edit(SourceSpan.of(whole.start.value, whole.endExclusive.value), "")
+        session.edit(SourceSpan.of(0, 0), "Again.")
+
+        assertEquals("Again.\n", session.text)
+    }
+
     private fun longDocument(): String = GateFixture.tenThousandWords()
 
     private companion object {

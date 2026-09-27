@@ -6,6 +6,10 @@ package com.appthere.drafts.editor.engine
  * Ten thousand words, with the structures that make reparse interesting: headings, lists, quotes,
  * and inline markup a careless window could split. A bounded reparse looks identical to an
  * unbounded one on three paragraphs, which is why the criteria specify a size.
+ *
+ * The section count is set so the document clears ten thousand words rather than approaches it. It
+ * was sixty for a while, which gives 9,480 -- close enough to look right in a name and not close
+ * enough to be one.
  */
 internal object GateFixture {
     fun tenThousandWords(): String =
@@ -29,6 +33,6 @@ internal object GateFixture {
             }
         }
 
-    private const val SECTIONS = 60
+    private const val SECTIONS = 64
     private const val PARAGRAPHS_PER_SECTION = 5
 }

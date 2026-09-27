@@ -1,5 +1,6 @@
 package com.appthere.drafts.editor.engine
 
+import com.appthere.drafts.core.model.Block
 import com.appthere.drafts.core.model.SourceSpan
 import com.appthere.drafts.core.parse.markdown.MarkdownDocumentParser
 
@@ -100,6 +101,14 @@ class DocumentSession(
      * that paragraph alone.
      */
     private fun dirtyWindow(range: SourceSpan): IntRange {
+        // An empty document has no window: nothing to throw away, everything to parse. Without this
+        // the arithmetic below lands on `0..0`, and the caller then asks for `subList(1, 0)`. Found
+        // by undoing a delete of the whole document, which is the ordinary way to reach this state.
+        //
+        // Spelled out rather than `IntRange.EMPTY`, which is `1..0` -- empty, but with a `first` of
+        // one, and the caller slices with `first`.
+        if (blocks.isEmpty()) return 0..-1
+
         val touched = blocks.indices.filter { index -> blocks[index].touches(range) }
 
         val first = (touched.minOrNull() ?: blocks.indices.lastOrNull() ?: 0) - 1
@@ -165,4 +174,15 @@ class DocumentSession(
             range.start.value == span.endExclusive.value ||
             range.endExclusive.value == span.start.value
     }
+}
+
+/**
+ * The raw source of one block.
+ *
+ * Straight out of the buffer by span, which is the same mechanism byte-preserving serialisation
+ * uses. A block with no span was synthesised rather than parsed and has no source to show.
+ */
+fun DocumentSession.sourceOf(block: Block): String {
+    val span = block.source ?: return ""
+    return text.substring(span.start.value, span.endExclusive.value)
 }
