@@ -103,6 +103,28 @@ class ArchitectureRulesFixtureTest {
         )
     }
 
+    @Test
+    fun `a comment mentioning a banned spelling is not a violation`() {
+        // Regression. Both text-matching rules used to match comments, so `:platform-files` was
+        // reported as using Dispatchers.IO on the strength of a KDoc line saying it must not. The
+        // fixture carries both banned spellings in comments and must come back clean.
+        val dispatchers = ArchitectureRules.commonMainDoesNotUseDispatchersIo(compliantFiles())
+        val markup = ArchitectureRules.exportBackendsDoNotBuildXmlByConcatenation(compliantFiles())
+
+        assertEquals(emptyList(), dispatchers.offenders, "A comment is not a use of Dispatchers.IO")
+        assertEquals(emptyList(), markup.offenders, "A comment is not markup built by concatenation")
+    }
+
+    @Test
+    fun `the compliant fixture really does contain the banned spellings`() {
+        // Without this the test above passes when the fixture is empty, renamed, or quietly loses
+        // the strings it exists to carry -- the same vacuous-assertion trap this class is named for.
+        val text = compliantFiles().joinToString("\n") { it.text }
+
+        assertTrue(text.contains("Dispatchers.IO"), "The fixture lost its Dispatchers.IO mention")
+        assertTrue(text.contains("<w:p>"), "The fixture lost its markup mention")
+    }
+
     private fun fixtureFiles(): List<KoFileDeclaration> = Konsist.scopeFromDirectory(FIXTURE_DIR).files
 
     private fun compliantFiles(): List<KoFileDeclaration> = Konsist.scopeFromDirectory(COMPLIANT_DIR).files

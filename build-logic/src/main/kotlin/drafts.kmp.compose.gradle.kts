@@ -12,3 +12,18 @@ plugins {
     id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+// Compose Resources adds a copy-to-assets task per Android variant, and for the device-test variant
+// it configures no output directory -- so the task fails Gradle's own property validation and takes
+// whatever depends on it down with it. That includes `buildHealth`, which is how this surfaced: the
+// first CI run failed on :a11y, a module with no resources of its own.
+//
+// Disabling it is what lets device tests run at all. The cost is that bundled resources do not
+// reach the test APK, so a device test can check the platform's fonts but not ours --
+// `AndroidFontTest` says as much. Revisit when the plugin fixes the task.
+//
+// Here rather than per-module because the task exists in every module this plugin is applied to,
+// whether or not that module has any resources.
+tasks.matching { it.name == "copyAndroidDeviceTestComposeResourcesToAndroidAssets" }.configureEach {
+    enabled = false
+}

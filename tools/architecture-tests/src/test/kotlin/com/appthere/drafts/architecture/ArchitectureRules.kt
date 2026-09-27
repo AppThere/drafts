@@ -69,7 +69,7 @@ object ArchitectureRules {
             rule = "commonMain does not reference Dispatchers.IO",
             offenders =
                 files
-                    .filter { it.text.contains("Dispatchers.IO") }
+                    .filter { it.code.contains("Dispatchers.IO") }
                     .map { it.path },
         )
 
@@ -100,7 +100,7 @@ object ArchitectureRules {
             rule = "export backends do not build XML by concatenation",
             offenders =
                 files
-                    .filter { MARKUP_LITERAL.containsMatchIn(it.text) }
+                    .filter { MARKUP_LITERAL.containsMatchIn(it.code) }
                     .map { it.path },
         )
 
@@ -124,6 +124,26 @@ object ArchitectureRules {
 
         return Violations("Modifier is the first optional parameter", offenders)
     }
+
+    /**
+     * The file's source with comments stripped.
+     *
+     * The two rules above match text rather than imports, because what they forbid is a spelling
+     * rather than a dependency. Matching the raw text makes them fire on prose: a KDoc explaining
+     * why `Dispatchers.IO` is banned violates the ban, which is how `:platform-files` first tripped
+     * this rule -- the offending line was the comment saying the rule exists. A rule that punishes
+     * writing about itself gets worked around rather than obeyed.
+     *
+     * String literals are deliberately kept. The XML rule is looking for markup *in a string*, so
+     * stripping them would leave it matching nothing at all.
+     */
+    private val KoFileDeclaration.code: String get() = COMMENT.replace(text, " ")
+
+    /**
+     * Block comments and line comments. The lookbehind keeps `://` out of it, so a URL in a string
+     * does not swallow the rest of its line.
+     */
+    private val COMMENT = Regex("""/\*[\s\S]*?\*/|(?<!:)//[^\n]*""")
 
     /** True when the function either takes no `Modifier`, or takes it as its first optional. */
     private fun KoFunctionDeclaration.takesModifierFirstAmongOptionals(): Boolean {
