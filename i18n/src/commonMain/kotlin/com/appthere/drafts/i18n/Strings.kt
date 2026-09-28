@@ -59,6 +59,20 @@ object Strings {
     const val COULD_NOT_OPEN = "Could not open this document"
 
     /**
+     * 8.3's banner, in its own words.
+     *
+     * "*Unsaved changes from your last session have been restored.* [ Compare ] [ Discard ]"
+     *
+     * `Compare` is not offered: it needs a diff view, which does not exist, and the same omission
+     * is already recorded for 8.2's "Show differences". `KEEP` is not in the spec and is here
+     * because the banner has to be dismissible -- an unobtrusive banner that cannot be got rid of
+     * stops being unobtrusive by the second document.
+     */
+    const val RESTORED = "Unsaved changes from your last session have been restored."
+    const val DISCARD = "Discard"
+    const val KEEP = "Keep"
+
+    /**
      * 8.2's refusal, in its own words.
      *
      * "*This file has changed on disk since you opened it.* [ Save a copy... ] [ Reload and lose my

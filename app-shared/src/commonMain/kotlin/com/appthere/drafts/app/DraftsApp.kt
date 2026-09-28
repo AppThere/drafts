@@ -102,6 +102,10 @@ fun DraftsApp(
     // still conflicted afterwards, so the dialog would come straight back.
     var refusal: WriteOutcome.Conflict? by remember(document) { mutableStateOf(null) }
 
+    // 8.3's banner. Separate state from `restoredFromSnapshot`, which is a fact about how the
+    // document opened and does not stop being true once the reader has answered.
+    var announceRestored by remember(document) { mutableStateOf(document.restoredFromSnapshot) }
+
     DraftsWindow(
         editor = document.editor,
         initialSettings = initialSettings,
@@ -134,6 +138,23 @@ fun DraftsApp(
     ) {
         Box(Modifier.align(Alignment.TopStart).padding(controlsInset)) {
             DocumentStateBadge(document.lifecycle.state)
+        }
+
+        if (announceRestored) {
+            RestoredBanner(
+                onKeep = { announceRestored = false },
+                onDiscard = {
+                    // Back to the file, and the snapshot goes with it. Reloading without discarding
+                    // would leave the snapshot to be restored again on the next launch, which is
+                    // the reader being asked the same question until they answer it differently.
+                    scope.launch {
+                        document.reload()
+                        keeper?.discard()
+                        announceRestored = false
+                    }
+                },
+                modifier = Modifier.align(Alignment.BottomCenter).padding(controlsInset),
+            )
         }
 
         if (refusal != null) {

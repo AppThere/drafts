@@ -60,6 +60,31 @@ class SnapshotStore(
             )
         }.getOrNull()
 
+    /**
+     * 8.3's question on launch: does this document's snapshot hold work the file does not?
+     *
+     * "compare snapshot digest against the file's current digest. If they differ, the snapshot
+     * holds unsaved work." Digests and not timestamps, because a snapshot is written on a timer
+     * and is therefore almost always newer than the file even when it says exactly the same thing
+     * -- an mtime comparison would announce restored changes after every session.
+     *
+     * The record is carried along but not required. A snapshot whose `meta.json` is unreadable
+     * still holds the reader's words, and 8.3 says "Never auto-discard a snapshot"; losing the
+     * caret position is not a reason to lose the sentence it was sitting in.
+     */
+    suspend fun examine(
+        documentId: String,
+        fileDigest: Digest,
+    ): Recovery {
+        val text = textOf(documentId)
+
+        return when {
+            text == null -> Recovery.NothingToRestore
+            sha256(text.encodeToByteArray()) == fileDigest -> Recovery.NothingToRestore
+            else -> Recovery.UnsavedWork(text = text, record = recordOf(documentId))
+        }
+    }
+
     /** 8.3's pruning, for one document. Both files or neither. */
     suspend fun discard(documentId: String): Boolean {
         val text = store.delete(snapshotOf(documentId))

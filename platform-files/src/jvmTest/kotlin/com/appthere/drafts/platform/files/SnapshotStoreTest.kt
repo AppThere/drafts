@@ -5,6 +5,7 @@ import java.nio.file.Path
 import kotlin.io.path.createTempDirectory
 import kotlin.io.path.exists
 import kotlin.io.path.readText
+import kotlin.io.path.setLastModifiedTime
 import kotlin.io.path.writeText
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -172,6 +173,75 @@ class SnapshotStoreTest {
         snapshotPath = snapshots.snapshotOf(id).token,
     )
 
+    @Test
+    fun `a snapshot holding the same words as the file is nothing to restore`() =
+        runTest {
+            // The ordinary case on every launch: the last session ended with a save, so the snapshot
+            // and the file agree. Announcing restored changes here would cry wolf after every session
+            // and teach the reader to dismiss the one banner that matters.
+            snapshots.write(record(), ORIGINAL)
+
+            assertEquals(
+                Recovery.NothingToRestore,
+                snapshots.examine(ID, sha256(ORIGINAL.encodeToByteArray())),
+            )
+        }
+
+    @Test
+    fun `a snapshot holding more than the file is unsaved work`() =
+        runTest {
+            // 8.3: "If they differ, the snapshot holds unsaved work." The session ended without a save
+            // -- a crash, a kill, a battery -- and these words exist nowhere else.
+            snapshots.write(record(), TEXT)
+
+            val recovery = snapshots.examine(ID, sha256(ORIGINAL.encodeToByteArray()))
+
+            assertEquals(TEXT, (recovery as? Recovery.UnsavedWork)?.text)
+        }
+
+    @Test
+    fun `a document with no snapshot has nothing to restore`() =
+        runTest {
+            // Walked for every restored session on launch, most of which have never been snapshotted.
+            assertEquals(
+                Recovery.NothingToRestore,
+                snapshots.examine("never-opened", sha256(ORIGINAL.encodeToByteArray())),
+            )
+        }
+
+    @Test
+    fun `unsaved work is restored even when its record cannot be read`() =
+        runTest {
+            // "Never auto-discard a snapshot." An unreadable caret position is not a reason to discard
+            // the sentence the caret was sitting in.
+            snapshots.write(record(), TEXT)
+            directory.resolve("sessions/$ID/meta.json").writeText("{ not json at all")
+
+            val recovery = snapshots.examine(ID, sha256(ORIGINAL.encodeToByteArray()))
+
+            assertEquals(TEXT, (recovery as? Recovery.UnsavedWork)?.text)
+            assertNull((recovery as? Recovery.UnsavedWork)?.record)
+        }
+
+    @Test
+    fun `the comparison is of digests and not of timestamps`() =
+        runTest {
+            // A snapshot is written on a timer, so it is almost always newer than the file even when it
+            // says exactly the same thing. An mtime comparison would report unsaved work after every
+            // session that ended normally.
+            snapshots.write(record(), ORIGINAL)
+            val snapshotFile = directory.resolve("sessions/$ID/snapshot.md")
+            snapshotFile.setLastModifiedTime(
+                java.nio.file.attribute.FileTime
+                    .fromMillis(FAR_FUTURE),
+            )
+
+            assertEquals(
+                Recovery.NothingToRestore,
+                snapshots.examine(ID, sha256(ORIGINAL.encodeToByteArray())),
+            )
+        }
+
     /** A store that stops writing partway, standing in for a process that stopped. */
     private class StopsAfter(
         private val delegate: DocumentStore,
@@ -195,5 +265,8 @@ class SnapshotStoreTest {
         const val TEXT = "# Chapter 3\n\nUnsaved work.\n"
         const val ORIGINAL = "# Chapter 3\n"
         val CARET = CaretRecord(blockIndex = 42, offset = 17)
+
+        /** Comfortably after any real snapshot, so a timestamp comparison would notice. */
+        const val FAR_FUTURE = 4_000_000_000_000L
     }
 }

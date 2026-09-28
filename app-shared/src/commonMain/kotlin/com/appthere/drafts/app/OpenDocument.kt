@@ -9,9 +9,12 @@ import androidx.compose.runtime.setValue
 import com.appthere.drafts.editor.engine.DocumentSession
 import com.appthere.drafts.editor.engine.UndoHistory
 import com.appthere.drafts.editor.ui.EditorState
+import com.appthere.drafts.platform.files.Digest
+import com.appthere.drafts.platform.files.DocumentContents
 import com.appthere.drafts.platform.files.DocumentRef
 import com.appthere.drafts.platform.files.DocumentSessionState
 import com.appthere.drafts.platform.files.DocumentStore
+import com.appthere.drafts.platform.files.Recovery
 import com.appthere.drafts.platform.files.WriteOutcome
 
 /**
@@ -26,6 +29,7 @@ class OpenDocument(
     private val store: DocumentStore,
     editor: EditorState,
     opened: DocumentSessionState,
+    val restoredFromSnapshot: Boolean = false,
 ) {
     /**
      * Replaced wholesale by [reload], never edited in place.
@@ -42,6 +46,15 @@ class OpenDocument(
     private var savedRevision by mutableStateOf(editor.revision)
 
     /**
+     * True while the restored text is still not in the file.
+     *
+     * A document opened from an 8.3 snapshot starts unsaved even though nobody has typed: the words
+     * on screen are not the words on disk, which is the entire reason the snapshot was kept. The
+     * revision counter cannot say that on its own -- it starts at zero either way.
+     */
+    private var restoredButUnsaved by mutableStateOf(restoredFromSnapshot)
+
+    /**
      * 8.4's state, derived rather than stored.
      *
      * `dirty` is the editor's business and the other four are the store's, so anything that kept a
@@ -50,7 +63,7 @@ class OpenDocument(
      * keystroke without anything having to notify it.
      */
     val lifecycle: DocumentSessionState
-        get() = recorded.copy(hasUnsavedEdits = editor.revision != savedRevision)
+        get() = recorded.copy(hasUnsavedEdits = restoredButUnsaved || editor.revision != savedRevision)
 
     /**
      * 8.2's explicit save: re-read, compare, and write only if the file is untouched.
@@ -63,6 +76,7 @@ class OpenDocument(
         val outcome = store.writeIfUnchanged(recorded.ref, editor.text, recorded.base.digest)
         if (outcome is WriteOutcome.Written) {
             savedRevision = editor.revision
+            restoredButUnsaved = false
         }
         recorded = recorded.wrote(outcome)
         return outcome
@@ -89,6 +103,7 @@ class OpenDocument(
 
         editor = EditorState(DocumentSession(contents.text))
         savedRevision = editor.revision
+        restoredButUnsaved = false
         recorded = recorded.reloaded(contents)
     }
 }
@@ -123,21 +138,39 @@ sealed interface DocumentOpening {
 fun rememberOpenDocument(
     store: DocumentStore,
     ref: DocumentRef,
+    recover: (suspend (Digest) -> Recovery)? = null,
 ): DocumentOpening {
-    val opening by produceState<DocumentOpening>(DocumentOpening.Opening, store, ref) {
+    val opening by produceState<DocumentOpening>(DocumentOpening.Opening, store, ref, recover) {
         value =
             runCatching { store.read(ref) }
-                .map { contents ->
-                    DocumentOpening.Opened(
-                        OpenDocument(
-                            store = store,
-                            editor = EditorState(DocumentSession(contents.text)),
-                            opened = DocumentSessionState.opened(ref, contents),
-                        ),
-                    )
-                }.getOrElse { failure ->
+                .map { contents -> DocumentOpening.Opened(openedWith(store, ref, contents, recover)) }
+                .getOrElse { failure ->
                     DocumentOpening.Failed(failure.message ?: failure::class.simpleName.orEmpty())
                 }
     }
     return opening
+}
+
+/**
+ * Builds the document, restoring 8.3's snapshot over it when there is unsaved work in one.
+ *
+ * The recorded facts stay the *file's* facts even when the text came from the snapshot. That is
+ * what keeps 8.2 honest afterwards: the next save compares against the file as it is now, so a
+ * restored session that saves over a file someone else has edited is still refused.
+ */
+private suspend fun openedWith(
+    store: DocumentStore,
+    ref: DocumentRef,
+    contents: DocumentContents,
+    recover: (suspend (Digest) -> Recovery)?,
+): OpenDocument {
+    val recovery = recover?.invoke(contents.facts.digest) ?: Recovery.NothingToRestore
+    val restored = recovery as? Recovery.UnsavedWork
+
+    return OpenDocument(
+        store = store,
+        editor = EditorState(DocumentSession(restored?.text ?: contents.text)),
+        opened = DocumentSessionState.opened(ref, contents),
+        restoredFromSnapshot = restored != null,
+    )
 }

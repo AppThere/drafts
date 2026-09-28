@@ -18,8 +18,10 @@ import com.appthere.drafts.app.DraftsApp
 import com.appthere.drafts.app.SnapshotKeeper
 import com.appthere.drafts.app.rememberOpenDocument
 import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.platform.files.Digest
 import com.appthere.drafts.platform.files.DocumentRef
 import com.appthere.drafts.platform.files.PathDocumentStore
+import com.appthere.drafts.platform.files.Recovery
 import com.appthere.drafts.platform.files.SnapshotStore
 import com.appthere.drafts.platform.files.SnapshotTrigger
 import com.appthere.drafts.platform.files.desktopIdentity
@@ -84,12 +86,21 @@ private fun FileDocument(
     val store = remember { PathDocumentStore() }
     val ref = remember(path) { DocumentRef(path) }
     val snapshots = remember { SnapshotStore(store, desktopSessionRoot()) }
+    val identity = remember(path) { desktopIdentity(path) }
 
-    when (val opening = rememberOpenDocument(store, ref)) {
+    // 8.3, on the way in: if a snapshot holds words the file does not, the document opens with
+    // those words. The comparison happens before anything is shown, so the reader never sees the
+    // file's version flash up and be replaced.
+    val recover: suspend (Digest) -> Recovery =
+        remember(identity) {
+            { digest -> snapshots.examine(identity.documentId, digest) }
+        }
+
+    when (val opening = rememberOpenDocument(store, ref, recover)) {
         is DocumentOpening.Opened -> {
             val keeper =
                 remember(opening.document) {
-                    SnapshotKeeper(opening.document, snapshots, desktopIdentity(path))
+                    SnapshotKeeper(opening.document, snapshots, identity)
                 }
 
             // 8.1's "Window close, before teardown". Registered upwards rather than handled here,

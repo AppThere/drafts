@@ -61,6 +61,17 @@ class SnapshotKeeper(
         scrollOffset: Int,
     ): Boolean = schedule.hasUnsavedEdits && capture(trigger, scrollOffset)
 
+    /**
+     * 8.3's "[ Discard ]", which is the only way a snapshot is ever thrown away deliberately.
+     *
+     * "Never auto-discard a snapshot" leaves exactly one door open: the reader saying so. The
+     * schedule is cleared as well, or the next idle pause would write the snapshot straight back.
+     */
+    suspend fun discard(): Boolean {
+        schedule.snapshotted()
+        return snapshots.discard(identity.documentId)
+    }
+
     private suspend fun capture(
         trigger: SnapshotTrigger,
         scrollOffset: Int,
