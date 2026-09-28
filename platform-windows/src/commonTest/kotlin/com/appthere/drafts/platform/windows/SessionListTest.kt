@@ -71,7 +71,7 @@ class SessionListTest {
                     accessToken = "/documents/salt-road.fountain",
                 )
 
-            val updated = sessions.savedAs(moved)
+            val updated = sessions.updated(moved)
 
             assertEquals(untitled.documentId, updated?.documentId)
             assertEquals(moved.uri, updated?.uri)
@@ -82,7 +82,7 @@ class SessionListTest {
     @Test
     fun `save as with no session to move reports none`() =
         runTest {
-            assertNull(sessions().savedAs(identity("nobody")))
+            assertNull(sessions().updated(identity("nobody")))
         }
 
     @Test

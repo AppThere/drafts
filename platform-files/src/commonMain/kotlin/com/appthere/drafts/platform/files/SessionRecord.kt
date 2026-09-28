@@ -94,6 +94,16 @@ data class SessionRecord(
     @SerialName("closedAt") val closedAt: Long? = null,
     val window: WindowRecord? = null,
 ) {
+    /** Who this session is for, as the record last described it. */
+    fun identity(): SessionIdentity =
+        SessionIdentity(
+            documentId = documentId,
+            uri = uri,
+            displayName = displayName,
+            kind = kind,
+            accessToken = accessToken,
+        )
+
     companion object {
         /**
          * Lenient on read, tidy on write.

@@ -64,13 +64,14 @@ class SessionList(
     }
 
     /**
-     * 7.4's *Save As* has moved a document to [moved]'s file, keeping its id.
+     * The record follows a document whose identity changed, keeping its id: 7.4's *Save As* gave it
+     * a file, or its kind was chosen while it was untitled.
      *
-     * The record follows it -- file, name, kind and access token -- so the next launch reopens the
-     * file rather than an untitled document, or the file it was saved away from. Returns the updated
-     * record, or null if there was none to update.
+     * File, name, kind and access token all come from [moved], so the next launch reopens the file
+     * rather than an untitled document, and as the kind the reader chose. Returns the updated record,
+     * or null if there was none to update.
      */
-    suspend fun savedAs(moved: SessionIdentity): SessionRecord? {
+    suspend fun updated(moved: SessionIdentity): SessionRecord? {
         val record = snapshots.recordOf(moved.documentId) ?: return null
         val updated =
             record.copy(

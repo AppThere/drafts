@@ -8,6 +8,7 @@ import com.appthere.drafts.design.Theme
 import com.appthere.drafts.platform.files.DocumentRef
 import com.appthere.drafts.platform.files.DocumentStore
 import com.appthere.drafts.platform.files.WriteOutcome
+import com.appthere.drafts.platform.intents.DocumentKind
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -74,9 +75,31 @@ class SettingsStore(
         return store.writeAtomically(refFor(kind), encoded) is WriteOutcome.Written
     }
 
+    /**
+     * 7.4: "An untitled document starts as the kind the reader last created -- Markdown on first
+     * launch."
+     *
+     * Beside the per-kind settings, because it is the same sort of thing: a choice the reader made,
+     * kept so they do not have to make it again. Anything unreadable is the first launch.
+     */
+    suspend fun kindForNew(): DocumentKind =
+        runCatching { store.read(newKindRef).text.trim() }
+            .getOrNull()
+            ?.let { id -> DocumentKind.entries.firstOrNull { it.id == id } }
+            ?: DocumentKind.Markdown
+
+    /** Remembers [kind] as the one the reader last created, for the next new document. */
+    suspend fun rememberKindForNew(kind: DocumentKind): Boolean =
+        store.writeAtomically(newKindRef, kind.id) is WriteOutcome.Written
+
     private fun refFor(kind: String) = DocumentRef("$root/$kind.json")
 
+    private val newKindRef get() = DocumentRef("$root/$NEW_KIND")
+
     private companion object {
+        /** Not `.json`: it holds one word, and a per-kind settings file is never named for it. */
+        const val NEW_KIND = "new-document-kind"
+
         /**
          * Lenient on read, so a settings file written by a later version opens in an earlier one
          * with the fields it understands rather than being discarded whole.

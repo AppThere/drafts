@@ -3,6 +3,7 @@ package com.appthere.drafts.app.desktop
 import com.appthere.drafts.platform.files.PathDocumentStore
 import com.appthere.drafts.platform.files.SnapshotStore
 import com.appthere.drafts.platform.files.desktopIdentity
+import com.appthere.drafts.platform.intents.DocumentKind
 import com.appthere.drafts.platform.windows.SessionList
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Path
@@ -39,6 +40,20 @@ class LaunchTest {
             assertNull(only.uri, "The new document claimed a file")
             assertEquals(UNTITLED, only.displayName)
             assertEquals("markdown", only.kind)
+        }
+
+    @Test
+    fun `the untitled document is the kind the reader last created`() =
+        runBlocking {
+            val opened =
+                sessionsAtLaunch(
+                    sessions,
+                    path = null,
+                    untitledName = UNTITLED,
+                    newKind = DocumentKind.Fountain,
+                ).single()
+
+            assertEquals("fountain", opened.kind)
         }
 
     @Test

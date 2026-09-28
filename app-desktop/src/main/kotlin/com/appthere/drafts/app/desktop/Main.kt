@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -34,6 +35,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.appthere.drafts.app.DocumentOpening
 import com.appthere.drafts.app.DraftsApp
+import com.appthere.drafts.app.KindChange
 import com.appthere.drafts.app.SampleDocument
 import com.appthere.drafts.app.SettingsStore
 import com.appthere.drafts.app.SnapshotKeeper
@@ -63,6 +65,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import java.awt.Desktop
 import java.awt.Frame
 
@@ -152,7 +155,7 @@ private fun ApplicationScope.DraftsApplication(
         // than thirty days ago has no snapshot worth reopening.
         stores.snapshots.prune(epochMillis())
 
-        open += sessionsAtLaunch(sessions, args.firstOrNull(), Strings.UNTITLED)
+        open += sessionsAtLaunch(sessions, args.firstOrNull(), Strings.UNTITLED, stores.settings.kindForNew())
         restored = true
 
         // Documents handed over by later launches, and by macOS. A new window each, per 9.4.
@@ -313,6 +316,8 @@ private fun FileDocument(
         }
     val moved by rememberUpdatedState(onMove)
     val saving = remember(stores) { SaveAs(stores.sessions) { moved(it) } }
+    val kinds = remember(stores) { KindChange(stores.sessions, stores.settings) { moved(it) } }
+    val scope = rememberCoroutineScope()
 
     when (opening) {
         is DocumentOpening.Opened -> {
@@ -340,6 +345,13 @@ private fun FileDocument(
                         chooseSaveLocation(parent, Strings.SAVE_AS, suggested, near = record.accessToken)
                             ?.let { path -> saving.to(path, opening.document, record, keeper) }
                     },
+                    // 7.4's kind, while there is no file whose extension already says.
+                    onKindChange =
+                        if (record.uri == null) {
+                            { chosen -> scope.launch { kinds.to(chosen, record, keeper) } }
+                        } else {
+                            null
+                        },
                 )
             }
         }
@@ -382,15 +394,6 @@ private class Stores(
         }
     }
 }
-
-private fun SessionRecord.identity() =
-    SessionIdentity(
-        documentId = documentId,
-        uri = uri,
-        displayName = displayName,
-        kind = kind,
-        accessToken = accessToken,
-    )
 
 /**
  * F11, or Ctrl+Cmd+F where that is the convention.

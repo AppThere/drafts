@@ -95,6 +95,22 @@ and Windows go through the same lookup, which Skiko implements for them; neither
 
 ---
 
+## 7.4 — Choosing Fountain does not yet re-interpret the text
+
+**Spec:** "choosing Fountain re-interprets the same text as Fountain and applies the Fountain reader
+settings."
+
+**Code:** choosing Fountain changes the session's kind, the extension *Save As* offers, the reader
+settings the window wears, and the kind the next new document starts as. The text is still parsed
+as Markdown, as every `.fountain` file is today.
+
+**Why:** there is no Fountain parser yet; `:core-parse-fountain` is Phase 7. Everything the choice
+can honestly change, it changes.
+
+**Closes when:** Phase 7's parser exists and the editor chooses its parser by kind.
+
+---
+
 ## 12 — Focus mode dims by block, not by sentence
 
 **Spec:** "**Focus mode** as an option: dim all blocks except the current one, or the current

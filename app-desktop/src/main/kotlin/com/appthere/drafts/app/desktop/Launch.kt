@@ -16,19 +16,20 @@ import com.appthere.drafts.platform.windows.SessionList
  * Only then. Sessions to restore mean the reader is picking up where they left off, and 7.4 is
  * explicit that "a launch that always added a blank window would leave one to close every time".
  *
- * Markdown, for now. 7.4 says "the kind the reader last created", and the thing that makes a
- * reader's choice of kind -- the switch in the chrome -- is what will remember it.
+ * The untitled document is [newKind]: "the kind the reader last created -- Markdown on first
+ * launch".
  */
 internal suspend fun sessionsAtLaunch(
     sessions: SessionList,
     path: String?,
     untitledName: String,
+    newKind: DocumentKind = DocumentKind.Markdown,
 ): List<SessionRecord> {
     val open = sessions.restorable().toMutableList()
     path?.let { open.show(it, sessions) }
 
     if (open.isEmpty()) {
-        open += sessions.opened(SessionIdentity.untitled(kind = DocumentKind.Markdown.id, displayName = untitledName))
+        open += sessions.opened(SessionIdentity.untitled(kind = newKind.id, displayName = untitledName))
     }
     return open
 }

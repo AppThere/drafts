@@ -18,6 +18,11 @@ object Strings {
     /** 7.4: the name a new document has until its first save gives it one. */
     const val UNTITLED = "Untitled"
 
+    /** 7.4's choice of kind for an untitled document, named as a writer would name them. */
+    const val KIND = "Kind"
+    const val KIND_MARKDOWN = "Markdown"
+    const val KIND_FOUNTAIN = "Fountain"
+
     /** 7.4's *Save As*: the dialog's title, and the words when a save does not happen. */
     const val SAVE_AS = "Save As"
     const val COULD_NOT_SAVE =

@@ -2,8 +2,10 @@ package com.appthere.drafts.app
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
@@ -11,7 +13,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -44,6 +45,7 @@ import com.appthere.drafts.editor.ui.BlockEditor
 import com.appthere.drafts.editor.ui.EditorState
 import com.appthere.drafts.editor.ui.handleShortcut
 import com.appthere.drafts.platform.files.WriteOutcome
+import com.appthere.drafts.platform.intents.DocumentKind
 import kotlinx.coroutines.launch
 
 /**
@@ -90,6 +92,9 @@ fun DraftsApp(
  * saves there, and returns what happened -- null if the reader cancelled. It belongs to the host
  * because the picker does; without one, an untitled document has nowhere to go and Ctrl+S does
  * nothing, which is the honest answer on a platform that has no picker yet.
+ *
+ * [onKindChange] is 7.4's choice of kind while the document is untitled. The host records it; the
+ * window only offers it, and only while there is no file whose extension already says.
  */
 @Composable
 fun DraftsApp(
@@ -100,20 +105,13 @@ fun DraftsApp(
     settingsStore: SettingsStore? = null,
     kind: String = DEFAULT_KIND,
     saveAs: (suspend () -> WriteOutcome?)? = null,
+    onKindChange: ((DocumentKind) -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
     val scroll = rememberLazyListState()
     val autoHide = rememberAutoHide(document)
 
-    // 8.1's autosave, when the platform has somewhere app-private to put it. Null rather than a
-    // no-op keeper so that a build without snapshot storage is visibly without it.
-    if (keeper != null) {
-        SnapshotEffect(
-            keeper = keeper,
-            revision = document.editor.revision,
-            scrollOffset = { scroll.firstVisibleItemIndex * SCROLL_SCALE + scroll.firstVisibleItemScrollOffset },
-        )
-    }
+    SessionEffects(document, keeper, scroll)
 
     // A refusal, not a state. 8.4 puts the state in the chrome and allows "dialogs only on
     // attempted write", so the dialog is driven by the outcome of a save and cleared by answering
@@ -124,14 +122,6 @@ fun DraftsApp(
     // 8.3's banner. Separate state from `restoredFromSnapshot`, which is a fact about how the
     // document opened and does not stop being true once the reader has answered.
     var announceRestored by remember(document) { mutableStateOf(document.restoredFromSnapshot) }
-
-    // 8.1's other half of "caret and scroll survive with the text". Once, on open: a reader who has
-    // scrolled since should not be dragged back by a recomposition.
-    LaunchedEffect(document) {
-        document.scrollOffset?.let { offset ->
-            scroll.scrollToItem(offset / SCROLL_SCALE, offset % SCROLL_SCALE)
-        }
-    }
 
     DraftsWindow(
         editor = document.editor,
@@ -182,9 +172,13 @@ fun DraftsApp(
         // The dot is what fades. The controls panel, the conflict dialog and the restore banner
         // are each summoned deliberately and stay until answered: fading something the reader just
         // asked for, or is about to Tab into, would be the interface taking it away from them.
-        Box(Modifier.align(Alignment.TopStart).padding(controlsInset)) {
-            FadingChrome(hidden = autoHide.hidden) { DocumentStateBadge(document.lifecycle.state) }
-        }
+        StatusChrome(
+            document = document,
+            kind = kind,
+            hidden = autoHide.hidden,
+            onKindChange = onKindChange,
+            modifier = Modifier.align(Alignment.TopStart).padding(controlsInset),
+        )
 
         if (announceRestored) {
             RestoredBanner(
@@ -253,14 +247,11 @@ private fun DraftsWindow(
     chromeHidden: Boolean = false,
     chrome: @Composable BoxScope.() -> Unit,
 ) {
-    var settings by remember { mutableStateOf(initialSettings) }
+    // Keyed on what the host hands in, so a document whose kind changes -- chosen while untitled,
+    // or given by Save As's extension -- takes that kind's settings (5.5 keeps them per kind)
+    // rather than wearing the old kind's until it is reopened.
+    val settings = remember(initialSettings) { WindowSettings(initialSettings) }
     val scope = rememberCoroutineScope()
-
-    // Whether the most recent change failed to reach disk. The *most recent*: a stepper pressed
-    // three times is three writes in flight, and only the last one says what is on disk now. Each
-    // write takes a ticket so an earlier one finishing late cannot overwrite a later answer.
-    var settingsUnsaved by remember { mutableStateOf(false) }
-    var settingsTicket by remember { mutableIntStateOf(0) }
     val panels = remember { Panels() }
     val root = remember { FocusRequester() }
 
@@ -276,7 +267,7 @@ private fun DraftsWindow(
     }
     val clipboard = LocalClipboardManager.current
 
-    DraftsTheme(settings) {
+    DraftsTheme(settings.current) {
         Box(
             modifier
                 .fillMaxSize()
@@ -356,19 +347,11 @@ private fun DraftsWindow(
 
             if (panels.controls) {
                 ReaderControls(
-                    settings = settings,
+                    settings = settings.current,
                     // 5.5: "persisted per document type". Written as the reader changes them, so
-                    // closing the window is not a way to lose them -- which is what closing the
-                    // window did until now.
-                    onChange = { changed ->
-                        settings = changed
-                        val ticket = ++settingsTicket
-                        scope.launch {
-                            val kept = onSettingsChange(changed)
-                            if (ticket == settingsTicket) settingsUnsaved = !kept
-                        }
-                    },
-                    unsaved = settingsUnsaved,
+                    // closing the window is not a way to lose them.
+                    onChange = { changed -> settings.change(changed, scope, onSettingsChange) },
+                    unsaved = settings.unsaved,
                     modifier = Modifier.align(Alignment.TopEnd).padding(controlsInset),
                     onClose = refocused(panels::closeControls),
                     onShowLicences = panels::openLicences,
@@ -380,6 +363,66 @@ private fun DraftsWindow(
                     onClose = refocused(panels::closeLicences),
                     modifier = Modifier.align(Alignment.Center).padding(controlsInset),
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Keeping the session: 8.1's autosave, and 7.3's scroll put back where the reader left it.
+ *
+ * The autosave runs only when the platform has somewhere app-private to put snapshots. [keeper] is
+ * null rather than a no-op, so a build without snapshot storage is visibly without it.
+ *
+ * The scroll is restored once, on open: a reader who has scrolled since should not be dragged back
+ * by a recomposition. (The caret was already placed as the document was built.)
+ */
+@Composable
+private fun SessionEffects(
+    document: OpenDocument,
+    keeper: SnapshotKeeper?,
+    scroll: LazyListState,
+) {
+    if (keeper != null) {
+        SnapshotEffect(
+            keeper = keeper,
+            revision = document.editor.revision,
+            scrollOffset = { scroll.firstVisibleItemIndex * SCROLL_SCALE + scroll.firstVisibleItemScrollOffset },
+        )
+    }
+
+    LaunchedEffect(document) {
+        document.scrollOffset?.let { offset ->
+            scroll.scrollToItem(offset / SCROLL_SCALE, offset % SCROLL_SCALE)
+        }
+    }
+}
+
+/**
+ * The chrome at the window's top start: 8.4's status, and 7.4's kind while the document is untitled
+ * -- *Untitled · Markdown*, a control "until the first save".
+ *
+ * All of it fades together on sustained typing (12), and the kind cannot be changed while faded.
+ */
+@Composable
+private fun StatusChrome(
+    document: OpenDocument,
+    kind: String,
+    hidden: Boolean,
+    onKindChange: ((DocumentKind) -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier) {
+        FadingChrome(hidden = hidden) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(chromeGap),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                DocumentStateBadge(document.lifecycle.state)
+
+                if (document.isUntitled && onKindChange != null) {
+                    KindSwitch(kind = kindOf(kind), enabled = !hidden, onChange = onKindChange)
+                }
             }
         }
     }
@@ -404,45 +447,7 @@ private const val DEFAULT_KIND = "markdown"
 /** Far enough from the corner to read as a panel over the document rather than part of the frame. */
 private val controlsInset = 16.dp
 
-/**
- * A modifier going down, which 12 counts as reaching for the chrome.
- *
- * The key itself, not a shortcut using it: pressing Ctrl and thinking better of it is still the
- * reader looking for something.
- */
-private fun rouses(event: KeyEvent): Boolean =
-    event.type == KeyEventType.KeyDown &&
-        event.key in
-        setOf(
-            Key.CtrlLeft,
-            Key.CtrlRight,
-            Key.ShiftLeft,
-            Key.ShiftRight,
-            Key.AltLeft,
-            Key.AltRight,
-            Key.MetaLeft,
-            Key.MetaRight,
-        )
+/** Between the status badge and the kind beside it. */
+private val chromeGap = 12.dp
 
-/** Escape, which cancels whatever is being asked. */
-private fun dismisses(event: KeyEvent): Boolean = event.type == KeyEventType.KeyDown && event.key == Key.Escape
-
-/** 8.2's explicit save, on the shortcut every editor uses for it. */
-private fun saves(event: KeyEvent): Boolean =
-    event.type == KeyEventType.KeyDown &&
-        (event.isCtrlPressed || event.isMetaPressed) &&
-        !event.isShiftPressed &&
-        event.key == Key.S
-
-/** 7.4's *Save As*, on the shortcut every editor uses for it. */
-private fun savesAs(event: KeyEvent): Boolean =
-    event.type == KeyEventType.KeyDown &&
-        (event.isCtrlPressed || event.isMetaPressed) &&
-        event.isShiftPressed &&
-        event.key == Key.S
-
-/** 5.5's settings, on the shortcut every editor uses for them. */
-private fun togglesControls(event: KeyEvent): Boolean =
-    event.type == KeyEventType.KeyDown &&
-        (event.isCtrlPressed || event.isMetaPressed) &&
-        event.key == Key.Comma
+private fun kindOf(id: String): DocumentKind = DocumentKind.entries.firstOrNull { it.id == id } ?: DocumentKind.Markdown

@@ -6,6 +6,7 @@ import com.appthere.drafts.design.Palettes
 import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.design.Theme
 import com.appthere.drafts.platform.files.DocumentRef
+import com.appthere.drafts.platform.intents.DocumentKind
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -162,6 +163,31 @@ class SettingsStoreTest {
             assertEquals(Theme.Fixed(Palettes.Dark), restored.theme)
             assertEquals(LINE_HEIGHT_IN_FILE, restored.lineHeight)
             assertEquals(ReaderSettings().paragraphSpacing, restored.paragraphSpacing)
+        }
+
+    @Test
+    fun `a first launch creates markdown`() =
+        runTest {
+            // 7.4: "the kind the reader last created -- Markdown on first launch".
+            assertEquals(DocumentKind.Markdown, store().kindForNew())
+        }
+
+    @Test
+    fun `the kind last created is the kind created next`() =
+        runTest {
+            val settings = store()
+
+            settings.rememberKindForNew(DocumentKind.Fountain)
+
+            assertEquals(DocumentKind.Fountain, settings.kindForNew())
+        }
+
+    @Test
+    fun `a kind no version knows reads as a first launch`() =
+        runTest {
+            val store = FakeDocumentStore(DocumentRef("$ROOT/new-document-kind"), "sonnet")
+
+            assertEquals(DocumentKind.Markdown, SettingsStore(store, ROOT).kindForNew())
         }
 
     private fun store() = SettingsStore(FakeDocumentStore(DocumentRef("$ROOT/unused"), ""), ROOT)

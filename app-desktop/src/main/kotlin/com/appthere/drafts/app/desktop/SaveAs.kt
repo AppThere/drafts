@@ -37,7 +37,7 @@ internal class SaveAs(
         val outcome = document.saveAs(DocumentRef(moved.accessToken ?: path))
         if (outcome is WriteOutcome.Written) {
             keeper?.movedTo(moved)
-            sessions.savedAs(moved)?.let(onMoved)
+            sessions.updated(moved)?.let(onMoved)
         }
         return outcome
     }
