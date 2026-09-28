@@ -328,7 +328,7 @@ private fun FileDocument(
         is DocumentOpening.Opened -> {
             val keeper = remember(opening.document) { SnapshotKeeper(opening.document, snapshots, identity) }
 
-            onReadyToClose { keeper.snapshotOn(SnapshotTrigger.Closing, scrollOffset = 0) }
+            onReadyToClose { keeper.snapshotOn(SnapshotTrigger.Closing) }
 
             saved?.let { initial ->
                 DraftsApp(

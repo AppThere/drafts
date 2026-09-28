@@ -11,6 +11,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -181,10 +182,7 @@ class SnapshotStoreTest {
             // and teach the reader to dismiss the one banner that matters.
             snapshots.write(record(), ORIGINAL)
 
-            assertEquals(
-                Recovery.NothingToRestore,
-                snapshots.examine(ID, sha256(ORIGINAL.encodeToByteArray())),
-            )
+            assertIs<Recovery.NothingToRestore>(snapshots.examine(ID, sha256(ORIGINAL.encodeToByteArray())))
         }
 
     @Test
@@ -204,7 +202,7 @@ class SnapshotStoreTest {
         runTest {
             // Walked for every restored session on launch, most of which have never been snapshotted.
             assertEquals(
-                Recovery.NothingToRestore,
+                Recovery.NothingToRestore(record = null),
                 snapshots.examine("never-opened", sha256(ORIGINAL.encodeToByteArray())),
             )
         }
@@ -236,10 +234,56 @@ class SnapshotStoreTest {
                     .fromMillis(FAR_FUTURE),
             )
 
-            assertEquals(
-                Recovery.NothingToRestore,
-                snapshots.examine(ID, sha256(ORIGINAL.encodeToByteArray())),
-            )
+            assertIs<Recovery.NothingToRestore>(snapshots.examine(ID, sha256(ORIGINAL.encodeToByteArray())))
+        }
+
+    @Test
+    fun `nothing to restore still says where the reader was`() =
+        runTest {
+            // 7.3 restores caret and scroll on every launch, not only after a crash. A clean session
+            // has no words to give back and still has a place to give back.
+            snapshots.write(record(), ORIGINAL)
+
+            val recovery = snapshots.examine(ID, sha256(ORIGINAL.encodeToByteArray()))
+
+            assertIs<Recovery.NothingToRestore>(recovery)
+            assertEquals(CARET, recovery.record?.caret)
+        }
+
+    @Test
+    fun `a snapshot does not erase the window's geometry`() =
+        runTest {
+            // The session list writes the window as it moves; the snapshot writes the text as it
+            // changes. Each autosave used to write a record of its own with no window in it, so any
+            // edit after the last move reopened the window at its default size.
+            snapshots.write(record(), TEXT)
+            snapshots.putRecord(requireNotNull(snapshots.recordOf(ID)).copy(window = WINDOW, closedAt = CLOSED))
+
+            snapshots.write(record(), TEXT + "More.")
+
+            assertEquals(WINDOW, snapshots.recordOf(ID)?.window)
+            assertEquals(CLOSED, snapshots.recordOf(ID)?.closedAt)
+        }
+
+    @Test
+    fun `a position can be remembered without touching the text`() =
+        runTest {
+            // For a document with nothing unsaved: its words are in the file already, so only the
+            // place the reader got to is written.
+            snapshots.write(record(), TEXT)
+            val elsewhere = CaretRecord(blockIndex = 7, offset = 3)
+
+            assertTrue(snapshots.rememberPosition(ID, elsewhere, scrollOffset = 99))
+
+            assertEquals(elsewhere, snapshots.recordOf(ID)?.caret)
+            assertEquals(99, snapshots.recordOf(ID)?.scrollOffset)
+            assertEquals(TEXT, snapshots.textOf(ID), "Remembering a position rewrote the snapshot")
+        }
+
+    @Test
+    fun `a session with no record has no position to remember`() =
+        runTest {
+            assertFalse(snapshots.rememberPosition("never-opened", CARET, scrollOffset = 0))
         }
 
     /** A store that stops writing partway, standing in for a process that stopped. */
@@ -262,6 +306,8 @@ class SnapshotStoreTest {
 
     private companion object {
         const val ID = "6f1c2f7e-0000-4000-8000-000000000001"
+        const val CLOSED = 1_700_000_000_000L
+        val WINDOW = WindowRecord(x = 120, y = 80, width = 900, height = 1100, placement = "floating")
         const val TEXT = "# Chapter 3\n\nUnsaved work.\n"
         const val ORIGINAL = "# Chapter 3\n"
         val CARET = CaretRecord(blockIndex = 42, offset = 17)

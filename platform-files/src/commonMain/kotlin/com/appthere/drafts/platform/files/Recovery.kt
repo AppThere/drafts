@@ -12,8 +12,19 @@ package com.appthere.drafts.platform.files
  * directory must not stop the others being examined.
  */
 sealed interface Recovery {
+    /**
+     * Where the reader was, per 7.3's record, or null if nothing was recorded.
+     *
+     * Carried in both outcomes. Whether there is work to restore and where the reader had got to
+     * are separate questions: a document read, scrolled and closed without an edit has nothing to
+     * recover and still has a place to go back to.
+     */
+    val record: SessionRecord?
+
     /** No snapshot, or one that matches the file. Nothing to tell the reader about. */
-    data object NothingToRestore : Recovery
+    data class NothingToRestore(
+        override val record: SessionRecord? = null,
+    ) : Recovery
 
     /**
      * The snapshot holds work the file does not.
@@ -24,6 +35,6 @@ sealed interface Recovery {
      */
     data class UnsavedWork(
         val text: String,
-        val record: SessionRecord?,
+        override val record: SessionRecord?,
     ) : Recovery
 }

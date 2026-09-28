@@ -121,7 +121,7 @@ fun DraftsApp(
     // 8.1's other half of "caret and scroll survive with the text". Once, on open: a reader who has
     // scrolled since should not be dragged back by a recomposition.
     LaunchedEffect(document) {
-        document.restored?.scrollOffset?.let { offset ->
+        document.scrollOffset?.let { offset ->
             scroll.scrollToItem(offset / SCROLL_SCALE, offset % SCROLL_SCALE)
         }
     }

@@ -99,7 +99,9 @@ private fun startedFrom(
     uri = identity.uri,
     displayName = identity.displayName,
     kind = identity.kind,
-    caret = CaretRecord(blockIndex = 0, offset = 0),
+    // -1: nowhere yet. Block 0 would reopen a document the reader never clicked into with its first
+    // block revealed, as though they had been editing the title.
+    caret = CaretRecord(blockIndex = -1, offset = 0),
     scrollOffset = 0,
     baseDigest = unreadDigest,
     snapshotPath = snapshotPath,

@@ -248,21 +248,38 @@ class RecoveryTest {
         runSkikoComposeUiTest(size = SIZE) {
             val document = open()
 
-            assertEquals(SCROLL, document.restored?.scrollOffset)
+            assertEquals(SCROLL, document.scrollOffset)
         }
     }
 
     @Test
-    fun `a document that was not restored has no caret to put back`() {
-        // Opening a file normally should leave the caret nowhere, which is what puts every block in
-        // preview state. A restored caret on an ordinary open would reveal a block nobody asked for.
-        givenSnapshot(ORIGINAL)
+    fun `a document nobody recorded a caret for opens with none`() {
+        // Opening a file with no recorded position should leave the caret nowhere, which is what
+        // puts every block in preview state. An invented caret would reveal a block nobody asked for.
+        givenSnapshot(ORIGINAL, caret = CaretRecord(blockIndex = -1, offset = 0))
 
         runSkikoComposeUiTest(size = SIZE) {
             val document = open()
 
             assertNull(document.editor.caret)
-            assertNull(document.restored?.scrollOffset)
+            assertFalse(document.restoredFromSnapshot)
+        }
+    }
+
+    @Test
+    fun `a document with nothing unsaved still reopens where the reader left it`() {
+        // Phase 4's acceptance: "Session restores caret, scroll". The snapshot matches the file, so
+        // there is no work to restore and no banner -- but the reader was on the third block, a
+        // long way down, and that is where they should come back to.
+        givenSnapshot(MANY_BLOCKS, caret = CaretRecord(blockIndex = 2, offset = 1), scroll = SCROLL)
+        file().writeText(MANY_BLOCKS)
+
+        runSkikoComposeUiTest(size = SIZE) {
+            val document = open()
+
+            assertFalse(document.restoredFromSnapshot, "A clean document announced restored work")
+            assertEquals(2, document.editor.blocks.indexOfFirst { it.id == document.editor.caret?.block })
+            assertEquals(SCROLL, document.scrollOffset)
         }
     }
 

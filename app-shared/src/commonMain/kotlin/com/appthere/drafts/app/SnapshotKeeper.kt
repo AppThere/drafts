@@ -30,6 +30,21 @@ class SnapshotKeeper(
     var lastTrigger: SnapshotTrigger? = null
         private set
 
+    /**
+     * The scroll position the window last reported.
+     *
+     * Kept here because the one trigger that has no scroll state to hand -- the window closing,
+     * which the host fires from outside the composition -- still has to record where the reader
+     * was. It used to record zero, which reopened every closed document at the top.
+     */
+    var scrollOffset: Int = 0
+        private set
+
+    /** Tells the keeper where the window is scrolled to, as it moves. */
+    fun scrolled(offset: Int) {
+        scrollOffset = offset
+    }
+
     /** True when the editor has moved on from the last snapshot. */
     fun hasUnsavedEdits(): Boolean = schedule.hasUnsavedEdits
 
@@ -56,11 +71,20 @@ class SnapshotKeeper(
      * Each is a moment at which the reader may not get another one, so there is no condition to
      * evaluate beyond whether anything has changed. Writing an identical snapshot on every blur
      * would be wasted I/O on a path that runs whenever someone alt-tabs.
+     *
+     * With nothing unsaved there are no words to capture, but there is still a place: the caret and
+     * the scroll are written to the record alone, so a document that was only read reopens where
+     * the reader left it (7.3).
      */
     suspend fun snapshotOn(
         trigger: SnapshotTrigger,
-        scrollOffset: Int,
-    ): Boolean = schedule.hasUnsavedEdits && capture(trigger, scrollOffset)
+        scrollOffset: Int = this.scrollOffset,
+    ): Boolean =
+        if (schedule.hasUnsavedEdits) {
+            capture(trigger, scrollOffset)
+        } else {
+            snapshots.rememberPosition(identity.documentId, caretRecord(), scrollOffset)
+        }
 
     /**
      * 8.3's retention clock, started by a successful save.
@@ -103,16 +127,13 @@ class SnapshotKeeper(
      * The editor holds a `BlockId`, which is meaningless after a restart -- ids are handed out per
      * session. An index survives, which is why 7.3 stores one.
      */
-    private fun recordOf(scrollOffset: Int): SessionRecord {
-        val caret = document.editor.caret
-        val index = caret?.let { current -> document.editor.blocks.indexOfFirst { it.id == current.block } } ?: -1
-
-        return SessionRecord(
+    private fun recordOf(scrollOffset: Int): SessionRecord =
+        SessionRecord(
             documentId = identity.documentId,
             uri = identity.uri,
             displayName = identity.displayName,
             kind = identity.kind,
-            caret = CaretRecord(blockIndex = index, offset = caret?.offset ?: 0),
+            caret = caretRecord(),
             scrollOffset = scrollOffset,
             baseDigest =
                 document.lifecycle.base.digest
@@ -120,5 +141,12 @@ class SnapshotKeeper(
             accessToken = identity.accessToken,
             snapshotPath = snapshots.snapshotOf(identity.documentId).token,
         )
+
+    /** The caret in 7.3's terms, with block index -1 for a document the reader has not clicked into. */
+    private fun caretRecord(): CaretRecord {
+        val caret = document.editor.caret
+        val index = caret?.let { current -> document.editor.blocks.indexOfFirst { it.id == current.block } } ?: -1
+
+        return CaretRecord(blockIndex = index, offset = caret?.offset ?: 0)
     }
 }

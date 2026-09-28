@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalWindowInfo
 import com.appthere.drafts.platform.files.SnapshotTrigger
 import kotlinx.coroutines.delay
@@ -58,6 +59,12 @@ fun SnapshotEffect(
             delay(if (wait > 0) wait else RETRY_AFTER_MILLIS)
             keeper.snapshotIfDue(currentTime(), currentScroll())
         }
+    }
+
+    // The closing snapshot is fired by the host, which has no scroll state of its own. Telling the
+    // keeper as the window scrolls is what lets that one record where the reader actually was.
+    LaunchedEffect(keeper) {
+        snapshotFlow { currentScroll() }.collect { keeper.scrolled(it) }
     }
 
     LaunchedEffect(keeper, focused) {

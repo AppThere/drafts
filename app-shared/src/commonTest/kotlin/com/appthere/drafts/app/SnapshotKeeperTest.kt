@@ -126,6 +126,48 @@ class SnapshotKeeperTest {
         }
 
     @Test
+    fun `closing with nothing unsaved records where the reader is and leaves the text alone`() =
+        runTest {
+            // A document that was only read: no words to capture, but 7.3 still brings the reader
+            // back to the caret and scroll they left. Captured once so a record exists, as the
+            // session list's would.
+            val keeper = keeper(TWO_BLOCKS)
+            keeper.document.type("Unsaved. ")
+            keeper.subject.edited(START)
+            keeper.subject.snapshotOn(SnapshotTrigger.FocusLost, SCROLL)
+            val captured = keeper.snapshots.textOf(ID)
+
+            val second = keeper.document.editor.blocks[1]
+            keeper.document.editor.place(Caret(second.id, OFFSET))
+            assertTrue(keeper.subject.snapshotOn(SnapshotTrigger.Closing, SCROLL + 1))
+
+            assertEquals(
+                1,
+                keeper.snapshots
+                    .recordOf(ID)
+                    ?.caret
+                    ?.blockIndex,
+            )
+            assertEquals(SCROLL + 1, keeper.snapshots.recordOf(ID)?.scrollOffset)
+            assertEquals(captured, keeper.snapshots.textOf(ID), "Recording a position rewrote the snapshot")
+        }
+
+    @Test
+    fun `closing records the scroll the window last reported`() =
+        runTest {
+            // The host fires the closing snapshot from outside the composition, with no scroll state
+            // to hand. It used to pass zero, and every closed document reopened at the top.
+            val keeper = keeper()
+            keeper.document.type("Unsaved. ")
+            keeper.subject.edited(START)
+            keeper.subject.scrolled(SCROLL)
+
+            keeper.subject.snapshotOn(SnapshotTrigger.Closing)
+
+            assertEquals(SCROLL, keeper.snapshots.recordOf(ID)?.scrollOffset)
+        }
+
+    @Test
     fun `a captured document is not captured again until it changes`() =
         runTest {
             val keeper = keeper()

@@ -50,8 +50,42 @@ class SnapshotStore(
         val written = store.writeAtomically(snapshotOf(session.documentId), text)
         if (written !is WriteOutcome.Written) return false
 
-        val record = SessionRecord.format.encodeToString(SessionRecord.serializer(), session)
-        return store.writeAtomically(metaOf(session.documentId), record) is WriteOutcome.Written
+        return putRecord(carriedOver(session))
+    }
+
+    /**
+     * Records where the reader is -- caret and scroll -- without touching the snapshot's text.
+     *
+     * For a document with nothing unsaved. Its words are already in the file, so there is no
+     * snapshot to write, but 7.3 still restores "caret, scroll" on the next launch, and a reader who
+     * read to chapter nine and closed the window should come back to chapter nine. False if there
+     * is no record to update: a session nobody opened has no place to remember.
+     */
+    suspend fun rememberPosition(
+        documentId: String,
+        caret: CaretRecord,
+        scrollOffset: Int,
+    ): Boolean {
+        val record = recordOf(documentId) ?: return false
+
+        return putRecord(record.copy(caret = caret, scrollOffset = scrollOffset))
+    }
+
+    /**
+     * [session] with the parts a snapshot does not own taken from the record already on disk.
+     *
+     * A snapshot knows the text, the caret, the scroll and the digest. The window's geometry belongs
+     * to the session list, which writes it as the window moves, and whether the session is closed
+     * belongs to the session list too. A snapshot that wrote its own record over theirs would erase
+     * both -- which it did, silently, on every autosave after the last time a window moved.
+     */
+    private suspend fun carriedOver(session: SessionRecord): SessionRecord {
+        val existing = recordOf(session.documentId) ?: return session
+
+        return session.copy(
+            window = session.window ?: existing.window,
+            closedAt = session.closedAt ?: existing.closedAt,
+        )
     }
 
     /**
@@ -121,10 +155,12 @@ class SnapshotStore(
     ): Recovery {
         val text = textOf(documentId)
 
+        val record = recordOf(documentId)
+
         return when {
-            text == null -> Recovery.NothingToRestore
-            sha256(text.encodeToByteArray()) == fileDigest -> Recovery.NothingToRestore
-            else -> Recovery.UnsavedWork(text = text, record = recordOf(documentId))
+            text == null -> Recovery.NothingToRestore(record)
+            sha256(text.encodeToByteArray()) == fileDigest -> Recovery.NothingToRestore(record)
+            else -> Recovery.UnsavedWork(text = text, record = record)
         }
     }
 

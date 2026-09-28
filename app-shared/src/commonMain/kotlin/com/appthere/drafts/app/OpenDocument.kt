@@ -31,10 +31,13 @@ class OpenDocument(
     private val store: DocumentStore,
     editor: EditorState,
     opened: DocumentSessionState,
-    val restored: RestoredSnapshot? = null,
+    reopening: Reopening = Reopening(),
 ) {
     /** True when the text on screen came from 8.3's snapshot rather than from the file. */
-    val restoredFromSnapshot: Boolean get() = restored != null
+    val restoredFromSnapshot: Boolean = reopening.fromSnapshot
+
+    /** Where 7.3's record says the window was scrolled to, or null if it did not say. */
+    val scrollOffset: Int? = reopening.scrollOffset
 
     /**
      * Replaced wholesale by [reload], never edited in place.
@@ -57,7 +60,7 @@ class OpenDocument(
      * on screen are not the words on disk, which is the entire reason the snapshot was kept. The
      * revision counter cannot say that on its own -- it starts at zero either way.
      */
-    private var restoredButUnsaved by mutableStateOf(restored != null)
+    private var restoredButUnsaved by mutableStateOf(restoredFromSnapshot)
 
     /**
      * 8.4's state, derived rather than stored.
@@ -114,15 +117,16 @@ class OpenDocument(
 }
 
 /**
- * What 8.3 restored, for whoever has to put the reader back where they were.
+ * What a previous session left behind for this one.
  *
- * 8.1 keeps `meta.json` beside the snapshot "so caret and scroll survive with the text". The caret
- * is applied to the editor as the document is built; the scroll position cannot be, because the
- * scroll state belongs to the window rather than to the document -- so it is carried here and
- * applied by the window. Null scroll means the record did not say.
+ * Two separate facts. Whether the words came from 8.3's snapshot decides the restore banner; where
+ * 7.3's record says the reader was decides where the window opens -- and holds whether or not any
+ * words were restored, because a document that was only read still reopens where it was left. The
+ * scroll is carried here rather than applied, because scroll state belongs to the window.
  */
-data class RestoredSnapshot(
-    val scrollOffset: Int?,
+data class Reopening(
+    val fromSnapshot: Boolean = false,
+    val scrollOffset: Int? = null,
 )
 
 /** Whether the document has arrived yet. Opening is I/O, so there is a moment before it has. */
@@ -181,17 +185,19 @@ private suspend fun openedWith(
     contents: DocumentContents,
     recover: (suspend (Digest) -> Recovery)?,
 ): OpenDocument {
-    val recovery = recover?.invoke(contents.facts.digest) ?: Recovery.NothingToRestore
+    val recovery = recover?.invoke(contents.facts.digest) ?: Recovery.NothingToRestore()
     val restored = recovery as? Recovery.UnsavedWork
     val editor = EditorState(DocumentSession(restored?.text ?: contents.text))
 
-    restored?.record?.caret?.let { editor.placeAt(it) }
+    // 7.3's caret and scroll, whichever way the document opened. They used to come back only with
+    // unsaved work, so a document that had been read and closed reopened at the top every time.
+    recovery.record?.caret?.let { editor.placeAt(it) }
 
     return OpenDocument(
         store = store,
         editor = editor,
         opened = DocumentSessionState.opened(ref, contents),
-        restored = restored?.let { RestoredSnapshot(scrollOffset = it.record?.scrollOffset) },
+        reopening = Reopening(fromSnapshot = restored != null, scrollOffset = recovery.record?.scrollOffset),
     )
 }
 
