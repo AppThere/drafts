@@ -59,6 +59,7 @@ import com.appthere.drafts.platform.files.desktopSessionRoot
 import com.appthere.drafts.platform.files.desktopSettingsRoot
 import com.appthere.drafts.platform.files.epochMillis
 import com.appthere.drafts.platform.intents.DocumentKind
+import com.appthere.drafts.platform.intents.LaunchRequest
 import com.appthere.drafts.platform.intents.SingleInstance
 import com.appthere.drafts.platform.windows.SessionList
 import kotlinx.coroutines.channels.Channel
@@ -68,6 +69,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import java.awt.Desktop
 import java.awt.Frame
+import java.awt.MenuItem
+import java.awt.PopupMenu
+import java.awt.Taskbar
 
 /**
  * The desktop entry point.
@@ -84,11 +88,12 @@ import java.awt.Frame
  */
 fun main(args: Array<String>) {
     val instance = SingleInstance()
-    val opened = Channel<String>(Channel.UNLIMITED)
+    val request = LaunchRequest.of(args.toList())
+    val requests = Channel<LaunchRequest>(Channel.UNLIMITED)
 
-    if (!becameTheRunningInstance(instance, args, opened)) return
+    if (!becameTheRunningInstance(instance, request, requests)) return
 
-    application { DraftsApplication(args, opened) }
+    application { DraftsApplication(request, requests) }
     instance.release()
 }
 
@@ -100,19 +105,21 @@ fun main(args: Array<String>) {
  * one."
  *
  * Claims first and hands off only if the claim fails, so the decision is the one the operating
- * system arbitrated rather than a guess about who started when. A launch that cannot claim and has
- * nothing to hand over has nothing to do: the running instance is already showing everything.
+ * system arbitrated rather than a guess about who started when. A launch that asked for nothing
+ * hands over a new document: 7.4, "Launching while the application is already running opens a new
+ * untitled document in a new window" -- the reader asked for the application again.
  */
 private fun becameTheRunningInstance(
     instance: SingleInstance,
-    args: Array<String>,
-    opened: Channel<String>,
+    request: LaunchRequest?,
+    requests: Channel<LaunchRequest>,
 ): Boolean {
-    if (!instance.claim { path -> opened.trySend(path) }) {
-        args.firstOrNull()?.let { instance.handOff(it) }
+    if (!instance.claim { line -> LaunchRequest.decoded(line)?.let(requests::trySend) }) {
+        instance.handOff((request ?: LaunchRequest.New()).encoded())
         return false
     }
-    installOpenFileHandler(opened)
+    installOpenFileHandler(requests)
+    installDockMenu(requests)
     return true
 }
 
@@ -124,13 +131,41 @@ private fun becameTheRunningInstance(
  * error -- and `Desktop` throws rather than reporting on some headless setups, so the whole thing
  * is guarded.
  */
-private fun installOpenFileHandler(opened: Channel<String>) {
+private fun installOpenFileHandler(requests: Channel<LaunchRequest>) {
     runCatching {
         if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.APP_OPEN_FILE)) {
-            Desktop.getDesktop().setOpenFileHandler { event -> event.files.forEach { opened.trySend(it.path) } }
+            Desktop.getDesktop().setOpenFileHandler { event ->
+                event.files.forEach { requests.trySend(LaunchRequest.Open(it.path)) }
+            }
         }
     }
 }
+
+/**
+ * 7.4 on macOS: the Dock menu's *New Markdown document* and *New Fountain screenplay*.
+ *
+ * `Taskbar`'s menu is the Dock's on macOS and unsupported elsewhere -- Linux has the `.desktop`
+ * entry's actions instead, and Windows would have a jump list (`divergences.md`) -- so this is a
+ * no-op there. Guarded like the open-file handler, for the same headless setups. Untested: there is
+ * no Mac in this project's build environment.
+ */
+private fun installDockMenu(requests: Channel<LaunchRequest>) {
+    runCatching {
+        if (Taskbar.isTaskbarSupported() && Taskbar.getTaskbar().isSupported(Taskbar.Feature.MENU)) {
+            Taskbar.getTaskbar().menu =
+                PopupMenu().apply {
+                    add(newDocumentItem(Strings.NEW_MARKDOWN, DocumentKind.Markdown, requests))
+                    add(newDocumentItem(Strings.NEW_FOUNTAIN, DocumentKind.Fountain, requests))
+                }
+        }
+    }
+}
+
+private fun newDocumentItem(
+    label: String,
+    kind: DocumentKind,
+    requests: Channel<LaunchRequest>,
+) = MenuItem(label).apply { addActionListener { requests.trySend(LaunchRequest.New(kind)) } }
 
 /**
  * The application: 7.2's session list, one `Window` per entry.
@@ -141,8 +176,8 @@ private fun installOpenFileHandler(opened: Channel<String>) {
  */
 @Composable
 private fun ApplicationScope.DraftsApplication(
-    args: Array<String>,
-    opened: Channel<String>,
+    request: LaunchRequest?,
+    requests: Channel<LaunchRequest>,
 ) {
     val stores = remember { Stores.desktop() }
     val sessions = stores.sessions
@@ -155,11 +190,16 @@ private fun ApplicationScope.DraftsApplication(
         // than thirty days ago has no snapshot worth reopening.
         stores.snapshots.prune(epochMillis())
 
-        open += sessionsAtLaunch(sessions, args.firstOrNull(), Strings.UNTITLED, stores.settings.kindForNew())
+        open += sessionsAtLaunch(sessions, request, Strings.UNTITLED, stores.settings.kindForNew())
+        request?.let { stores.rememberKindOf(it) }
         restored = true
 
-        // Documents handed over by later launches, and by macOS. A new window each, per 9.4.
-        for (path in opened) open.show(path, sessions)
+        // Requests handed over by later launches, and by macOS: a file in a window of its own (9.4),
+        // or a new document (7.4).
+        for (next in requests) {
+            open.serve(next, sessions, Strings.UNTITLED, stores.settings.kindForNew())
+            stores.rememberKindOf(next)
+        }
     }
 
     open.forEach { record ->
@@ -386,6 +426,14 @@ private class Stores(
     val sessions: SessionList,
     val settings: SettingsStore,
 ) {
+    /**
+     * A new document asked for by kind -- *New Fountain screenplay* -- is the reader creating that
+     * kind, which makes it "the kind the reader last created" (7.4).
+     */
+    suspend fun rememberKindOf(request: LaunchRequest) {
+        (request as? LaunchRequest.New)?.kind?.let { settings.rememberKindForNew(it) }
+    }
+
     companion object {
         fun desktop(): Stores {
             val files = PathDocumentStore()

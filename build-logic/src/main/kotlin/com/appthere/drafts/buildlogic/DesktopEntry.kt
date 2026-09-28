@@ -19,10 +19,25 @@ import java.nio.file.Files
  * shipping a package that quietly still cannot open a file.
  */
 object DesktopEntry {
-    /** Rewrites the entry inside [deb] in place, declaring [mimeTypes] and taking a path. */
+    /**
+     * One of the entry's actions: a `[Desktop Action]` group, which launchers show in the
+     * application's context menu. 7.4's *New Markdown document* and *New Fountain screenplay* are
+     * these on Linux. [arguments] follow the application's own command.
+     */
+    data class Action(
+        val id: String,
+        val name: String,
+        val arguments: String,
+    )
+
+    /**
+     * Rewrites the entry inside [deb] in place, declaring [mimeTypes], taking a path, and offering
+     * [actions].
+     */
     fun fixDeb(
         deb: File,
         mimeTypes: List<String>,
+        actions: List<Action> = emptyList(),
     ) {
         val work = Files.createTempDirectory("drafts-deb").toFile()
         try {
@@ -30,7 +45,7 @@ object DesktopEntry {
 
             val entries = work.walk().filter { it.isFile && it.name.endsWith(".desktop") }.toList()
             val entry = entries.singleOrNull() ?: error("Expected one .desktop file in $deb, found ${entries.size}")
-            entry.writeText(fixed(entry.readText(), mimeTypes))
+            entry.writeText(fixed(entry.readText(), mimeTypes, actions))
 
             // Root-owned, as a package's files must be; `fakeroot` because this build is not root.
             run("fakeroot", "dpkg-deb", "--build", "--root-owner-group", work.path, deb.path)
@@ -39,10 +54,14 @@ object DesktopEntry {
         }
     }
 
-    /** [entry] with `%f` on its `Exec` line and one `MimeType` line naming [mimeTypes]. */
+    /**
+     * [entry] with `%f` on its `Exec` line, one `MimeType` line naming [mimeTypes], and a
+     * `[Desktop Action]` group for each of [actions].
+     */
     fun fixed(
         entry: String,
         mimeTypes: List<String>,
+        actions: List<Action> = emptyList(),
     ): String {
         val lines = entry.lines()
         check(lines.any { it.startsWith("Exec=") }) { "The desktop entry has no Exec line:\n$entry" }
@@ -57,7 +76,19 @@ object DesktopEntry {
                 }
             }
 
-        return (rewritten.dropLastWhile { it.isBlank() } + mimeLine).joinToString("\n", postfix = "\n")
+        val main = rewritten.dropLastWhile { it.isBlank() } + mimeLine
+        if (actions.isEmpty()) return main.joinToString("\n", postfix = "\n")
+
+        // The action runs the application's own command, without the field code that hands it a
+        // file: an action is not given one.
+        val command = lines.first { it.startsWith("Exec=") }.removePrefix("Exec=").replace(FIELD_CODE, "").trim()
+        val groups =
+            actions.flatMap { action ->
+                listOf("", "[Desktop Action ${action.id}]", "Name=${action.name}", "Exec=$command ${action.arguments}")
+            }
+
+        return (main + "Actions=${actions.joinToString(";", postfix = ";") { it.id }}" + groups)
+            .joinToString("\n", postfix = "\n")
     }
 
     /** Any of the Desktop Entry spec's file or URL field codes: one already there is left alone. */

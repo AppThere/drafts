@@ -36,11 +36,12 @@ class SingleInstance(
     /**
      * Becomes the running instance, or reports that one already exists.
      *
-     * [onOpen] is called on a background thread for each path a later launch hands over. Whatever
+     * [onMessage] is called on a background thread for each line a later launch hands over -- a
+     * [LaunchRequest], encoded; this class carries it without knowing what it means. Whatever
      * it does with it has to be safe from there -- on the desktop that means posting to the
      * composition rather than touching it.
      */
-    fun claim(onOpen: (String) -> Unit): Boolean {
+    fun claim(onMessage: (String) -> Unit): Boolean {
         val bound =
             try {
                 ServerSocket(port, BACKLOG, InetAddress.getLoopbackAddress())
@@ -50,19 +51,19 @@ class SingleInstance(
             }
 
         server = bound
-        thread(isDaemon = true, name = "drafts-single-instance") { accept(bound, onOpen) }
+        thread(isDaemon = true, name = "drafts-single-instance") { accept(bound, onMessage) }
         return true
     }
 
     /**
-     * Hands [path] to the running instance. False when there is nobody to hand it to.
+     * Hands [message] to the running instance. False when there is nobody to hand it to.
      *
      * False is also what a stranger on the port gets, and what a timeout gets. In every one of
      * those cases the right answer is the same: carry on as the first instance. Refusing to start
      * because something unexpected answered would make the application unlaunchable for a reason
      * the reader could not possibly diagnose.
      */
-    fun handOff(path: String): Boolean =
+    fun handOff(message: String): Boolean =
         try {
             Socket().use { socket ->
                 socket.connect(java.net.InetSocketAddress(InetAddress.getLoopbackAddress(), port), TIMEOUT_MILLIS)
@@ -72,7 +73,7 @@ class SingleInstance(
                 if (reader.readLine() != GREETING) {
                     false
                 } else {
-                    socket.getOutputStream().write((path + "\n").toByteArray())
+                    socket.getOutputStream().write((message + "\n").toByteArray())
                     socket.getOutputStream().flush()
                     true
                 }
@@ -90,10 +91,10 @@ class SingleInstance(
 
     private fun accept(
         bound: ServerSocket,
-        onOpen: (String) -> Unit,
+        onMessage: (String) -> Unit,
     ) {
         while (!bound.isClosed) {
-            val handled = runCatching { bound.accept().use { greet(it, onOpen) } }
+            val handled = runCatching { bound.accept().use { greet(it, onMessage) } }
 
             // A failed connection is one launch that did not get through, not a reason to stop
             // listening -- the application would then silently stop accepting documents for the
@@ -104,17 +105,17 @@ class SingleInstance(
 
     private fun greet(
         socket: Socket,
-        onOpen: (String) -> Unit,
+        onMessage: (String) -> Unit,
     ) {
         socket.soTimeout = TIMEOUT_MILLIS
         socket.getOutputStream().write((GREETING + "\n").toByteArray())
         socket.getOutputStream().flush()
 
-        val path = readPath(socket.getInputStream().bufferedReader())
-        if (!path.isNullOrBlank()) onOpen(path)
+        val message = readMessage(socket.getInputStream().bufferedReader())
+        if (!message.isNullOrBlank()) onMessage(message)
     }
 
-    private fun readPath(reader: BufferedReader): String? =
+    private fun readMessage(reader: BufferedReader): String? =
         try {
             reader.readLine()
         } catch (expectedWhenPeerSaysNothing: SocketTimeoutException) {

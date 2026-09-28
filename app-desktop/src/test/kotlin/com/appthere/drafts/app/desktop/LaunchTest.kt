@@ -4,6 +4,7 @@ import com.appthere.drafts.platform.files.PathDocumentStore
 import com.appthere.drafts.platform.files.SnapshotStore
 import com.appthere.drafts.platform.files.desktopIdentity
 import com.appthere.drafts.platform.intents.DocumentKind
+import com.appthere.drafts.platform.intents.LaunchRequest
 import com.appthere.drafts.platform.windows.SessionList
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Path
@@ -34,7 +35,7 @@ class LaunchTest {
         runBlocking {
             // 7.4: "Launching with nothing to restore opens one untitled document, ready to type
             // into." Not the sample, and not a window with no document in it.
-            val opened = sessionsAtLaunch(sessions, path = null, untitledName = UNTITLED)
+            val opened = sessionsAtLaunch(sessions, request = null, untitledName = UNTITLED)
 
             val only = opened.single()
             assertNull(only.uri, "The new document claimed a file")
@@ -48,7 +49,7 @@ class LaunchTest {
             val opened =
                 sessionsAtLaunch(
                     sessions,
-                    path = null,
+                    request = null,
                     untitledName = UNTITLED,
                     newKind = DocumentKind.Fountain,
                 ).single()
@@ -61,7 +62,7 @@ class LaunchTest {
         runBlocking {
             // Recorded as soon as it opens, so closing the application straight away still brings
             // it back -- its words, once there are any, live in its snapshot.
-            val opened = sessionsAtLaunch(sessions, path = null, untitledName = UNTITLED).single()
+            val opened = sessionsAtLaunch(sessions, request = null, untitledName = UNTITLED).single()
 
             assertEquals(listOf(opened.documentId), sessions.restorable().map { it.documentId })
         }
@@ -73,7 +74,7 @@ class LaunchTest {
             val chapter = file("chapter.md")
             sessions.opened(desktopIdentity(chapter.toString(), "markdown"))
 
-            val opened = sessionsAtLaunch(sessions, path = null, untitledName = UNTITLED)
+            val opened = sessionsAtLaunch(sessions, request = null, untitledName = UNTITLED)
 
             assertEquals(listOf("chapter.md"), opened.map { it.displayName })
         }
@@ -85,7 +86,8 @@ class LaunchTest {
             val scene = file("scene.fountain")
             sessions.opened(desktopIdentity(chapter.toString(), "markdown"))
 
-            val opened = sessionsAtLaunch(sessions, path = scene.toString(), untitledName = UNTITLED)
+            val opened =
+                sessionsAtLaunch(sessions, request = LaunchRequest.Open(scene.toString()), untitledName = UNTITLED)
 
             assertEquals(listOf("chapter.md", "scene.fountain"), opened.map { it.displayName })
             assertEquals("fountain", opened.last().kind)
@@ -96,7 +98,8 @@ class LaunchTest {
         runBlocking {
             val scene = file("scene.fountain")
 
-            val opened = sessionsAtLaunch(sessions, path = scene.toString(), untitledName = UNTITLED)
+            val opened =
+                sessionsAtLaunch(sessions, request = LaunchRequest.Open(scene.toString()), untitledName = UNTITLED)
 
             assertEquals(listOf("scene.fountain"), opened.map { it.displayName })
         }
@@ -111,9 +114,46 @@ class LaunchTest {
                 desktopIdentity(draft.toString(), "markdown").copy(documentId = "6f1c2f7e-untitled-then-saved")
             val open = mutableListOf(sessions.opened(saved))
 
-            open.show(draft.toString(), sessions)
+            open.serve(LaunchRequest.Open(draft.toString()), sessions, UNTITLED, DocumentKind.Markdown)
 
             assertEquals(listOf(saved.documentId), open.map { it.documentId })
+        }
+
+    @Test
+    fun `the launcher's new document opens beside what was restored`() =
+        runBlocking {
+            // "New Fountain screenplay" is a request like a file is: restoring does not swallow it.
+            val chapter = file("chapter.md")
+            sessions.opened(desktopIdentity(chapter.toString(), "markdown"))
+
+            val opened =
+                sessionsAtLaunch(sessions, request = LaunchRequest.New(DocumentKind.Fountain), untitledName = UNTITLED)
+
+            assertEquals(listOf("chapter.md", UNTITLED), opened.map { it.displayName })
+            assertEquals("fountain", opened.last().kind)
+        }
+
+    @Test
+    fun `a new document asked for later is always a new window`() =
+        runBlocking {
+            // 7.4: launching again while running "opens a new untitled document in a new window".
+            // Unlike a file, a new document is never already open.
+            val open = sessionsAtLaunch(sessions, request = null, untitledName = UNTITLED).toMutableList()
+
+            open.serve(LaunchRequest.New(), sessions, UNTITLED, DocumentKind.Markdown)
+
+            assertEquals(2, open.size)
+            assertEquals(2, open.map { it.documentId }.distinct().size)
+        }
+
+    @Test
+    fun `a new document of no stated kind is the kind last created`() =
+        runBlocking {
+            val open = mutableListOf<com.appthere.drafts.platform.files.SessionRecord>()
+
+            open.serve(LaunchRequest.New(kind = null), sessions, UNTITLED, DocumentKind.Fountain)
+
+            assertEquals("fountain", open.single().kind)
         }
 
     private fun file(name: String): Path = directory.resolve(name).also { it.writeText("Words.\n") }

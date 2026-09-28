@@ -51,10 +51,37 @@ class DesktopEntryTest {
         }
     }
 
+    @Test
+    fun `the launcher's new-document actions run the application with no file`() {
+        // 7.4 on Linux: the entry's actions, in the launcher's context menu.
+        val fixed = DesktopEntry.fixed(FROM_JPACKAGE, OPENS, ACTIONS)
+        val lines = fixed.lines()
+
+        assertTrue("Actions=new-markdown;new-fountain;" in lines)
+        assertTrue("[Desktop Action new-fountain]" in lines)
+        assertTrue("Name=New Fountain screenplay" in lines)
+        assertTrue("Exec=/opt/appthere-drafts/bin/Drafts --new fountain" in lines, "Got:\n$fixed")
+    }
+
+    @Test
+    fun `the actions come after everything in the main group`() {
+        // Keys belong to the group above them. A MimeType line after an action group would be the
+        // action's, and the application would stop being offered for any type at all.
+        val lines = DesktopEntry.fixed(FROM_JPACKAGE, OPENS, ACTIONS).lines()
+
+        assertTrue(lines.indexOfFirst { it.startsWith("MimeType=") } < lines.indexOf("[Desktop Action new-markdown]"))
+        assertTrue(lines.indexOfFirst { it.startsWith("Actions=") } < lines.indexOf("[Desktop Action new-markdown]"))
+    }
+
     private fun execOf(entry: String) = entry.lines().single { it.startsWith("Exec=") }
 
     private companion object {
         val OPENS = listOf("text/markdown", "text/x-markdown", "text/x-fountain")
+        val ACTIONS =
+            listOf(
+                DesktopEntry.Action("new-markdown", "New Markdown document", "--new markdown"),
+                DesktopEntry.Action("new-fountain", "New Fountain screenplay", "--new fountain"),
+            )
 
         val FROM_JPACKAGE =
             """

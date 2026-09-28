@@ -23,6 +23,10 @@ object Strings {
     const val KIND_MARKDOWN = "Markdown"
     const val KIND_FOUNTAIN = "Fountain"
 
+    /** 7.4's launcher entry points, where a platform shows them from inside the application. */
+    const val NEW_MARKDOWN = "New Markdown document"
+    const val NEW_FOUNTAIN = "New Fountain screenplay"
+
     /** 7.4's *Save As*: the dialog's title, and the words when a save does not happen. */
     const val SAVE_AS = "Save As"
     const val COULD_NOT_SAVE =

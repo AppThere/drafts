@@ -1,3 +1,4 @@
+import com.appthere.drafts.buildlogic.DesktopEntry
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 // The desktop host (appthere-drafts.md 3: ":app-desktop  JVM main, file associations").
@@ -103,10 +104,17 @@ compose.desktop {
 tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask>().configureEach {
     if (targetFormat == TargetFormat.Deb) {
         val opens = listOf("text/markdown", "text/x-markdown", fountainMime)
+        // 7.4's launcher entry points on Linux, in the launcher's context menu. English here: the
+        // desktop entry has its own `Name[lang]=` keys for translations, and nothing in the build
+        // can reach the application's strings.
+        val actions =
+            listOf(
+                DesktopEntry.Action("new-markdown", "New Markdown document", "--new markdown"),
+                DesktopEntry.Action("new-fountain", "New Fountain screenplay", "--new fountain"),
+            )
         doLast {
             destinationDir.get().asFile.listFiles { file -> file.extension == "deb" }.orEmpty().forEach {
-                com.appthere.drafts.buildlogic.DesktopEntry
-                    .fixDeb(it, opens)
+                DesktopEntry.fixDeb(it, opens, actions)
             }
         }
     }

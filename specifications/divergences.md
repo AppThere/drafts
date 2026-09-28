@@ -111,6 +111,28 @@ can honestly change, it changes.
 
 ---
 
+## 7.4 — No Windows jump list, and no *File > New* anywhere
+
+**Spec:** the launcher entry points table — Linux `.desktop` actions; macOS Dock menu and *File >
+New*; Windows jump list tasks and *File > New*.
+
+**Code:** the Linux actions, built and used from an installed package. The macOS Dock menu,
+written and never run (no Mac here). No Windows jump list, and no *File > New* on any platform.
+Every route shares one request type (`--new <kind>`), so each missing one is a caller, not a
+mechanism.
+
+**Why:** a jump list is Windows' `ICustomDestinationList`, a COM API that neither `jpackage` nor
+Compose exposes; it needs a native bridge. *File > New* needs a menu bar, and the application has
+none. On Windows and Linux a menu bar is chrome that sits in the window permanently, which §12 does
+not allow ("The only chrome is the status indicator … and one control that opens the reader
+settings"). macOS's menu bar is outside the window and would not conflict.
+
+**Closes when:** a human decides whether §12 or §7.4 gives way on Windows and Linux — a macOS-only
+menu bar is the obvious first step either way — and a native bridge for the jump list is judged
+worth its weight.
+
+---
+
 ## 12 — Focus mode dims by block, not by sentence
 
 **Spec:** "**Focus mode** as an option: dim all blocks except the current one, or the current
