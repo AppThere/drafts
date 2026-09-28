@@ -209,41 +209,10 @@ class TypingLatencyTest {
         return timings.drop(WARMUP).sorted()[KEYSTROKES / 2]
     }
 
-    /**
-     * Ten thousand words with the structures that make reparse interesting.
-     *
-     * Headings, lists, quotes and inline markup, so that a careless dirty window has something to
-     * get wrong. Mirrors the shape of `:editor-engine`'s own gate fixture without sharing it: a
-     * module existing only to hold a string generator would cost more than the duplication, and the
-     * size assertion above is what actually keeps either of them honest.
-     */
-    private fun gateDocument(): String =
-        buildString {
-            repeat(SECTIONS) { section ->
-                appendLine("## Section $section")
-                appendLine()
-                repeat(PARAGRAPHS_PER_SECTION) { paragraph ->
-                    appendLine(
-                        "Paragraph $paragraph of section $section with *emphasis*, `code`, and a " +
-                            "[link](https://example.com) in it, written out at enough length to " +
-                            "make the document a realistic size for the gate criterion.",
-                    )
-                    appendLine()
-                }
-                appendLine("- first item")
-                appendLine("- second item")
-                appendLine()
-                appendLine("> A quoted line.")
-                appendLine()
-            }
-        }
-
     private companion object {
         const val WIDTH = 1200f
         const val HEIGHT = 900f
 
-        const val SECTIONS = 64
-        const val PARAGRAPHS_PER_SECTION = 5
         const val TEN_THOUSAND = 10_000
 
         const val KEYSTROKES = 40

@@ -208,6 +208,64 @@ class RecoveryTest {
         }
     }
 
+    @Test
+    fun `the caret comes back where the reader left it`() {
+        // Phase 4 acceptance: "Session restores caret, scroll". 8.1 keeps meta.json beside the
+        // snapshot for exactly this -- a manuscript restored at the top when the reader was in the
+        // middle of a sentence has given back the words and lost the place.
+        givenSnapshot(MANY_BLOCKS, caret = CaretRecord(blockIndex = 2, offset = 3))
+
+        runSkikoComposeUiTest(size = SIZE) {
+            val document = open()
+
+            assertEquals(document.editor.blocks[2].id, document.editor.caret?.block)
+            assertEquals(3, document.editor.caret?.offset)
+        }
+    }
+
+    @Test
+    fun `a caret beyond the end of the document is ignored rather than fatal`() {
+        // A meta.json can outlive the text it describes -- written before an edit that removed
+        // blocks, or simply damaged. Opening at the top is a small loss; failing to open is not.
+        //
+        // Ignored rather than clamped to the last block. Clamping would put the caret somewhere the
+        // reader never was and reveal that block's raw source, which looks like the editor deciding
+        // to open a different part of the document than the one they left.
+        givenSnapshot(MANY_BLOCKS, caret = CaretRecord(blockIndex = 99, offset = 500))
+
+        runSkikoComposeUiTest(size = SIZE) {
+            val document = open()
+
+            assertEquals(MANY_BLOCKS, document.editor.text)
+            assertNull(document.editor.caret, "A caret nobody recorded was invented from a bad index")
+        }
+    }
+
+    @Test
+    fun `the scroll position comes back with the text`() {
+        givenSnapshot(MANY_BLOCKS, scroll = SCROLL)
+
+        runSkikoComposeUiTest(size = SIZE) {
+            val document = open()
+
+            assertEquals(SCROLL, document.restored?.scrollOffset)
+        }
+    }
+
+    @Test
+    fun `a document that was not restored has no caret to put back`() {
+        // Opening a file normally should leave the caret nowhere, which is what puts every block in
+        // preview state. A restored caret on an ordinary open would reveal a block nobody asked for.
+        givenSnapshot(ORIGINAL)
+
+        runSkikoComposeUiTest(size = SIZE) {
+            val document = open()
+
+            assertNull(document.editor.caret)
+            assertNull(document.restored?.scrollOffset)
+        }
+    }
+
     private fun androidx.compose.ui.test.SkikoComposeUiTest.save() {
         onRoot().performKeyInput {
             keyDown(Key.CtrlLeft)
@@ -217,9 +275,13 @@ class RecoveryTest {
     }
 
     /** Puts [text] in the snapshot and the original in the file, as a crashed session leaves them. */
-    private fun givenSnapshot(text: String) {
+    private fun givenSnapshot(
+        text: String,
+        caret: CaretRecord = CaretRecord(blockIndex = 0, offset = 0),
+        scroll: Int = 0,
+    ) {
         file().writeText(ORIGINAL)
-        runBlocking { snapshots.write(record(), text) }
+        runBlocking { snapshots.write(record(caret, scroll), text) }
     }
 
     private fun androidx.compose.ui.test.SkikoComposeUiTest.open(): OpenDocument {
@@ -248,17 +310,19 @@ class RecoveryTest {
         return document
     }
 
-    private fun record() =
-        SessionRecord(
-            documentId = ID,
-            uri = "file:///chapter.md",
-            displayName = "chapter.md",
-            kind = "markdown",
-            caret = CaretRecord(blockIndex = 0, offset = 0),
-            scrollOffset = 0,
-            baseDigest = sha256(ORIGINAL.encodeToByteArray()).toString(),
-            snapshotPath = snapshots.snapshotOf(ID).token,
-        )
+    private fun record(
+        caret: CaretRecord = CaretRecord(blockIndex = 0, offset = 0),
+        scroll: Int = 0,
+    ) = SessionRecord(
+        documentId = ID,
+        uri = "file:///chapter.md",
+        displayName = "chapter.md",
+        kind = "markdown",
+        caret = caret,
+        scrollOffset = scroll,
+        baseDigest = sha256(ORIGINAL.encodeToByteArray()).toString(),
+        snapshotPath = snapshots.snapshotOf(ID).token,
+    )
 
     private fun file(): Path = directory.resolve("chapter.md")
 
@@ -272,6 +336,8 @@ class RecoveryTest {
         const val ORIGINAL_LINE = "As last saved."
         const val UNSAVED = "Work that never reached the file.\n"
         const val UNSAVED_LINE = "Work that never reached the file."
+        const val MANY_BLOCKS = "First.\n\nSecond.\n\nThird.\n\nFourth.\n"
+        const val SCROLL = 8_123
         val IDENTITY =
             SessionIdentity(
                 documentId = ID,

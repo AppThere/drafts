@@ -6,9 +6,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
+import com.appthere.drafts.editor.engine.Caret
 import com.appthere.drafts.editor.engine.DocumentSession
 import com.appthere.drafts.editor.engine.UndoHistory
 import com.appthere.drafts.editor.ui.EditorState
+import com.appthere.drafts.platform.files.CaretRecord
 import com.appthere.drafts.platform.files.Digest
 import com.appthere.drafts.platform.files.DocumentContents
 import com.appthere.drafts.platform.files.DocumentRef
@@ -29,8 +31,11 @@ class OpenDocument(
     private val store: DocumentStore,
     editor: EditorState,
     opened: DocumentSessionState,
-    val restoredFromSnapshot: Boolean = false,
+    val restored: RestoredSnapshot? = null,
 ) {
+    /** True when the text on screen came from 8.3's snapshot rather than from the file. */
+    val restoredFromSnapshot: Boolean get() = restored != null
+
     /**
      * Replaced wholesale by [reload], never edited in place.
      *
@@ -52,7 +57,7 @@ class OpenDocument(
      * on screen are not the words on disk, which is the entire reason the snapshot was kept. The
      * revision counter cannot say that on its own -- it starts at zero either way.
      */
-    private var restoredButUnsaved by mutableStateOf(restoredFromSnapshot)
+    private var restoredButUnsaved by mutableStateOf(restored != null)
 
     /**
      * 8.4's state, derived rather than stored.
@@ -107,6 +112,18 @@ class OpenDocument(
         recorded = recorded.reloaded(contents)
     }
 }
+
+/**
+ * What 8.3 restored, for whoever has to put the reader back where they were.
+ *
+ * 8.1 keeps `meta.json` beside the snapshot "so caret and scroll survive with the text". The caret
+ * is applied to the editor as the document is built; the scroll position cannot be, because the
+ * scroll state belongs to the window rather than to the document -- so it is carried here and
+ * applied by the window. Null scroll means the record did not say.
+ */
+data class RestoredSnapshot(
+    val scrollOffset: Int?,
+)
 
 /** Whether the document has arrived yet. Opening is I/O, so there is a moment before it has. */
 sealed interface DocumentOpening {
@@ -166,11 +183,31 @@ private suspend fun openedWith(
 ): OpenDocument {
     val recovery = recover?.invoke(contents.facts.digest) ?: Recovery.NothingToRestore
     val restored = recovery as? Recovery.UnsavedWork
+    val editor = EditorState(DocumentSession(restored?.text ?: contents.text))
+
+    restored?.record?.caret?.let { editor.placeAt(it) }
 
     return OpenDocument(
         store = store,
-        editor = EditorState(DocumentSession(restored?.text ?: contents.text)),
+        editor = editor,
         opened = DocumentSessionState.opened(ref, contents),
-        restoredFromSnapshot = restored != null,
+        restored = restored?.let { RestoredSnapshot(scrollOffset = it.record?.scrollOffset) },
     )
+}
+
+/**
+ * Puts the caret back where 7.3 recorded it.
+ *
+ * By index, because that is what 7.3 stores and what survives a restart -- block ids are handed out
+ * per session and mean nothing afterwards.
+ *
+ * An index outside the document is ignored rather than clamped or thrown. A `meta.json` can outlive
+ * the text it describes: the snapshot may have been written before an edit that removed blocks, or
+ * the record may simply be damaged. Opening at the top is a small loss; failing to open is not.
+ */
+private fun EditorState.placeAt(caret: CaretRecord) {
+    val block = blocks.getOrNull(caret.blockIndex) ?: return
+    val offset = caret.offset.coerceIn(0, sourceOf(block.block).length)
+
+    place(Caret(block.id, offset))
 }
