@@ -71,8 +71,8 @@ import java.awt.Desktop
  * per entry, each with its own `WindowState` (position, size, placement) persisted."
  *
  * The list is [SessionList]'s, so it survives the process. A path on the command line joins it; the
- * sessions from last time rejoin it on launch. With neither, the window comes up on the sample
- * document, which is the Phase 2 behaviour the gate criteria still depend on.
+ * sessions from last time rejoin it on launch. With neither, an untitled document opens (7.4) --
+ * see [sessionsAtLaunch].
  *
  * File > Open is still absent. It needs a platform file dialog, which is `:platform-intents`.
  */
@@ -151,8 +151,7 @@ private fun ApplicationScope.DraftsApplication(
         // than thirty days ago has no snapshot worth reopening.
         snapshots.prune(epochMillis())
 
-        open += sessions.restorable()
-        args.firstOrNull()?.let { open.show(it, sessions) }
+        open += sessionsAtLaunch(sessions, args.firstOrNull(), Strings.UNTITLED)
         restored = true
 
         // Documents handed over by later launches, and by macOS. A new window each, per 9.4.
@@ -182,35 +181,12 @@ private fun ApplicationScope.DraftsApplication(
     // Invisible rather than a "loading" window, because a real one would flash up and be replaced
     // by windows in different places.
     //
-    // It also keeps a first instance launched with no document alive, so it is there to receive
-    // one.
+    // Once the launch's windows are open this goes, and closing the last of them ends the
+    // application -- rather than conjuring another untitled document, which 7.4 asks for only at
+    // launch.
     if (!restored) {
         Window(onCloseRequest = ::exitApplication, visible = false, title = Strings.WINDOW_TITLE) {}
     }
-
-    // Nothing to restore and nothing asked for: the sample, in a window of its own that no session
-    // knows about. There is no document to record, because there is no file.
-    if (restored && open.isEmpty()) {
-        Window(onCloseRequest = ::exitApplication, title = Strings.WINDOW_TITLE) {
-            DraftsApp(initialText = SampleDocument.TEXT)
-        }
-    }
-}
-
-/**
- * Adds a document to the session list and to the windows on screen, unless it is already there.
- *
- * Already-open is the ordinary case when a reader double-clicks a file they have open: 9.4 asks
- * for a new window per document, not per double-click.
- */
-private suspend fun MutableList<SessionRecord>.show(
-    path: String,
-    sessions: SessionList,
-) {
-    val kind = DocumentKind.of(path) ?: DocumentKind.Markdown
-    val record = sessions.opened(desktopIdentity(path, kind.id))
-
-    if (none { it.documentId == record.documentId }) this += record
 }
 
 /**

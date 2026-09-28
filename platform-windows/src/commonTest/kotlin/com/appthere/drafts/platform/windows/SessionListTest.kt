@@ -52,6 +52,7 @@ class SessionListTest {
             val restored = sessions.restorable().single()
             assertEquals(untitled.documentId, restored.documentId)
             assertNull(restored.uri)
+            assertNull(restored.baseDigest, "An untitled record claimed the digest of a file it does not have")
             assertEquals("fountain", restored.kind)
         }
 

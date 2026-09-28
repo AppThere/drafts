@@ -256,7 +256,8 @@ in phase 9.
 - Packaging for macOS, Windows, Linux.
 - New documents (`appthere-drafts.md` §7.4): an untitled document when there is nothing to restore,
   the kind chosen in the chrome until first save, *Save As* through a save dialog, the `untitled`
-  state (§8.4), and the Linux, macOS and Windows launcher entry points.
+  state (§8.4), the Linux, macOS and Windows launcher entry points, and a new untitled window when
+  the application is launched while already running.
 
 **Acceptance**
 - Double-clicking a `.md` file opens it in a new window of the running instance.

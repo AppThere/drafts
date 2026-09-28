@@ -103,7 +103,9 @@ private fun startedFrom(
     // block revealed, as though they had been editing the title.
     caret = CaretRecord(blockIndex = -1, offset = 0),
     scrollOffset = 0,
-    baseDigest = unreadDigest,
+    // Null for an untitled document (7.4): it has no file, so there is nothing to have read yet or
+    // ever. The placeholder would claim a file digest it can never have.
+    baseDigest = if (identity.uri == null) null else unreadDigest,
     snapshotPath = snapshotPath,
     accessToken = identity.accessToken,
 )

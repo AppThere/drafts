@@ -426,7 +426,9 @@ snapshot with a clear banner offering *Save As*.
 
 **Launching with nothing to restore opens one untitled document**, ready to type into. Launching
 with sessions to restore restores them (§7.3) and opens nothing else — a launch that always added
-a blank window would leave one to close every time.
+a blank window would leave one to close every time. **Launching while the application is already
+running opens a new untitled document in a new window**: the reader asked for the application
+again, and it is already showing everything else they had open.
 
 **The kind is chosen, not asked for.** An untitled document starts as the kind the reader last
 created — Markdown on first launch — and the chrome shows it: *Untitled · Markdown*. Until the

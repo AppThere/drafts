@@ -15,6 +15,9 @@ package com.appthere.drafts.i18n
 object Strings {
     const val WINDOW_TITLE = "Drafts"
 
+    /** 7.4: the name a new document has until its first save gives it one. */
+    const val UNTITLED = "Untitled"
+
     // The reader controls of `appthere-drafts.md` 5.5. Named for what they do to the reading
     // experience rather than for the property they set: "Text size", not "Base sp".
     const val READER_CONTROLS = "Reader"
