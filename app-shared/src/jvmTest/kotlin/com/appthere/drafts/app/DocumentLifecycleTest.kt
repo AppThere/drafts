@@ -80,10 +80,13 @@ class DocumentLifecycleTest {
             type(document, "Mine. ")
 
             save()
-            waitUntil(timeoutMillis = TIMEOUT) { file().readText() != ORIGINAL }
+            // Wait for the badge, not for the file. The bytes land on an IO thread and
+            // `savedRevision` is only set when the coroutine resumes afterwards, so the file can
+            // be written while the badge still says `Unsaved` -- which passed on this machine and
+            // failed on CI, where the resume is slower.
+            waitUntil(timeoutMillis = TIMEOUT) { showing(badge(Strings.STATE_CLEAN)) }
 
             assertEquals("Mine. $ORIGINAL", file().readText())
-            onNodeWithContentDescription(badge(Strings.STATE_CLEAN)).assertExists()
         }
     }
 
@@ -186,7 +189,10 @@ class DocumentLifecycleTest {
             type(document, "Mine. ")
 
             save()
-            waitUntil(timeoutMillis = TIMEOUT) { file().readText() != ORIGINAL }
+            // Waiting for the badge rather than the file, so the save has demonstrably finished
+            // before anything asserts a dialog is absent. Waiting for the bytes alone would let
+            // this pass while the outcome was still on its way back.
+            waitUntil(timeoutMillis = TIMEOUT) { showing(badge(Strings.STATE_CLEAN)) }
 
             onNodeWithText(Strings.CONFLICT, useUnmergedTree = true).assertDoesNotExist()
         }
@@ -322,6 +328,10 @@ class DocumentLifecycleTest {
             keyUp(Key.CtrlLeft)
         }
     }
+
+    /** True once a node with [description] is on screen. */
+    private fun SkikoComposeUiTest.showing(description: String): Boolean =
+        onAllNodesWithContentDescription(description).fetchSemanticsNodes().isNotEmpty()
 
     /** True once 8.2's dialog is on screen. */
     private fun SkikoComposeUiTest.asking(): Boolean =
