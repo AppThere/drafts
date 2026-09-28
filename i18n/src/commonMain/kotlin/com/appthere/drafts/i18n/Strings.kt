@@ -18,6 +18,12 @@ object Strings {
     /** 7.4: the name a new document has until its first save gives it one. */
     const val UNTITLED = "Untitled"
 
+    /** 7.4's *Save As*: the dialog's title, and the words when a save does not happen. */
+    const val SAVE_AS = "Save As"
+    const val COULD_NOT_SAVE =
+        "This document could not be saved. Your words are safe in this window, and will be here " +
+            "next time too."
+
     // The reader controls of `appthere-drafts.md` 5.5. Named for what they do to the reading
     // experience rather than for the property they set: "Text size", not "Base sp".
     const val READER_CONTROLS = "Reader"

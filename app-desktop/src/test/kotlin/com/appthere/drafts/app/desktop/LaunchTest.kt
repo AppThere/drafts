@@ -86,6 +86,21 @@ class LaunchTest {
             assertEquals(listOf("scene.fountain"), opened.map { it.displayName })
         }
 
+    @Test
+    fun `a file already open under another id is not opened twice`() =
+        runBlocking {
+            // A document saved from untitled keeps its UUID. Double-clicking its file must find
+            // that window rather than open the same file in a second one.
+            val draft = file("draft.md")
+            val saved =
+                desktopIdentity(draft.toString(), "markdown").copy(documentId = "6f1c2f7e-untitled-then-saved")
+            val open = mutableListOf(sessions.opened(saved))
+
+            open.show(draft.toString(), sessions)
+
+            assertEquals(listOf(saved.documentId), open.map { it.documentId })
+        }
+
     private fun file(name: String): Path = directory.resolve(name).also { it.writeText("Words.\n") }
 
     private companion object {

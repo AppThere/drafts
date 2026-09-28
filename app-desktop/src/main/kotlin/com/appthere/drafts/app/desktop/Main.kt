@@ -39,6 +39,7 @@ import com.appthere.drafts.app.SettingsStore
 import com.appthere.drafts.app.SnapshotKeeper
 import com.appthere.drafts.app.rememberOpenDocument
 import com.appthere.drafts.app.rememberUntitledDocument
+import com.appthere.drafts.app.suggestedFileName
 import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.i18n.Strings
 import com.appthere.drafts.platform.files.Digest
@@ -50,6 +51,7 @@ import com.appthere.drafts.platform.files.SessionRecord
 import com.appthere.drafts.platform.files.SnapshotStore
 import com.appthere.drafts.platform.files.SnapshotTrigger
 import com.appthere.drafts.platform.files.WindowRecord
+import com.appthere.drafts.platform.files.chooseSaveLocation
 import com.appthere.drafts.platform.files.desktopIdentity
 import com.appthere.drafts.platform.files.desktopSessionRoot
 import com.appthere.drafts.platform.files.desktopSettingsRoot
@@ -62,6 +64,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import java.awt.Desktop
+import java.awt.Frame
 
 /**
  * The desktop entry point.
@@ -74,7 +77,7 @@ import java.awt.Desktop
  * sessions from last time rejoin it on launch. With neither, an untitled document opens (7.4) --
  * see [sessionsAtLaunch].
  *
- * File > Open is still absent. It needs a platform file dialog, which is `:platform-intents`.
+ * File > Open is still absent. The save dialog it would sit beside is in `:platform-files`.
  */
 fun main(args: Array<String>) {
     val instance = SingleInstance()
@@ -138,10 +141,8 @@ private fun ApplicationScope.DraftsApplication(
     args: Array<String>,
     opened: Channel<String>,
 ) {
-    val store = remember { PathDocumentStore() }
-    val snapshots = remember { SnapshotStore(store, desktopSessionRoot()) }
-    val sessions = remember { SessionList(snapshots) }
-    val settings = remember { SettingsStore(store, desktopSettingsRoot()) }
+    val stores = remember { Stores.desktop() }
+    val sessions = stores.sessions
 
     val open = remember { mutableStateListOf<SessionRecord>() }
     var restored by remember { mutableStateOf(false) }
@@ -149,7 +150,7 @@ private fun ApplicationScope.DraftsApplication(
     LaunchedEffect(Unit) {
         // 8.3's pruning, before anything is restored: a session whose work reached a file more
         // than thirty days ago has no snapshot worth reopening.
-        snapshots.prune(epochMillis())
+        stores.snapshots.prune(epochMillis())
 
         open += sessionsAtLaunch(sessions, args.firstOrNull(), Strings.UNTITLED)
         restored = true
@@ -163,10 +164,10 @@ private fun ApplicationScope.DraftsApplication(
         key(record.documentId) {
             DocumentWindow(
                 record = record,
-                sessions = sessions,
-                snapshots = snapshots,
-                settings = settings,
-                store = store,
+                stores = stores,
+                // 7.4's Save As moves a document to a new file under the same id: the window stays,
+                // and its title follows.
+                onMove = { moved -> open.replaceAll { if (it.documentId == moved.documentId) moved else it } },
                 onClose = { open.removeAll { it.documentId == record.documentId } },
             )
         }
@@ -199,10 +200,8 @@ private fun ApplicationScope.DraftsApplication(
 @Composable
 private fun ApplicationScope.DocumentWindow(
     record: SessionRecord,
-    sessions: SessionList,
-    snapshots: SnapshotStore,
-    settings: SettingsStore,
-    store: PathDocumentStore,
+    stores: Stores,
+    onMove: (SessionRecord) -> Unit,
     onClose: () -> Unit,
 ) {
     val state =
@@ -243,9 +242,9 @@ private fun ApplicationScope.DocumentWindow(
     ) {
         FileDocument(
             record = record,
-            snapshots = snapshots,
-            settings = settings,
-            store = store,
+            stores = stores,
+            parent = window,
+            onMove = onMove,
             onReadyToClose = { closing = it },
         )
     }
@@ -258,7 +257,7 @@ private fun ApplicationScope.DocumentWindow(
             .distinctUntilChanged()
             .collectLatest { geometry ->
                 delay(SETTLE_MILLIS)
-                sessions.remember(record.documentId, geometry)
+                stores.sessions.remember(record.documentId, geometry)
             }
     }
 
@@ -268,7 +267,7 @@ private fun ApplicationScope.DocumentWindow(
     if (closed) {
         LaunchedEffect(Unit) {
             closing?.invoke()
-            sessions.closed(record.documentId)
+            stores.sessions.closed(record.documentId)
             forget()
         }
     }
@@ -285,33 +284,39 @@ private fun ApplicationScope.DocumentWindow(
 @Composable
 private fun FileDocument(
     record: SessionRecord,
-    snapshots: SnapshotStore,
-    settings: SettingsStore,
-    store: PathDocumentStore,
+    stores: Stores,
+    parent: Frame,
+    onMove: (SessionRecord) -> Unit,
     onReadyToClose: (suspend () -> Unit) -> Unit,
 ) {
     val identity = remember(record.documentId) { record.identity() }
     val recover: suspend (Digest) -> Recovery =
-        remember(identity) { { digest -> snapshots.examine(identity.documentId, digest) } }
+        remember(identity) { { digest -> stores.snapshots.examine(identity.documentId, digest) } }
 
     // 5.5's settings for this document's type, read before the window is drawn so the reader never
     // sees the defaults flash up and be replaced by their own typography.
-    val saved by produceState<ReaderSettings?>(null, settings, record.kind) {
-        value = settings.settingsFor(record.kind) ?: ReaderSettings()
+    val saved by produceState<ReaderSettings?>(null, stores.settings, record.kind) {
+        value = stores.settings.settingsFor(record.kind) ?: ReaderSettings()
     }
 
     // A record with no file is an untitled document (7.4), whose words live only in its snapshot.
-    val file = record.accessToken ?: record.uri
+    //
+    // Decided once, when the window opens. After Save As the record has a file, and deciding again
+    // would re-read the document from it -- a new editor, with the undo history and the caret gone,
+    // for a document that had not changed.
+    val file = remember(record.documentId) { record.accessToken ?: record.uri }
     val opening =
         if (file == null) {
-            rememberUntitledDocument(store, snapshots, record.documentId)
+            rememberUntitledDocument(stores.files, stores.snapshots, record.documentId)
         } else {
-            rememberOpenDocument(store, remember(file) { DocumentRef(file) }, recover)
+            rememberOpenDocument(stores.files, remember(file) { DocumentRef(file) }, recover)
         }
+    val moved by rememberUpdatedState(onMove)
+    val saving = remember(stores) { SaveAs(stores.sessions) { moved(it) } }
 
     when (opening) {
         is DocumentOpening.Opened -> {
-            val keeper = remember(opening.document) { SnapshotKeeper(opening.document, snapshots, identity) }
+            val keeper = remember(opening.document) { SnapshotKeeper(opening.document, stores.snapshots, identity) }
 
             onReadyToClose { keeper.snapshotOn(SnapshotTrigger.Closing) }
 
@@ -320,8 +325,21 @@ private fun FileDocument(
                     document = opening.document,
                     initialSettings = initial,
                     keeper = keeper,
-                    settingsStore = settings,
+                    settingsStore = stores.settings,
                     kind = record.kind,
+                    saveAs = {
+                        // 7.4: the name comes from the first heading or the title page while the
+                        // document is untitled; once it has a file, Save As offers that file's name.
+                        val suggested =
+                            if (record.uri == null) {
+                                opening.document.editor.suggestedFileName(kindOf(record.kind), Strings.UNTITLED)
+                            } else {
+                                record.displayName
+                            }
+
+                        chooseSaveLocation(parent, Strings.SAVE_AS, suggested, near = record.accessToken)
+                            ?.let { path -> saving.to(path, opening.document, record, keeper) }
+                    },
                 )
             }
         }
@@ -341,6 +359,27 @@ private fun FileDocument(
 private fun Notice(text: String) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         BasicText(text)
+    }
+}
+
+private fun kindOf(id: String): DocumentKind = DocumentKind.entries.firstOrNull { it.id == id } ?: DocumentKind.Markdown
+
+/**
+ * The four places the desktop keeps things, made once and shared by every window: the reader's
+ * files, 8.1's snapshots, 7.3's session list, and 5.5's settings.
+ */
+private class Stores(
+    val files: PathDocumentStore,
+    val snapshots: SnapshotStore,
+    val sessions: SessionList,
+    val settings: SettingsStore,
+) {
+    companion object {
+        fun desktop(): Stores {
+            val files = PathDocumentStore()
+            val snapshots = SnapshotStore(files, desktopSessionRoot())
+            return Stores(files, snapshots, SessionList(snapshots), SettingsStore(files, desktopSettingsRoot()))
+        }
     }
 }
 

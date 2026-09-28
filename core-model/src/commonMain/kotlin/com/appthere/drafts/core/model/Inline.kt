@@ -182,3 +182,23 @@ enum class Origin {
     /** Raw HTML, which CommonMark permits and this dialect passes through untouched. */
     RAW_HTML,
 }
+
+/**
+ * The words a reader sees, with every piece of markup flattened away.
+ *
+ * The same text a browser gives as a rendered element's `textContent`, which is what GitHub's
+ * heading ids are made from (`markdown-dialect.md`) and what a reader would call a heading's
+ * title. So a code span contributes its code -- "Using `foo`" reads as "Using foo" -- while an
+ * image, a footnote marker, and raw HTML or a shortcode contribute nothing a reader reads as words.
+ * A line break becomes a space, which is how it reads.
+ */
+fun List<Inline>.plainText(): String =
+    joinToString("") { inline ->
+        when (inline) {
+            is Text -> inline.value
+            is CodeSpan -> inline.text
+            is LineBreak -> " "
+            is Image, is FootnoteRef, is RawInline -> ""
+            else -> inline.children.plainText()
+        }
+    }

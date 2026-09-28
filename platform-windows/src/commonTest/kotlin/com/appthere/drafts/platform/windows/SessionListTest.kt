@@ -57,6 +57,35 @@ class SessionListTest {
         }
 
     @Test
+    fun `save as moves the record to the new file and keeps its id`() =
+        runTest {
+            // 7.4's first save. The next launch has to reopen the file, not an untitled document.
+            val sessions = sessions()
+            val untitled = SessionIdentity.untitled(kind = "markdown", displayName = "Untitled")
+            sessions.opened(untitled)
+            val moved =
+                untitled.copy(
+                    uri = "file:///documents/salt-road.fountain",
+                    displayName = "salt-road.fountain",
+                    kind = "fountain",
+                    accessToken = "/documents/salt-road.fountain",
+                )
+
+            val updated = sessions.savedAs(moved)
+
+            assertEquals(untitled.documentId, updated?.documentId)
+            assertEquals(moved.uri, updated?.uri)
+            assertEquals("fountain", updated?.kind)
+            assertEquals(listOf("salt-road.fountain"), sessions.restorable().map { it.displayName })
+        }
+
+    @Test
+    fun `save as with no session to move reports none`() =
+        runTest {
+            assertNull(sessions().savedAs(identity("nobody")))
+        }
+
+    @Test
     fun `a closed document is not restorable`() =
         runTest {
             val sessions = sessions()

@@ -38,13 +38,19 @@ internal suspend fun sessionsAtLaunch(
  *
  * Already-open is the ordinary case when a reader double-clicks a file they have open: 9.4 asks
  * for a new window per document, not per double-click.
+ *
+ * "Already there" is by file, not by id. A document saved from untitled (7.4) keeps the UUID it was
+ * given, so its id is not the one this path would produce -- and matching on ids would open the
+ * file a second time, in a second window, as a second session.
  */
 internal suspend fun MutableList<SessionRecord>.show(
     path: String,
     sessions: SessionList,
 ) {
     val kind = DocumentKind.of(path) ?: DocumentKind.Markdown
-    val record = sessions.opened(desktopIdentity(path, kind.id))
+    val identity = desktopIdentity(path, kind.id)
+    if (any { it.uri == identity.uri }) return
 
+    val record = sessions.opened(identity)
     if (none { it.documentId == record.documentId }) this += record
 }

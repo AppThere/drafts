@@ -27,6 +27,7 @@ import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
@@ -81,9 +82,14 @@ fun DraftsApp(
 }
 
 /**
- * The same window, for a document that came from a file.
+ * The same window, for a document with a session: one from a file, or an untitled one (7.4).
  *
  * The difference the [document] makes is the badge 8.4 asks for and a save that can happen at all.
+ *
+ * [saveAs] is the host's *Save As*: it asks the reader where, through the platform's own picker,
+ * saves there, and returns what happened -- null if the reader cancelled. It belongs to the host
+ * because the picker does; without one, an untitled document has nowhere to go and Ctrl+S does
+ * nothing, which is the honest answer on a platform that has no picker yet.
  */
 @Composable
 fun DraftsApp(
@@ -93,6 +99,7 @@ fun DraftsApp(
     keeper: SnapshotKeeper? = null,
     settingsStore: SettingsStore? = null,
     kind: String = DEFAULT_KIND,
+    saveAs: (suspend () -> WriteOutcome?)? = null,
 ) {
     val scope = rememberCoroutineScope()
     val scroll = rememberLazyListState()
@@ -112,7 +119,7 @@ fun DraftsApp(
     // attempted write", so the dialog is driven by the outcome of a save and cleared by answering
     // it. Driving it from `conflicted` instead would make Cancel do nothing -- the document is
     // still conflicted afterwards, so the dialog would come straight back.
-    var refusal: WriteOutcome.Conflict? by remember(document) { mutableStateOf(null) }
+    val saving = remember(document, keeper) { Saving(document, keeper) }
 
     // 8.3's banner. Separate state from `restoredFromSnapshot`, which is a fact about how the
     // document opened and does not stop being true once the reader has answered.
@@ -147,21 +154,18 @@ fun DraftsApp(
                 // visible effect and no test can tell the difference. It stays because the day the
                 // editor does want Escape -- clearing a selection is the obvious candidate -- a
                 // handler that had been swallowing it since now would be a silent dead key.
-                refusal != null && dismisses(event) -> {
-                    refusal = null
+                saving.refusal != null && dismisses(event) -> {
+                    saving.answered()
+                    true
+                }
+
+                savesAs(event) -> {
+                    scope.launch { saving.saveAs(saveAs) }
                     true
                 }
 
                 saves(event) -> {
-                    scope.launch {
-                        val outcome = document.save()
-                        refusal = outcome as? WriteOutcome.Conflict
-
-                        // 8.3's thirty days are counted from here. Only on a write that happened:
-                        // stamping a refused save would make the snapshot prunable while it was
-                        // still the only copy of the work.
-                        if (outcome is WriteOutcome.Written) keeper?.noteSaved()
-                    }
+                    scope.launch { saving.save(saveAs) }
                     true
                 }
 
@@ -199,16 +203,24 @@ fun DraftsApp(
             )
         }
 
-        if (refusal != null) {
+        if (saving.refusal != null) {
             ConflictDialog(
                 onReload = {
                     scope.launch {
                         document.reload()
-                        refusal = null
+                        saving.answered()
                     }
                 },
-                onCancel = { refusal = null },
+                onCancel = saving::answered,
                 modifier = Modifier.align(Alignment.Center).padding(controlsInset),
+            )
+        }
+
+        // At the top, clear of 8.3's banner at the foot: both can be showing at once.
+        if (saving.failed) {
+            SaveFailedBanner(
+                onDismiss = saving::acknowledged,
+                modifier = Modifier.align(Alignment.TopCenter).padding(controlsInset),
             )
         }
     }
@@ -419,6 +431,14 @@ private fun dismisses(event: KeyEvent): Boolean = event.type == KeyEventType.Key
 private fun saves(event: KeyEvent): Boolean =
     event.type == KeyEventType.KeyDown &&
         (event.isCtrlPressed || event.isMetaPressed) &&
+        !event.isShiftPressed &&
+        event.key == Key.S
+
+/** 7.4's *Save As*, on the shortcut every editor uses for it. */
+private fun savesAs(event: KeyEvent): Boolean =
+    event.type == KeyEventType.KeyDown &&
+        (event.isCtrlPressed || event.isMetaPressed) &&
+        event.isShiftPressed &&
         event.key == Key.S
 
 /** 5.5's settings, on the shortcut every editor uses for them. */

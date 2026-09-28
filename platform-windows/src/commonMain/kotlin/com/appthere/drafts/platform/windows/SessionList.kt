@@ -63,6 +63,26 @@ class SessionList(
         return snapshots.putRecord(record.copy(closedAt = now))
     }
 
+    /**
+     * 7.4's *Save As* has moved a document to [moved]'s file, keeping its id.
+     *
+     * The record follows it -- file, name, kind and access token -- so the next launch reopens the
+     * file rather than an untitled document, or the file it was saved away from. Returns the updated
+     * record, or null if there was none to update.
+     */
+    suspend fun savedAs(moved: SessionIdentity): SessionRecord? {
+        val record = snapshots.recordOf(moved.documentId) ?: return null
+        val updated =
+            record.copy(
+                uri = moved.uri,
+                displayName = moved.displayName,
+                kind = moved.kind,
+                accessToken = moved.accessToken,
+            )
+
+        return updated.takeIf { snapshots.putRecord(it) }
+    }
+
     /** Persists a window's geometry, per 7.2's "each with its own `WindowState` ... persisted". */
     suspend fun remember(
         documentId: String,

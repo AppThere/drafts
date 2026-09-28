@@ -53,6 +53,15 @@ class AttributeSyntaxTest {
     }
 
     @Test
+    fun `a generated id keeps the words inside a code span`() {
+        // GitHub reads the heading as a reader does. "Using `foo`" is "Using foo", so its id is
+        // `using-foo` -- this used to come out as `using-`, the code dropped.
+        val heading = parser.parse("## Using `foo`\n").blocks.single() as Heading
+
+        assertEquals("using-foo", heading.attrs.id)
+    }
+
+    @Test
     fun `generated ids preserve non-Latin scripts`() {
         // "Unicode preserved" -- a heading in Japanese gets an id in Japanese, not an empty string.
         val heading = parser.parse("## 日本語の見出し\n").blocks.single() as Heading

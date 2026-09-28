@@ -9,6 +9,7 @@ import com.appthere.drafts.core.model.Inline
 import com.appthere.drafts.core.model.LineBreak
 import com.appthere.drafts.core.model.Paragraph
 import com.appthere.drafts.core.model.Text
+import com.appthere.drafts.core.model.plainText
 
 /**
  * Attaches attribute blocks to headings and images, and generates heading ids
@@ -119,12 +120,3 @@ internal object AttributeRestorer {
     /** Image, soft break, attribute block. */
     private const val STANDALONE_IMAGE_SIZE = 3
 }
-
-/** Heading text with markup flattened, which is what an id is generated from. */
-private fun List<Inline>.plainText(): String =
-    joinToString("") { inline ->
-        when (inline) {
-            is Text -> inline.value
-            else -> inline.children.plainText()
-        }
-    }

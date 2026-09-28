@@ -15,6 +15,7 @@ import com.appthere.drafts.platform.files.sha256
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -223,6 +224,30 @@ class SnapshotKeeperTest {
             keeper.subject.snapshotOn(SnapshotTrigger.FocusLost)
 
             assertEquals(untitledRecord().documentId, keeper.snapshots.recordOf(UNTITLED.documentId)?.documentId)
+        }
+
+    @Test
+    fun `after save as the snapshots name the new file`() =
+        runTest {
+            // Otherwise the next autosave writes the old location -- none, for an untitled
+            // document -- back over the record, and the next launch reopens it as untitled.
+            val keeper = untitledKeeper(TWO_BLOCKS)
+            val moved = UNTITLED.copy(uri = "file:///documents/draft.md", displayName = "draft.md")
+            keeper.subject.movedTo(moved)
+            keeper.document.type("Unsaved. ")
+            keeper.subject.edited(START)
+
+            keeper.subject.snapshotOn(SnapshotTrigger.FocusLost)
+
+            assertEquals(moved.uri, keeper.snapshots.recordOf(UNTITLED.documentId)?.uri)
+        }
+
+    @Test
+    fun `a document cannot move to someone else's id`() =
+        runTest {
+            val keeper = untitledKeeper(TWO_BLOCKS)
+
+            assertFailsWith<IllegalArgumentException> { keeper.subject.movedTo(IDENTITY) }
         }
 
     @Test

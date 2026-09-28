@@ -23,9 +23,24 @@ import com.appthere.drafts.platform.files.epochMillis
 class SnapshotKeeper(
     private val document: OpenDocument,
     private val snapshots: SnapshotStore,
-    private val identity: SessionIdentity,
+    identity: SessionIdentity,
     private val schedule: SnapshotSchedule = SnapshotSchedule(),
 ) {
+    /** Who the snapshots are for. Moves with the document on *Save As*; the id never does. */
+    private var identity: SessionIdentity = identity
+
+    /**
+     * 7.4's *Save As* has given the document a file, or a different one.
+     *
+     * Every record written from here names the new file. Without this, the next autosave would
+     * write the old location -- none, for a document that was untitled -- back over the record the
+     * session list had just updated, and the next launch would reopen it as untitled again.
+     */
+    fun movedTo(moved: SessionIdentity) {
+        require(moved.documentId == identity.documentId) { "A document keeps its id when it moves" }
+        identity = moved
+    }
+
     /** Where the document had got to when it was last captured. Null until something is written. */
     var lastTrigger: SnapshotTrigger? = null
         private set

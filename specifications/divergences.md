@@ -18,15 +18,15 @@ Each entry says what the spec asks for, what the code does, why, and what would 
 
 **Code:** Reload and Cancel. Escape also cancels.
 
-**Why:** "Save a copy…" needs a platform save dialog, which Phase 5 did not build as first
-planned. "Show differences" needs a diff view, which nothing has built. A button that does nothing is worse
+**Why:** "Show differences" needs a diff view, which nothing has built. "Save a copy…" needed a
+platform save dialog, which now exists (§7.4's *Save As*); the button is not wired to it yet. A button that does nothing is worse
 than one that is not offered.
 
 **What holds anyway:** the refusal itself — the part that protects the file — does not depend on
 any of the four.
 
-**Closes when:** the save dialog arrives with §7.4's *Save As* (a Phase 5 deliverable), for
-"Save a copy…"; and whenever a diff view is built, for "Show differences".
+**Closes when:** "Save a copy…" is wired to the save dialog, which is a small change now; and
+whenever a diff view is built, for "Show differences".
 
 ---
 
@@ -127,19 +127,6 @@ resources (§11.1) — that half is simply unfinished.
 
 ---
 
-## 8.2 — A failed save is silent
-
-**Spec:** §8.2 and §8.4 — the reader is told about the state of their file; "dialogs only on
-attempted write".
-
-**Code:** Ctrl+S that fails on a full disk, a dropped share or a lost permission does nothing
-visible. Only a conflict is shown (`DraftsApp.kt`). The words are safe — the snapshot holds them —
-but the reader believes a save happened.
-
-**Closes when:** Phase 5, alongside *Save As*, which needs the same failure message.
-
----
-
 ## 9.4 — Every user on a machine shares the single-instance port
 
 **Spec:** "Route to an existing instance via a single-instance lock and a local socket or named
@@ -188,7 +175,7 @@ first; moving to resources is then mechanical.
 
 **Code:** footnote references are dropped by the inline writer; heading and image attributes and
 loose definition-list entries are not written back; the attribute, footnote and definition-list
-restorers walk top-level blocks only; heading ids drop code-span text; a `[^x]:` line inside a
+restorers walk top-level blocks only; a `[^x]:` line inside a
 fenced code block is read as a footnote. Definition lists are one line per definition and one
 entry per list.
 
