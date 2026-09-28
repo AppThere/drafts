@@ -1,5 +1,6 @@
 plugins {
     id("drafts.kmp.compose")
+    alias(libs.plugins.kotlinSerialization)
 }
 
 kotlin {
@@ -16,6 +17,7 @@ kotlin {
 
             implementation(compose.runtime)
             implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.serialization.json)
             implementation(compose.foundation)
         }
 

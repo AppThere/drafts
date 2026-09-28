@@ -76,6 +76,7 @@ fun DraftsApp(
         editor = editor,
         initialSettings = initialSettings,
         onDocumentKey = ::saves,
+        onSettingsChange = {},
         modifier = modifier,
     ) {}
 }
@@ -91,6 +92,8 @@ fun DraftsApp(
     modifier: Modifier = Modifier,
     initialSettings: ReaderSettings = ReaderSettings(),
     keeper: SnapshotKeeper? = null,
+    settingsStore: SettingsStore? = null,
+    kind: String = DEFAULT_KIND,
 ) {
     val scope = rememberCoroutineScope()
     val scroll = rememberLazyListState()
@@ -139,6 +142,7 @@ fun DraftsApp(
     DraftsWindow(
         editor = document.editor,
         initialSettings = initialSettings,
+        onSettingsChange = { changed -> settingsStore?.remember(kind, changed) },
         scroll = scroll,
         onRouse = rouse,
         onDocumentKey = { event ->
@@ -237,12 +241,14 @@ private fun DraftsWindow(
     editor: EditorState,
     initialSettings: ReaderSettings,
     onDocumentKey: (KeyEvent) -> Boolean,
+    onSettingsChange: suspend (ReaderSettings) -> Unit,
     modifier: Modifier = Modifier,
     scroll: LazyListState = rememberLazyListState(),
     onRouse: () -> Unit = {},
     chrome: @Composable BoxScope.() -> Unit,
 ) {
     var settings by remember { mutableStateOf(initialSettings) }
+    val scope = rememberCoroutineScope()
     var showControls by remember { mutableStateOf(false) }
     var showLicences by remember { mutableStateOf(false) }
     val root = remember { FocusRequester() }
@@ -308,7 +314,13 @@ private fun DraftsWindow(
             if (showControls) {
                 ReaderControls(
                     settings = settings,
-                    onChange = { settings = it },
+                    // 5.5: "persisted per document type". Written as the reader changes them, so
+                    // closing the window is not a way to lose them -- which is what closing the
+                    // window did until now.
+                    onChange = { changed ->
+                        settings = changed
+                        scope.launch { onSettingsChange(changed) }
+                    },
                     modifier = Modifier.align(Alignment.TopEnd).padding(controlsInset),
                     onShowLicences = { showLicences = true },
                 )
@@ -331,6 +343,14 @@ private fun DraftsWindow(
  * one, somewhere inside it.
  */
 private const val SCROLL_SCALE = 100_000
+
+/**
+ * The document type a settings file is keyed by, when nobody has said which.
+ *
+ * Markdown, because that is what an untyped buffer is: the sample document, and anything opened
+ * without an extension this application recognises.
+ */
+private const val DEFAULT_KIND = "markdown"
 
 /** Far enough from the corner to read as a panel over the document rather than part of the frame. */
 private val controlsInset = 16.dp

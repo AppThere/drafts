@@ -44,6 +44,9 @@ fun desktopDataRoot(
 /** 7.3 puts each document's snapshot in `sessions/<documentId>/`. */
 fun desktopSessionRoot(): String = Path.of(desktopDataRoot(), SESSIONS).toString()
 
+/** 5.5's settings, one file per document type, beside the sessions rather than inside them. */
+fun desktopSettingsRoot(): String = Path.of(desktopDataRoot(), SETTINGS).toString()
+
 /**
  * A desktop document's session identity.
  *
@@ -93,3 +96,4 @@ fun resolveDesktopToken(token: String): DocumentRef? =
 private const val VENDOR = "AppThere"
 private const val APPLICATION = "Drafts"
 private const val SESSIONS = "sessions"
+private const val SETTINGS = "settings"

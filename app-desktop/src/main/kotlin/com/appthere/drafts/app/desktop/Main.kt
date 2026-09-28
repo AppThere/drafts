@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -33,8 +34,10 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.appthere.drafts.app.DocumentOpening
 import com.appthere.drafts.app.DraftsApp
+import com.appthere.drafts.app.SettingsStore
 import com.appthere.drafts.app.SnapshotKeeper
 import com.appthere.drafts.app.rememberOpenDocument
+import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.i18n.Strings
 import com.appthere.drafts.platform.files.Digest
 import com.appthere.drafts.platform.files.DocumentRef
@@ -47,6 +50,7 @@ import com.appthere.drafts.platform.files.SnapshotTrigger
 import com.appthere.drafts.platform.files.WindowRecord
 import com.appthere.drafts.platform.files.desktopIdentity
 import com.appthere.drafts.platform.files.desktopSessionRoot
+import com.appthere.drafts.platform.files.desktopSettingsRoot
 import com.appthere.drafts.platform.files.epochMillis
 import com.appthere.drafts.platform.intents.DocumentKind
 import com.appthere.drafts.platform.intents.SingleInstance
@@ -135,6 +139,7 @@ private fun ApplicationScope.DraftsApplication(
     val store = remember { PathDocumentStore() }
     val snapshots = remember { SnapshotStore(store, desktopSessionRoot()) }
     val sessions = remember { SessionList(snapshots) }
+    val settings = remember { SettingsStore(store, desktopSettingsRoot()) }
 
     val open = remember { mutableStateListOf<SessionRecord>() }
     var restored by remember { mutableStateOf(false) }
@@ -159,6 +164,7 @@ private fun ApplicationScope.DraftsApplication(
                 record = record,
                 sessions = sessions,
                 snapshots = snapshots,
+                settings = settings,
                 store = store,
                 onClose = { open.removeAll { it.documentId == record.documentId } },
             )
@@ -217,6 +223,7 @@ private fun ApplicationScope.DocumentWindow(
     record: SessionRecord,
     sessions: SessionList,
     snapshots: SnapshotStore,
+    settings: SettingsStore,
     store: PathDocumentStore,
     onClose: () -> Unit,
 ) {
@@ -259,6 +266,7 @@ private fun ApplicationScope.DocumentWindow(
         FileDocument(
             record = record,
             snapshots = snapshots,
+            settings = settings,
             store = store,
             onReadyToClose = { closing = it },
         )
@@ -300,6 +308,7 @@ private fun ApplicationScope.DocumentWindow(
 private fun FileDocument(
     record: SessionRecord,
     snapshots: SnapshotStore,
+    settings: SettingsStore,
     store: PathDocumentStore,
     onReadyToClose: (suspend () -> Unit) -> Unit,
 ) {
@@ -308,13 +317,27 @@ private fun FileDocument(
     val recover: suspend (Digest) -> Recovery =
         remember(identity) { { digest -> snapshots.examine(identity.documentId, digest) } }
 
+    // 5.5's settings for this document's type, read before the window is drawn so the reader never
+    // sees the defaults flash up and be replaced by their own typography.
+    val saved by produceState<ReaderSettings?>(null, settings, record.kind) {
+        value = settings.settingsFor(record.kind) ?: ReaderSettings()
+    }
+
     when (val opening = rememberOpenDocument(store, ref, recover)) {
         is DocumentOpening.Opened -> {
             val keeper = remember(opening.document) { SnapshotKeeper(opening.document, snapshots, identity) }
 
             onReadyToClose { keeper.snapshotOn(SnapshotTrigger.Closing, scrollOffset = 0) }
 
-            DraftsApp(document = opening.document, keeper = keeper)
+            saved?.let { initial ->
+                DraftsApp(
+                    document = opening.document,
+                    initialSettings = initial,
+                    keeper = keeper,
+                    settingsStore = settings,
+                    kind = record.kind,
+                )
+            }
         }
 
         DocumentOpening.Opening -> {
