@@ -125,7 +125,15 @@ fun DraftsApp(
                 }
 
                 saves(event) -> {
-                    scope.launch { refusal = document.save() as? WriteOutcome.Conflict }
+                    scope.launch {
+                        val outcome = document.save()
+                        refusal = outcome as? WriteOutcome.Conflict
+
+                        // 8.3's thirty days are counted from here. Only on a write that happened:
+                        // stamping a refused save would make the snapshot prunable while it was
+                        // still the only copy of the work.
+                        if (outcome is WriteOutcome.Written) keeper?.noteSaved()
+                    }
                     true
                 }
 

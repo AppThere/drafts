@@ -1,5 +1,6 @@
 package com.appthere.drafts.platform.files
 
+import java.nio.file.Files
 import java.nio.file.Path
 
 /**
@@ -63,8 +64,23 @@ fun desktopIdentity(path: String): SessionIdentity {
         uri = file.toUri().toString(),
         displayName = file.fileName.toString(),
         kind = if (file.toString().endsWith(FOUNTAIN)) "fountain" else "markdown",
+        // 7.3: "**Desktop:** absolute path, with existence re-checked on restore." Absolute and
+        // normalised, so a session recorded from a relative path still resolves from a different
+        // working directory on the next launch.
+        accessToken = file.toString(),
     )
 }
+
+/**
+ * Resolves a desktop access token back to a document, or null if it no longer leads anywhere.
+ *
+ * The re-check 7.3 asks for. A path is not a permission -- it is a guess that survived a restart --
+ * and files get moved, renamed and deleted between sessions. 7.3 says what to do when this returns
+ * null: "A document whose file has vanished opens read-only from its snapshot with a clear banner
+ * offering *Save As*."
+ */
+fun resolveDesktopToken(token: String): DocumentRef? =
+    Path.of(token).takeIf { Files.isReadable(it) }?.let { DocumentRef(it.toString()) }
 
 private const val FOUNTAIN = ".fountain"
 private const val VENDOR = "AppThere"

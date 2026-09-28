@@ -18,6 +18,7 @@ data class SessionIdentity(
     val uri: String,
     val displayName: String,
     val kind: String,
+    val accessToken: String? = null,
 )
 
 /** Where the caret was, in the terms 7.3 stores it. */
@@ -44,10 +45,17 @@ data class WindowRecord(
  * Without it a restored snapshot would open at the top of the document with the caret nowhere,
  * which for a long manuscript is most of the value of restoring it at all.
  *
- * [accessToken] and [window] are nullable because nothing produces them yet. 7.3 makes the token
- * the crux -- a persisted URI permission on Android, a security-scoped bookmark on iOS -- and each
- * of those is platform work that has not been done. A record written now is honest about not having
- * them rather than carrying a placeholder that later code would trust.
+ * [accessToken] is 7.3's crux and differs per platform: on desktop it is the absolute path, with
+ * existence re-checked on restore. The Android persisted URI permission and the iOS security-scoped
+ * bookmark arrive with those platforms' stores, so the field stays nullable rather than carrying a
+ * placeholder that later code would trust.
+ *
+ * [savedAt] is what 8.3's retention is measured from -- "Retain snapshots for 30 days after a
+ * successful save, then prune". Null means no save has happened since this snapshot was written,
+ * and a snapshot that was never superseded by a save is never pruned. That is the whole of "Never
+ * auto-discard a snapshot": the clock only ever starts once the work is safely in the file.
+ *
+ * [window] is nullable because window geometry is Phase 5's, along with restoring windows at all.
  */
 @Serializable
 data class SessionRecord(
@@ -60,6 +68,7 @@ data class SessionRecord(
     @SerialName("baseDigest") val baseDigest: String,
     @SerialName("snapshotPath") val snapshotPath: String,
     @SerialName("accessToken") val accessToken: String? = null,
+    @SerialName("savedAt") val savedAt: Long? = null,
     val window: WindowRecord? = null,
 ) {
     companion object {

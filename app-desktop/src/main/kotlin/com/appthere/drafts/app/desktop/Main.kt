@@ -26,6 +26,7 @@ import com.appthere.drafts.platform.files.SnapshotStore
 import com.appthere.drafts.platform.files.SnapshotTrigger
 import com.appthere.drafts.platform.files.desktopIdentity
 import com.appthere.drafts.platform.files.desktopSessionRoot
+import com.appthere.drafts.platform.files.epochMillis
 
 /**
  * The desktop entry point.
@@ -95,6 +96,10 @@ private fun FileDocument(
         remember(identity) {
             { digest -> snapshots.examine(identity.documentId, digest) }
         }
+
+    // 8.3's pruning, on the way in. Sessions whose work reached a file more than thirty days ago
+    // are the only ones eligible; one that never saw a save is kept however old it is.
+    LaunchedEffect(snapshots) { snapshots.prune(epochMillis()) }
 
     when (val opening = rememberOpenDocument(store, ref, recover)) {
         is DocumentOpening.Opened -> {

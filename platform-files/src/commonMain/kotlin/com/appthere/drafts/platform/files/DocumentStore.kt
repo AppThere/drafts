@@ -126,6 +126,18 @@ interface DocumentStore {
         text: String,
     ): WriteOutcome
 
+    /**
+     * What is directly inside a directory we own.
+     *
+     * Only ever used on app-private storage: 7.3's session list is a directory of them, and 8.3's
+     * pruning has to walk it. Nothing here enumerates the reader's own filesystem, which is a
+     * capability this application has no reason to want and every reason not to have.
+     *
+     * An unreadable or absent directory is an empty list rather than a failure. On a first run
+     * there is no session directory at all, and launching must not depend on one existing.
+     */
+    suspend fun children(ref: DocumentRef): List<DocumentRef>
+
     /** Removes a file we own. Used to prune snapshots, per 8.3's thirty days. */
     suspend fun delete(ref: DocumentRef): Boolean
 }

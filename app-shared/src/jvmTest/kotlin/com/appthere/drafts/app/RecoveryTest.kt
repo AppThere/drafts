@@ -1,11 +1,15 @@
 package com.appthere.drafts.app
 
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
 import com.appthere.drafts.i18n.Strings
 import com.appthere.drafts.platform.files.CaretRecord
@@ -27,6 +31,8 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 /**
  * 8.3 on launch, through the whole stack against real files.
@@ -162,6 +168,51 @@ class RecoveryTest {
 
             onNodeWithText(ORIGINAL_LINE).assertExists()
             assertFalse(snapshotFile().exists(), "The discarded snapshot is still there")
+        }
+    }
+
+    @Test
+    fun `a save that lands starts the retention clock`() {
+        // 8.3 counts its thirty days from "a successful save". Until one happens the snapshot is
+        // the only copy of the work and must never be prunable.
+        givenSnapshot(UNSAVED)
+
+        runSkikoComposeUiTest(size = SIZE) {
+            open()
+
+            save()
+            waitUntil(timeoutMillis = TIMEOUT) { file().readText() == UNSAVED }
+            waitUntil(timeoutMillis = TIMEOUT) { runBlocking { snapshots.recordOf(ID)?.savedAt } != null }
+
+            assertNotNull(runBlocking { snapshots.recordOf(ID)?.savedAt })
+        }
+    }
+
+    @Test
+    fun `a save that was refused does not start the retention clock`() {
+        // The stamp says the work is safely in a file. A refused save is the case where it is
+        // emphatically not, and stamping here would make the snapshot prunable while it was still
+        // the only copy -- thirty days later, silently.
+        givenSnapshot(UNSAVED)
+
+        runSkikoComposeUiTest(size = SIZE) {
+            open()
+            file().writeText("Someone else's edit.\n")
+
+            save()
+            waitUntil(timeoutMillis = TIMEOUT) {
+                onAllNodesWithContentDescription(Strings.RELOAD).fetchSemanticsNodes().isNotEmpty()
+            }
+
+            assertNull(runBlocking { snapshots.recordOf(ID)?.savedAt })
+        }
+    }
+
+    private fun androidx.compose.ui.test.SkikoComposeUiTest.save() {
+        onRoot().performKeyInput {
+            keyDown(Key.CtrlLeft)
+            pressKey(Key.S)
+            keyUp(Key.CtrlLeft)
         }
     }
 

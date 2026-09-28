@@ -84,6 +84,16 @@ class FakeDocumentStore(
             WriteOutcome.Written(factsOf(text))
         }
 
+    /** Everything one level below [ref], as a real directory listing would report it. */
+    override suspend fun children(ref: DocumentRef): List<DocumentRef> {
+        val prefix = ref.token.trimEnd('/') + "/"
+
+        return files.keys
+            .filter { it.startsWith(prefix) }
+            .map { DocumentRef(prefix + it.removePrefix(prefix).substringBefore('/')) }
+            .distinct()
+    }
+
     override suspend fun delete(ref: DocumentRef): Boolean = files.remove(ref.token) != null
 
     private fun digestOf(text: String) = sha256(text.encodeToByteArray())

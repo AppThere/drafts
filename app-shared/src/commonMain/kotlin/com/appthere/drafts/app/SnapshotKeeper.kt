@@ -6,6 +6,7 @@ import com.appthere.drafts.platform.files.SessionRecord
 import com.appthere.drafts.platform.files.SnapshotSchedule
 import com.appthere.drafts.platform.files.SnapshotStore
 import com.appthere.drafts.platform.files.SnapshotTrigger
+import com.appthere.drafts.platform.files.epochMillis
 
 /**
  * 8.1's autosave, for one open document.
@@ -62,6 +63,15 @@ class SnapshotKeeper(
     ): Boolean = schedule.hasUnsavedEdits && capture(trigger, scrollOffset)
 
     /**
+     * 8.3's retention clock, started by a successful save.
+     *
+     * Called after the bytes are in the reader's file, not before. A stamp written ahead of a write
+     * that then failed would make the snapshot prunable while it was still the only copy of the
+     * work.
+     */
+    suspend fun noteSaved(now: Long = epochMillis()): Boolean = snapshots.markSaved(identity.documentId, now)
+
+    /**
      * 8.3's "[ Discard ]", which is the only way a snapshot is ever thrown away deliberately.
      *
      * "Never auto-discard a snapshot" leaves exactly one door open: the reader saying so. The
@@ -107,6 +117,7 @@ class SnapshotKeeper(
             baseDigest =
                 document.lifecycle.base.digest
                     .toString(),
+            accessToken = identity.accessToken,
             snapshotPath = snapshots.snapshotOf(identity.documentId).token,
         )
     }

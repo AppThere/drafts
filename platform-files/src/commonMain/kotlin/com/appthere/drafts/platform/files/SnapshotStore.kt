@@ -40,6 +40,23 @@ class SnapshotStore(
         return store.writeAtomically(metaOf(session.documentId), record) is WriteOutcome.Written
     }
 
+    /**
+     * Starts 8.3's retention clock: the work in this snapshot is now safely in the file.
+     *
+     * Only the record is rewritten. The snapshot text stays exactly as it was, because it is still
+     * the last thing autosave captured and rewriting it would be a write with nothing to write.
+     * A document with no snapshot has nothing to stamp and nothing to prune.
+     */
+    suspend fun markSaved(
+        documentId: String,
+        now: Long,
+    ): Boolean {
+        val record = recordOf(documentId) ?: return false
+        val stamped = SessionRecord.format.encodeToString(SessionRecord.serializer(), record.copy(savedAt = now))
+
+        return store.writeAtomically(metaOf(documentId), stamped) is WriteOutcome.Written
+    }
+
     /** The snapshot text, or null if there is none. */
     suspend fun textOf(documentId: String): String? =
         runCatching { store.read(snapshotOf(documentId)).text }.getOrNull()
@@ -92,6 +109,34 @@ class SnapshotStore(
         return text || meta
     }
 
+    /**
+     * Every session that has a directory, per 7.3's `sessions/<documentId>/`.
+     *
+     * The directory listing *is* the session list. A separate index file would be a second thing to
+     * keep in step with the first, and the failure mode of an index that drifts is a session nobody
+     * looks at holding work nobody knows about.
+     */
+    suspend fun sessions(): List<String> = store.children(DocumentRef(root)).map { it.token.substringAfterLast('/') }
+
+    /**
+     * 8.3's pruning: "Retain snapshots for 30 days after a successful save, then prune."
+     *
+     * The clock starts at a successful save and nowhere else. A session whose record has no
+     * [SessionRecord.savedAt] is never pruned however old it is -- it holds work that never reached
+     * a file, which is precisely what "Never auto-discard a snapshot" is protecting. The same goes
+     * for a session whose record cannot be read: unreadable is not the same as expired.
+     *
+     * Returns how many were pruned, which is the only way a caller can tell this did anything.
+     */
+    suspend fun prune(
+        now: Long,
+        retainMillis: Long = RETAIN_MILLIS,
+    ): Int =
+        sessions().count { documentId ->
+            val savedAt = recordOf(documentId)?.savedAt
+            savedAt != null && now - savedAt >= retainMillis && discard(documentId)
+        }
+
     /** Where 7.3 says the snapshot lives: `.../sessions/<documentId>/snapshot.md`. */
     fun snapshotOf(documentId: String): DocumentRef = DocumentRef("${directoryOf(documentId)}/$SNAPSHOT")
 
@@ -102,5 +147,8 @@ class SnapshotStore(
     companion object {
         const val SNAPSHOT = "snapshot.md"
         const val META = "meta.json"
+
+        /** 8.3's thirty days, in milliseconds. */
+        const val RETAIN_MILLIS = 30L * 24 * 60 * 60 * 1000
     }
 }

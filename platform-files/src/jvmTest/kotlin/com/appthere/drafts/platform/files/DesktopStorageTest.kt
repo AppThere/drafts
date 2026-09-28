@@ -1,0 +1,100 @@
+package com.appthere.drafts.platform.files
+
+import java.nio.file.Path
+import kotlin.io.path.createTempDirectory
+import kotlin.io.path.writeText
+import kotlin.test.AfterTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+/**
+ * 7.3's desktop half: where app-private data lives, and what an access token is worth.
+ *
+ * "**Desktop:** absolute path, with existence re-checked on restore." The re-check is the whole of
+ * it -- a path is not a permission, it is a guess that survived a restart, and between sessions
+ * files get moved, renamed and deleted.
+ */
+class DesktopStorageTest {
+    private val directory: Path = createTempDirectory("drafts-desktop")
+
+    @AfterTest
+    fun clean() {
+        directory.toFile().deleteRecursively()
+    }
+
+    @Test
+    fun `linux data goes under the XDG directory`() {
+        val root = desktopDataRoot(home = "/home/writer", os = "Linux", xdg = null)
+
+        assertEquals("/home/writer/.local/share/AppThere/Drafts", root)
+    }
+
+    @Test
+    fun `an explicit XDG_DATA_HOME is honoured`() {
+        // A reader who has moved their data directory has said where they want this. Ignoring it
+        // would put snapshots outside whatever their backup covers.
+        val root = desktopDataRoot(home = "/home/writer", os = "Linux", xdg = "/data/writer")
+
+        assertEquals("/data/writer/AppThere/Drafts", root)
+    }
+
+    @Test
+    fun `macOS data goes to Application Support`() {
+        // Where a Mac's backup looks and where an uninstaller cleans up. A directory invented next
+        // to the executable is in neither.
+        val root = desktopDataRoot(home = "/Users/writer", os = "Mac OS X", xdg = null)
+
+        assertEquals("/Users/writer/Library/Application Support/AppThere/Drafts", root)
+    }
+
+    @Test
+    fun `the token of an existing file resolves`() {
+        val file = directory.resolve("chapter.md")
+        file.writeText("A chapter.\n")
+
+        assertEquals(file.toString(), resolveDesktopToken(file.toString())?.token)
+    }
+
+    @Test
+    fun `the token of a file that has gone resolves to nothing`() {
+        // 7.3's re-check. The session file survived; the document did not. What happens next is
+        // 7.3's business -- "opens read-only from its snapshot" -- and this is how it finds out.
+        assertNull(resolveDesktopToken(directory.resolve("deleted.md").toString()))
+    }
+
+    @Test
+    fun `a relative path is recorded as an absolute one`() {
+        // A session recorded from one working directory has to resolve from another on the next
+        // launch, and nothing guarantees the application starts where it started last time.
+        val identity = desktopIdentity("chapter.md")
+
+        assertTrue(identity.accessToken.orEmpty().startsWith("/"), "Token was ${identity.accessToken}")
+    }
+
+    @Test
+    fun `two different documents get different ids`() {
+        assertNotEquals(
+            desktopIdentity("/documents/one.md").documentId,
+            desktopIdentity("/documents/two.md").documentId,
+        )
+    }
+
+    @Test
+    fun `the same document gets the same id every launch`() {
+        // The id is how a snapshot is found again after a restart. If it varied, every session
+        // would create a new directory and 8.3 would never find the work it saved.
+        assertEquals(
+            desktopIdentity("/documents/one.md").documentId,
+            desktopIdentity("/documents/./one.md").documentId,
+        )
+    }
+
+    @Test
+    fun `a fountain document is recorded as fountain`() {
+        assertEquals("fountain", desktopIdentity("/documents/big-fish.fountain").kind)
+        assertEquals("markdown", desktopIdentity("/documents/chapter.md").kind)
+    }
+}

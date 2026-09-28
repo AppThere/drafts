@@ -71,6 +71,15 @@ class PathDocumentStore(
         text: String,
     ): WriteOutcome = withContext(io) { atomically(ref.path(), text) }
 
+    override suspend fun children(ref: DocumentRef): List<DocumentRef> =
+        withContext(io) {
+            runCatching {
+                Files.list(ref.path()).use { entries ->
+                    entries.map { DocumentRef(it.toString()) }.toList()
+                }
+            }.getOrDefault(emptyList())
+        }
+
     override suspend fun delete(ref: DocumentRef): Boolean =
         withContext(io) {
             runCatching { Files.deleteIfExists(ref.path()) }.getOrDefault(false)
