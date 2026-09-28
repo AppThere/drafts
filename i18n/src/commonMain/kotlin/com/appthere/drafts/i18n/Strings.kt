@@ -17,6 +17,7 @@ object Strings {
     // The reader controls of `appthere-drafts.md` 5.5. Named for what they do to the reading
     // experience rather than for the property they set: "Text size", not "Base sp".
     const val READER_CONTROLS = "Reader"
+    const val OPEN_READER_CONTROLS = "Reader controls"
     const val THEME = "Theme"
     const val TEXT_SIZE = "Text size"
     const val LINE_HEIGHT = "Line height"

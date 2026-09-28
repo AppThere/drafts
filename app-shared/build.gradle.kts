@@ -19,6 +19,8 @@ kotlin {
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
             implementation(compose.foundation)
+            // Android's Back gesture closes an open panel rather than the activity.
+            implementation(libs.compose.ui.backhandler)
         }
 
         commonTest.dependencies {

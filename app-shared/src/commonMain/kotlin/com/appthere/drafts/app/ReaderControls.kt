@@ -62,6 +62,7 @@ fun ReaderControls(
     onChange: (ReaderSettings) -> Unit,
     modifier: Modifier = Modifier,
     unsaved: Boolean = false,
+    onClose: (() -> Unit)? = null,
     onShowLicences: (() -> Unit)? = null,
 ) {
     val palette = LocalPalette.current
@@ -85,7 +86,11 @@ fun ReaderControls(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(rowGap),
     ) {
-        BasicText(Strings.READER_CONTROLS, style = heading(palette))
+        if (onClose != null) {
+            PanelHeader(title = Strings.READER_CONTROLS, onClose = onClose)
+        } else {
+            BasicText(Strings.READER_CONTROLS, style = heading(palette))
+        }
 
         // A failed write of the settings file. Said here, where the reader is changing them, and
         // in words about what it means for them rather than what went wrong on disk: the change

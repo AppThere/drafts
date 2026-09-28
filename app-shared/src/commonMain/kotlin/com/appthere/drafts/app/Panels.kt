@@ -1,0 +1,167 @@
+package com.appthere.drafts.app
+
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.appthere.drafts.design.LocalPalette
+import com.appthere.drafts.design.Prose
+import com.appthere.drafts.i18n.Strings
+
+/**
+ * The panels that open over a document -- the reader controls and the licences -- and which of
+ * them is showing.
+ *
+ * One rule for closing, whatever asked: the one on top goes first. The licences open from the
+ * controls, so they are on top whenever both are showing, and Escape or Back takes them away and
+ * leaves the reader where they were.
+ */
+@Stable
+internal class Panels {
+    var controls by mutableStateOf(false)
+        private set
+
+    var licences by mutableStateOf(false)
+        private set
+
+    val anyOpen: Boolean get() = controls || licences
+
+    fun toggleControls() {
+        controls = !controls
+    }
+
+    fun openControls() {
+        controls = true
+    }
+
+    fun closeControls() {
+        controls = false
+    }
+
+    fun openLicences() {
+        licences = true
+    }
+
+    fun closeLicences() {
+        licences = false
+    }
+
+    /** Closes whichever panel is on top, and says whether there was one. */
+    fun closeTopmost(): Boolean =
+        when {
+            licences -> {
+                licences = false
+                true
+            }
+
+            controls -> {
+                controls = false
+                true
+            }
+
+            else -> {
+                false
+            }
+        }
+}
+
+/**
+ * A panel's title with its Close button.
+ *
+ * Every panel needs a way out that does not depend on a keyboard. A reader on a phone has no
+ * Escape key, and 10.2's "complete keyboard operation" is only half of it: the other half is that
+ * nothing is reachable *only* by keyboard.
+ */
+@Composable
+internal fun PanelHeader(
+    title: String,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val palette = LocalPalette.current
+
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier.fillMaxWidth()) {
+        BasicText(
+            text = title,
+            style = TextStyle(color = palette.ink, fontSize = headingSize, fontWeight = Prose.H4.weight),
+            modifier = Modifier.weight(1f),
+        )
+        PanelButton(text = Strings.CLOSE, description = Strings.CLOSE, onClick = onClose)
+    }
+}
+
+/**
+ * What opens the reader controls without a keyboard.
+ *
+ * In the corner the controls open into, so the button and the panel it stands for are in the same
+ * place. It is chrome, so it fades with the rest of the chrome on sustained typing (12) and cannot
+ * be pressed while faded -- a tap on an empty-looking corner should not open anything.
+ */
+@Composable
+internal fun ReaderControlsButton(
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    PanelButton(
+        text = Strings.READER_CONTROLS,
+        description = Strings.OPEN_READER_CONTROLS,
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier,
+    )
+}
+
+/** A bordered text button at 10.2's 48dp target, the one shape of button the panels use. */
+@Composable
+private fun PanelButton(
+    text: String,
+    description: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val palette = LocalPalette.current
+
+    BasicText(
+        text = text,
+        style = TextStyle(color = palette.ink, fontSize = labelSize, textAlign = TextAlign.Center),
+        modifier =
+            modifier
+                .sizeIn(minWidth = target, minHeight = target)
+                .border(hairline, palette.muted, RoundedCornerShape(corner))
+                .clickable(enabled = enabled, onClick = onClick)
+                .padding(buttonPadding)
+                .semantics {
+                    contentDescription = description
+                    role = Role.Button
+                },
+    )
+}
+
+/** 10.2: "Touch targets >= 48dp." */
+private val target = 48.dp
+private val hairline = 1.dp
+private val corner = 6.dp
+private val buttonPadding = 12.dp
+private val labelSize = 14.sp
+private val headingSize = 18.sp

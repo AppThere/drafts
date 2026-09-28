@@ -62,24 +62,7 @@ fun Licences(
             .padding(panelPadding),
         verticalArrangement = Arrangement.spacedBy(rowGap),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            BasicText(
-                text = Strings.LICENCES,
-                style = TextStyle(color = palette.ink, fontSize = headingSize, fontWeight = Prose.H4.weight),
-                modifier = Modifier.width(headingWidth),
-            )
-            BasicText(
-                text = Strings.CLOSE,
-                style = TextStyle(color = palette.ink, fontSize = labelSize, textAlign = TextAlign.Center),
-                modifier =
-                    Modifier
-                        .sizeIn(minWidth = target, minHeight = target)
-                        .border(hairline, palette.muted, RoundedCornerShape(corner))
-                        .clickable { onClose() }
-                        .padding(buttonPadding)
-                        .semantics { contentDescription = Strings.CLOSE },
-            )
-        }
+        PanelHeader(title = Strings.LICENCES, onClose = onClose)
 
         Column(
             Modifier.verticalScroll(rememberScrollState()),
@@ -122,13 +105,9 @@ private fun LicenceText(licence: FontLicence) {
 private val panelWidth = 560.dp
 private val panelHeight = 600.dp
 private val panelPadding = 16.dp
-private val headingWidth = 420.dp
 private val rowGap = 12.dp
 private val lineGap = 4.dp
-private val buttonPadding = 12.dp
 private val corner = 6.dp
 private val hairline = 1.dp
-private val target = 48.dp
 private val labelSize = 14.sp
-private val headingSize = 18.sp
 private val licenceSize = 11.sp

@@ -17,7 +17,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
@@ -131,6 +133,7 @@ fun DraftsApp(
         onSettingsChange = { changed -> settingsStore?.remember(kind, changed) ?: true },
         scroll = scroll,
         onRouse = autoHide::rouse,
+        chromeHidden = autoHide.hidden,
         onDocumentKey = { event ->
             // 12: "keypress of a modifier ... brings them back". Reaching for Ctrl is reaching for
             // something, whether or not the shortcut that follows is one this application knows.
@@ -221,7 +224,11 @@ fun DraftsApp(
  * `MaterialTheme` has gone. The surface here is a document, and the three things Material was
  * providing -- a type scale, a colour scheme and a background -- are exactly what the design
  * system now provides properly, from the spec's own numbers.
+ *
+ * The opt-in is for `BackHandler`, still marked experimental in Compose Multiplatform. It is the
+ * common API for Android's Back; the alternative is an `expect`/`actual` pair around the same call.
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun DraftsWindow(
     editor: EditorState,
@@ -231,6 +238,7 @@ private fun DraftsWindow(
     modifier: Modifier = Modifier,
     scroll: LazyListState = rememberLazyListState(),
     onRouse: () -> Unit = {},
+    chromeHidden: Boolean = false,
     chrome: @Composable BoxScope.() -> Unit,
 ) {
     var settings by remember { mutableStateOf(initialSettings) }
@@ -241,9 +249,19 @@ private fun DraftsWindow(
     // write takes a ticket so an earlier one finishing late cannot overwrite a later answer.
     var settingsUnsaved by remember { mutableStateOf(false) }
     var settingsTicket by remember { mutableIntStateOf(0) }
-    var showControls by remember { mutableStateOf(false) }
-    var showLicences by remember { mutableStateOf(false) }
+    val panels = remember { Panels() }
     val root = remember { FocusRequester() }
+
+    // A button pressed with a pointer takes focus, and the buttons that open and close panels are
+    // then removed -- taking focus with them, and leaving no focus owner for key events to start
+    // from. Escape and Ctrl+Comma would stop working until the reader clicked the document. So each
+    // of these hands focus back to the root, where every shortcut is handled.
+    val refocused: (() -> Unit) -> () -> Unit = { action ->
+        {
+            action()
+            root.requestFocus()
+        }
+    }
     val clipboard = LocalClipboardManager.current
 
     DraftsTheme(settings) {
@@ -278,7 +296,13 @@ private fun DraftsWindow(
                 .onPreviewKeyEvent { event ->
                     when {
                         togglesControls(event) -> {
-                            showControls = !showControls
+                            panels.toggleControls()
+                            true
+                        }
+
+                        // Escape closes what is open, the way it does everywhere. Only when there
+                        // is something: otherwise the key belongs to whatever else wants it.
+                        dismisses(event) && panels.closeTopmost() -> {
                             true
                         }
 
@@ -296,6 +320,11 @@ private fun DraftsWindow(
         ) {
             LaunchedEffect(Unit) { root.requestFocus() }
 
+            // Android's Back, and the edge swipe that stands for it. With nothing listening it
+            // finishes the activity -- which, for a document that exists only in memory, is the
+            // reader's text gone. While a panel is open, Back closes it instead.
+            BackHandler(enabled = panels.anyOpen) { panels.closeTopmost() }
+
             BlockEditor(state = editor, scroll = scroll)
 
             // Whatever belongs to a document that came from a file: 8.4's badge, and 8.2's
@@ -303,7 +332,17 @@ private fun DraftsWindow(
             // what they are and this function does not know.
             chrome()
 
-            if (showControls) {
+            // The way in that needs no keyboard. Hidden while the controls are open: the panel is
+            // in the same corner, with its own Close.
+            if (!panels.controls) {
+                Box(Modifier.align(Alignment.TopEnd).padding(controlsInset)) {
+                    FadingChrome(hidden = chromeHidden) {
+                        ReaderControlsButton(enabled = !chromeHidden, onClick = refocused(panels::openControls))
+                    }
+                }
+            }
+
+            if (panels.controls) {
                 ReaderControls(
                     settings = settings,
                     // 5.5: "persisted per document type". Written as the reader changes them, so
@@ -319,13 +358,14 @@ private fun DraftsWindow(
                     },
                     unsaved = settingsUnsaved,
                     modifier = Modifier.align(Alignment.TopEnd).padding(controlsInset),
-                    onShowLicences = { showLicences = true },
+                    onClose = refocused(panels::closeControls),
+                    onShowLicences = panels::openLicences,
                 )
             }
 
-            if (showLicences) {
+            if (panels.licences) {
                 Licences(
-                    onClose = { showLicences = false },
+                    onClose = refocused(panels::closeLicences),
                     modifier = Modifier.align(Alignment.Center).padding(controlsInset),
                 )
             }
