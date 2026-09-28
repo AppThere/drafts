@@ -55,7 +55,13 @@ data class WindowRecord(
  * and a snapshot that was never superseded by a save is never pruned. That is the whole of "Never
  * auto-discard a snapshot": the clock only ever starts once the work is safely in the file.
  *
- * [window] is nullable because window geometry is Phase 5's, along with restoring windows at all.
+ * [closedAt] separates "open" from "has a snapshot". 7.3 says "On launch, restore every session",
+ * and a session file outlives the document being closed -- 8.3 keeps the snapshot for thirty days
+ * after a save. Restoring every file on disk would reopen documents the reader shut months ago, so
+ * a record is a *restorable* session only while this is null.
+ *
+ * [window] is null until the document has a window with a size, which on desktop is immediately
+ * and on a phone is never.
  */
 @Serializable
 data class SessionRecord(
@@ -69,6 +75,7 @@ data class SessionRecord(
     @SerialName("snapshotPath") val snapshotPath: String,
     @SerialName("accessToken") val accessToken: String? = null,
     @SerialName("savedAt") val savedAt: Long? = null,
+    @SerialName("closedAt") val closedAt: Long? = null,
     val window: WindowRecord? = null,
 ) {
     companion object {

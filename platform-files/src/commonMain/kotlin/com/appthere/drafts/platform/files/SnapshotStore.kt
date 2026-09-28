@@ -66,9 +66,21 @@ class SnapshotStore(
         now: Long,
     ): Boolean {
         val record = recordOf(documentId) ?: return false
-        val stamped = SessionRecord.format.encodeToString(SessionRecord.serializer(), record.copy(savedAt = now))
 
-        return store.writeAtomically(metaOf(documentId), stamped) is WriteOutcome.Written
+        return putRecord(record.copy(savedAt = now))
+    }
+
+    /**
+     * Writes a session record with no snapshot beside it.
+     *
+     * 7.3's session list needs a record the moment a document is opened, not the first time it is
+     * edited. A document that was opened and read without being touched still has to come back on
+     * the next launch, and until now a record only existed once autosave had written one.
+     */
+    suspend fun putRecord(record: SessionRecord): Boolean {
+        val encoded = SessionRecord.format.encodeToString(SessionRecord.serializer(), record)
+
+        return store.writeAtomically(metaOf(record.documentId), encoded) is WriteOutcome.Written
     }
 
     /** The snapshot text, or null if there is none. */
