@@ -7,6 +7,8 @@ kotlin {
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.ui)
+            // For `isSystemInDarkTheme`, which is how 5.5's "system" theme knows what the system is.
+            implementation(compose.foundation)
             implementation(compose.components.resources)
         }
 

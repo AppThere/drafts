@@ -27,8 +27,9 @@ data class ProseStyle(
 /**
  * Builds the style for a role from the reader's settings.
  *
- * Three of 5.5's controls land here rather than in the scale: the line-height multiplier and the
- * letter spacing are applied on top of the role's own values, and the body weight replaces the
+ * Four of 5.5's controls land here rather than in the scale: the line-height multiplier, the
+ * paragraph spacing and the letter spacing are applied on top of the role's own values, and the
+ * body weight replaces the
  * role's weight for body text only -- a reader asking for lighter body text has not asked for
  * lighter headings, which are doing a different job.
  */
@@ -52,8 +53,8 @@ fun proseStyleOf(
                 letterSpacing = (role.tracking + settings.letterSpacing).em,
                 textAlign = TextAlign.Unspecified,
             ),
-        spaceBefore = spaceOf(size, role.spaceBefore),
-        spaceAfter = spaceOf(size, role.spaceAfter),
+        spaceBefore = spaceOf(size, role.spaceBefore * spacingFactorOf(settings)),
+        spaceAfter = spaceOf(size, role.spaceAfter * spacingFactorOf(settings)),
     )
 }
 
@@ -65,6 +66,9 @@ fun proseStyleOf(
  * the factor is exactly one, so what renders is 5.2's table untouched.
  */
 private fun lineHeightFactorOf(settings: ReaderSettings): Float = settings.lineHeight / Prose.Body.lineHeight
+
+/** Paragraph spacing, as a factor on the scale's own -- one at the default, like the line height. */
+private fun spacingFactorOf(settings: ReaderSettings): Float = settings.paragraphSpacing / Prose.Body.spaceAfter
 
 /**
  * 5.5's body weight control, applied to body-weight roles only.

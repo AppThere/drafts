@@ -105,3 +105,36 @@ across restart".
 **Code:** the first four. The fifth has nothing to hook — there is no navigation.
 
 **Closes when:** navigation exists.
+
+---
+
+## 5.5 — The "system" theme is always Light on Linux desktop
+
+**Spec:** "Theme: light, dark, sepia, high contrast, system".
+
+**Code:** "System" follows the operating system's light or dark preference through Compose's
+`isSystemInDarkTheme()`, re-read on every composition so a change while a document is open is
+followed. On Android that is the real setting. On Linux desktop it is always Light.
+
+**Why:** Compose Desktop asks Skiko, and Skiko's native lookup returns `UNKNOWN` on Linux, which
+Compose treats as "not dark". Measured on this project's Linux build machine, not inferred. macOS
+and Windows go through the same lookup, which Skiko implements for them; neither has been run.
+
+**Closes when:** a Linux `actual` reads the preference itself — the XDG Settings portal's
+`org.freedesktop.appearance color-scheme`, which GNOME and KDE both publish — or Skiko learns to.
+
+---
+
+## 12 — Focus mode dims by block, not by sentence
+
+**Spec:** "**Focus mode** as an option: dim all blocks except the current one, or the current
+sentence."
+
+**Code:** blocks only. `FocusMode` has `Off` and `Block`.
+
+**Why:** a sentence boundary is a question about the language, not the punctuation. A full stop
+ends "end." and does not end "Dr. Smith"; Japanese ends a sentence with `。`, and Greek asks a
+question with `;`. 11.1 requires the application to work in those languages, and a naive split would
+dim the wrong half of a sentence for most of the world.
+
+**Closes when:** 11.5's ICU-style segmentation exists. The sentence option belongs with it.

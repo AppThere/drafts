@@ -21,7 +21,7 @@ class ReaderSettingsTest {
         val settings = ReaderSettings()
 
         assertEquals(Prose.DefaultBase, settings.base)
-        assertEquals(Palettes.Light, settings.palette)
+        assertEquals(Theme.Fixed(Palettes.Light), settings.theme)
         assertEquals(ReaderSettings.DEFAULT_BODY_WEIGHT, settings.bodyWeight)
         assertFalse(settings.reducedMotion)
     }
@@ -51,6 +51,7 @@ class ReaderSettingsTest {
                 letterSpacing = 9f,
                 characters = 500f,
                 bodyWeight = 900,
+                paragraphSpacing = 9f,
             ).clamped()
 
         assertEquals(Prose.MaximumBase, wild.base)
@@ -58,6 +59,17 @@ class ReaderSettingsTest {
         assertEquals(ReaderSettings.MAX_LETTER_SPACING, wild.letterSpacing)
         assertEquals(Measure.MAXIMUM_CHARACTERS, wild.characters)
         assertEquals(ReaderSettings.MAX_BODY_WEIGHT, wild.bodyWeight)
+        assertEquals(ReaderSettings.MAXIMUM_PARAGRAPH_SPACING, wild.paragraphSpacing)
+    }
+
+    @Test
+    fun `paragraph spacing never reaches zero`() {
+        // 5.2: "Paragraphs are separated by space, not first-line indent." With no space and no
+        // indent, two paragraphs are one wall of text.
+        val closed = ReaderSettings(paragraphSpacing = 0f).clamped()
+
+        assertEquals(ReaderSettings.MINIMUM_PARAGRAPH_SPACING, closed.paragraphSpacing)
+        assertTrue(closed.paragraphSpacing > 0f)
     }
 
     @Test

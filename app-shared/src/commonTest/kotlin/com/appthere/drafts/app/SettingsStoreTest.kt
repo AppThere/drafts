@@ -4,6 +4,7 @@ import androidx.compose.ui.unit.sp
 import com.appthere.drafts.design.FocusMode
 import com.appthere.drafts.design.Palettes
 import com.appthere.drafts.design.ReaderSettings
+import com.appthere.drafts.design.Theme
 import com.appthere.drafts.platform.files.DocumentRef
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -31,12 +32,12 @@ class SettingsStoreTest {
     fun `what was saved comes back`() =
         runTest {
             val settings = store()
-            val chosen = ReaderSettings(palette = Palettes.Dark, base = BIGGER.sp, bodyWeight = HEAVIER)
+            val chosen = ReaderSettings(theme = Theme.Fixed(Palettes.Dark), base = BIGGER.sp, bodyWeight = HEAVIER)
 
             settings.remember("markdown", chosen)
 
             val restored = requireNotNull(settings.settingsFor("markdown"))
-            assertEquals(Palettes.Dark, restored.palette)
+            assertEquals(Theme.Fixed(Palettes.Dark), restored.theme)
             assertEquals(BIGGER, restored.base.value)
             assertEquals(HEAVIER, restored.bodyWeight)
         }
@@ -62,22 +63,22 @@ class SettingsStoreTest {
             // novel, and setting one must not change the other.
             val settings = store()
 
-            settings.remember("markdown", ReaderSettings(palette = Palettes.Sepia))
-            settings.remember("fountain", ReaderSettings(palette = Palettes.Dark))
+            settings.remember("markdown", ReaderSettings(theme = Theme.Fixed(Palettes.Sepia)))
+            settings.remember("fountain", ReaderSettings(theme = Theme.Fixed(Palettes.Dark)))
 
-            assertEquals(Palettes.Sepia, settings.settingsFor("markdown")?.palette)
-            assertEquals(Palettes.Dark, settings.settingsFor("fountain")?.palette)
+            assertEquals(Theme.Fixed(Palettes.Sepia), settings.settingsFor("markdown")?.theme)
+            assertEquals(Theme.Fixed(Palettes.Dark), settings.settingsFor("fountain")?.theme)
         }
 
     @Test
     fun `saving twice keeps the second`() =
         runTest {
             val settings = store()
-            settings.remember("markdown", ReaderSettings(palette = Palettes.Dark))
+            settings.remember("markdown", ReaderSettings(theme = Theme.Fixed(Palettes.Dark)))
 
-            settings.remember("markdown", ReaderSettings(palette = Palettes.HighContrast))
+            settings.remember("markdown", ReaderSettings(theme = Theme.Fixed(Palettes.HighContrast)))
 
-            assertEquals(Palettes.HighContrast, settings.settingsFor("markdown")?.palette)
+            assertEquals(Theme.Fixed(Palettes.HighContrast), settings.settingsFor("markdown")?.theme)
         }
 
     @Test
@@ -105,14 +106,14 @@ class SettingsStoreTest {
         }
 
     @Test
-    fun `an unknown palette falls back rather than failing the load`() =
+    fun `an unknown theme falls back rather than failing the load`() =
         runTest {
             // Palettes come and go. The rest of somebody's typography should not go with one.
             val store = FakeDocumentStore(DocumentRef("$ROOT/markdown.json"), UNKNOWN_PALETTE)
 
             val restored = requireNotNull(SettingsStore(store, ROOT).settingsFor("markdown"))
 
-            assertEquals(Palettes.Light, restored.palette)
+            assertEquals(Theme.Fixed(Palettes.Light), restored.theme)
             assertEquals(LINE_HEIGHT_IN_FILE, restored.lineHeight)
         }
 
@@ -123,7 +124,44 @@ class SettingsStoreTest {
             // setting the reader had chosen because of one it did not know.
             val store = FakeDocumentStore(DocumentRef("$ROOT/markdown.json"), FROM_THE_FUTURE)
 
-            assertEquals(Palettes.Dark, SettingsStore(store, ROOT).settingsFor("markdown")?.palette)
+            assertEquals(Theme.Fixed(Palettes.Dark), SettingsStore(store, ROOT).settingsFor("markdown")?.theme)
+        }
+
+    @Test
+    fun `following the system is remembered as that, not as the palette it gave today`() =
+        runTest {
+            // Saved in the evening, a "system" theme resolves to Dark. Remembering Dark would leave
+            // the reader in a dark document the next morning, which is not what they chose.
+            val settings = store()
+
+            settings.remember("markdown", ReaderSettings(theme = Theme.System))
+
+            assertEquals(Theme.System, settings.settingsFor("markdown")?.theme)
+        }
+
+    @Test
+    fun `paragraph spacing is remembered`() =
+        runTest {
+            val settings = store()
+
+            settings.remember("markdown", ReaderSettings(paragraphSpacing = WIDER))
+
+            assertEquals(WIDER, settings.settingsFor("markdown")?.paragraphSpacing)
+        }
+
+    @Test
+    fun `a file written before paragraph spacing existed keeps everything else`() =
+        runTest {
+            // `record` has no paragraph spacing in it, which is exactly what every settings file
+            // written before this control existed looks like. Failing the load over the missing
+            // field would reset the theme and the typography a reader had already chosen.
+            val store = FakeDocumentStore(DocumentRef("$ROOT/markdown.json"), BEFORE_PARAGRAPH_SPACING)
+
+            val restored = requireNotNull(SettingsStore(store, ROOT).settingsFor("markdown"))
+
+            assertEquals(Theme.Fixed(Palettes.Dark), restored.theme)
+            assertEquals(LINE_HEIGHT_IN_FILE, restored.lineHeight)
+            assertEquals(ReaderSettings().paragraphSpacing, restored.paragraphSpacing)
         }
 
     private fun store() = SettingsStore(FakeDocumentStore(DocumentRef("$ROOT/unused"), ""), ROOT)
@@ -134,10 +172,12 @@ class SettingsStoreTest {
         const val HEAVIER = 500
         const val MAX_BASE = 28f
         const val LINE_HEIGHT_IN_FILE = 1.8f
+        const val WIDER = 1.25f
 
         val OUT_OF_RANGE = record(baseSp = "999.0", lineHeight = "9.0")
         val UNKNOWN_PALETTE = record(palette = "Solarised", lineHeight = "1.8")
         val FROM_THE_FUTURE = record(palette = "Dark") + ""
+        val BEFORE_PARAGRAPH_SPACING = record(palette = "Dark", lineHeight = "1.8")
 
         fun record(
             palette: String = "Light",

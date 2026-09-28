@@ -1,7 +1,5 @@
 package com.appthere.drafts.app
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
@@ -13,14 +11,13 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
@@ -37,14 +34,13 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.unit.dp
 import com.appthere.drafts.design.DraftsTheme
-import com.appthere.drafts.design.LocalMotion
+import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.editor.engine.DocumentSession
 import com.appthere.drafts.editor.ui.BlockEditor
 import com.appthere.drafts.editor.ui.EditorState
 import com.appthere.drafts.editor.ui.handleShortcut
 import com.appthere.drafts.platform.files.WriteOutcome
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -76,7 +72,8 @@ fun DraftsApp(
         editor = editor,
         initialSettings = initialSettings,
         onDocumentKey = ::saves,
-        onSettingsChange = {},
+        // Nowhere to keep them, which is not the same as failing to: nothing to tell the reader.
+        onSettingsChange = { true },
         modifier = modifier,
     ) {}
 }
@@ -97,19 +94,7 @@ fun DraftsApp(
 ) {
     val scope = rememberCoroutineScope()
     val scroll = rememberLazyListState()
-    val chrome = remember(document) { ChromeVisibility() }
-    var chromeHidden by remember(document) { mutableStateOf(false) }
-
-    ChromeEffect(
-        visibility = chrome,
-        revision = document.editor.revision,
-        onChange = { chromeHidden = it },
-    )
-
-    val rouse = {
-        chrome.roused()
-        chromeHidden = false
-    }
+    val autoHide = rememberAutoHide(document)
 
     // 8.1's autosave, when the platform has somewhere app-private to put it. Null rather than a
     // no-op keeper so that a build without snapshot storage is visibly without it.
@@ -142,13 +127,14 @@ fun DraftsApp(
     DraftsWindow(
         editor = document.editor,
         initialSettings = initialSettings,
-        onSettingsChange = { changed -> settingsStore?.remember(kind, changed) },
+        // No store is a build without settings storage, not a failed write, and says nothing.
+        onSettingsChange = { changed -> settingsStore?.remember(kind, changed) ?: true },
         scroll = scroll,
-        onRouse = rouse,
+        onRouse = autoHide::rouse,
         onDocumentKey = { event ->
             // 12: "keypress of a modifier ... brings them back". Reaching for Ctrl is reaching for
             // something, whether or not the shortcut that follows is one this application knows.
-            if (rouses(event)) rouse()
+            if (rouses(event)) autoHide.rouse()
 
             when {
                 // Escape answers the dialog the way Escape answers every dialog.
@@ -190,7 +176,7 @@ fun DraftsApp(
         // are each summoned deliberately and stay until answered: fading something the reader just
         // asked for, or is about to Tab into, would be the interface taking it away from them.
         Box(Modifier.align(Alignment.TopStart).padding(controlsInset)) {
-            FadingChrome(hidden = chromeHidden) { DocumentStateBadge(document.lifecycle.state) }
+            FadingChrome(hidden = autoHide.hidden) { DocumentStateBadge(document.lifecycle.state) }
         }
 
         if (announceRestored) {
@@ -229,8 +215,8 @@ fun DraftsApp(
  * The composition root (`appthere-drafts.md` 3: ":app-shared  Navigation, settings, composition
  * root").
  *
- * The settings are held here and not persisted. 5.5 says they are "persisted per document type",
- * which needs somewhere to persist to -- still ahead, in 7.3's session file.
+ * The settings are held here, and handed to [onSettingsChange] to be kept as the reader changes
+ * them. It answers whether they were kept.
  *
  * `MaterialTheme` has gone. The surface here is a document, and the three things Material was
  * providing -- a type scale, a colour scheme and a background -- are exactly what the design
@@ -241,7 +227,7 @@ private fun DraftsWindow(
     editor: EditorState,
     initialSettings: ReaderSettings,
     onDocumentKey: (KeyEvent) -> Boolean,
-    onSettingsChange: suspend (ReaderSettings) -> Unit,
+    onSettingsChange: suspend (ReaderSettings) -> Boolean,
     modifier: Modifier = Modifier,
     scroll: LazyListState = rememberLazyListState(),
     onRouse: () -> Unit = {},
@@ -249,6 +235,12 @@ private fun DraftsWindow(
 ) {
     var settings by remember { mutableStateOf(initialSettings) }
     val scope = rememberCoroutineScope()
+
+    // Whether the most recent change failed to reach disk. The *most recent*: a stepper pressed
+    // three times is three writes in flight, and only the last one says what is on disk now. Each
+    // write takes a ticket so an earlier one finishing late cannot overwrite a later answer.
+    var settingsUnsaved by remember { mutableStateOf(false) }
+    var settingsTicket by remember { mutableIntStateOf(0) }
     var showControls by remember { mutableStateOf(false) }
     var showLicences by remember { mutableStateOf(false) }
     val root = remember { FocusRequester() }
@@ -258,7 +250,7 @@ private fun DraftsWindow(
         Box(
             modifier
                 .fillMaxSize()
-                .background(settings.palette.background)
+                .background(LocalPalette.current.background)
                 .focusRequester(root)
                 .focusable()
                 // 12: "Any pointer movement ... brings them back." Observed on the final pass and
@@ -319,8 +311,13 @@ private fun DraftsWindow(
                     // window did until now.
                     onChange = { changed ->
                         settings = changed
-                        scope.launch { onSettingsChange(changed) }
+                        val ticket = ++settingsTicket
+                        scope.launch {
+                            val kept = onSettingsChange(changed)
+                            if (ticket == settingsTicket) settingsUnsaved = !kept
+                        }
                     },
+                    unsaved = settingsUnsaved,
                     modifier = Modifier.align(Alignment.TopEnd).padding(controlsInset),
                     onShowLicences = { showLicences = true },
                 )
@@ -354,61 +351,6 @@ private const val DEFAULT_KIND = "markdown"
 
 /** Far enough from the corner to read as a panel over the document rather than part of the frame. */
 private val controlsInset = 16.dp
-
-/**
- * Runs 12's auto-hide for as long as the document is on screen.
- *
- * Its own composable with its own clock, for the reason the snapshot effect has one: with a real
- * monotonic source, `delay` obeys a test's virtual clock while the deadline arithmetic obeys the
- * wall clock, the deadline never arrives, and the test proves only that the two disagree.
- *
- * The deadline is slept to rather than polled, so nothing wakes once a frame to ask whether a
- * second and a half has gone by.
- */
-@Composable
-internal fun ChromeEffect(
-    visibility: ChromeVisibility,
-    revision: Int,
-    onChange: (Boolean) -> Unit,
-    now: () -> Long = Elapsed::millis,
-) {
-    val currentTime by rememberUpdatedState(now)
-    val report by rememberUpdatedState(onChange)
-
-    LaunchedEffect(visibility, revision) {
-        // Revision zero is the document as opened. Treating it as typing would have the chrome
-        // fade out three seconds after every launch, before anyone had touched anything.
-        if (revision == 0) return@LaunchedEffect
-
-        visibility.typed(currentTime())
-        val deadline = visibility.hidesAt() ?: return@LaunchedEffect
-
-        delay((deadline - currentTime()).coerceAtLeast(0))
-        report(visibility.isHidden(currentTime()))
-    }
-}
-
-/**
- * A fade that honours 10.2's reduced-motion preference.
- *
- * Inside the theme rather than outside it, because that is where the preference is readable. The
- * duration is the design system's own `chromeMillis`, which is already zero under reduced motion
- * -- 12 asks for a fade and 10.2 asks for that to be somebody's choice, and the number for it
- * existed before this did.
- */
-@Composable
-private fun FadingChrome(
-    hidden: Boolean,
-    content: @Composable () -> Unit,
-) {
-    val motion = LocalMotion.current
-    val alpha by animateFloatAsState(
-        targetValue = if (hidden) 0f else 1f,
-        animationSpec = tween(motion.chromeMillis),
-    )
-
-    Box(Modifier.alpha(alpha)) { content() }
-}
 
 /**
  * A modifier going down, which 12 counts as reaching for the chrome.

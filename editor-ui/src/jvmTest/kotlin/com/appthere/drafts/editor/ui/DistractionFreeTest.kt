@@ -17,6 +17,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
 import com.appthere.drafts.design.DraftsTheme
 import com.appthere.drafts.design.FocusMode
+import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.editor.engine.Caret
 import com.appthere.drafts.editor.engine.DocumentSession
@@ -201,7 +202,7 @@ class DistractionFreeTest {
                 // The page, which `DraftsApp` paints and this host otherwise would not. Without it
                 // the surface is transparent, every unpainted pixel captures as black, and any
                 // measurement of "the darkest pixel" is a measurement of nothing being there.
-                Box(Modifier.fillMaxSize().background(settings.palette.background)) {
+                Box(Modifier.fillMaxSize().background(LocalPalette.current.background)) {
                     BlockEditor(state = state, scroll = scroll)
                 }
             }

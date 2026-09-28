@@ -2,8 +2,9 @@ package com.appthere.drafts.app
 
 import androidx.compose.ui.unit.sp
 import com.appthere.drafts.design.FocusMode
-import com.appthere.drafts.design.Palettes
+import com.appthere.drafts.design.Prose
 import com.appthere.drafts.design.ReaderSettings
+import com.appthere.drafts.design.Theme
 import com.appthere.drafts.platform.files.DocumentRef
 import com.appthere.drafts.platform.files.DocumentStore
 import com.appthere.drafts.platform.files.WriteOutcome
@@ -20,10 +21,17 @@ import kotlinx.serialization.json.Json
  */
 @Serializable
 internal data class ReaderSettingsRecord(
+    /** The theme's name. Still called `palette` because files written before "system" existed say so. */
     val palette: String,
     val baseSp: Float,
     val lineHeight: Float,
     val letterSpacing: Float,
+    /**
+     * Defaulted, unlike its neighbours, because it arrived after files were already being written.
+     * A field those files lack must not make them unreadable, or adding a setting would reset every
+     * other one a reader had chosen.
+     */
+    val paragraphSpacing: Float = Prose.Body.spaceAfter,
     val characters: Float,
     val bodyWeight: Int,
     val reducedMotion: Boolean,
@@ -83,10 +91,11 @@ class SettingsStore(
 
 private fun ReaderSettings.toRecord() =
     ReaderSettingsRecord(
-        palette = palette.name,
+        palette = theme.name,
         baseSp = base.value,
         lineHeight = lineHeight,
         letterSpacing = letterSpacing,
+        paragraphSpacing = paragraphSpacing,
         characters = characters,
         bodyWeight = bodyWeight,
         reducedMotion = reducedMotion,
@@ -102,15 +111,16 @@ private fun ReaderSettings.toRecord() =
  * edited by hand, written by a version with different limits, or corrupted into something that
  * parses. 5.5 gives every control a range, and the ranges are what keep a document legible.
  *
- * An unknown palette name falls back to the default rather than failing the load. Palettes come
+ * An unknown theme name falls back to the default rather than failing the load. Palettes come
  * and go; the rest of somebody's typography should not go with one.
  */
 private fun ReaderSettingsRecord.toSettings(): ReaderSettings =
     ReaderSettings(
-        palette = Palettes.all.firstOrNull { it.name == palette } ?: Palettes.Light,
+        theme = Theme.named(palette) ?: ReaderSettings().theme,
         base = baseSp.sp,
         lineHeight = lineHeight,
         letterSpacing = letterSpacing,
+        paragraphSpacing = paragraphSpacing,
         characters = characters,
         bodyWeight = bodyWeight,
         reducedMotion = reducedMotion,

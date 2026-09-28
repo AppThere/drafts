@@ -22,6 +22,7 @@ import com.appthere.drafts.design.Measure
 import com.appthere.drafts.design.Palettes
 import com.appthere.drafts.design.Prose
 import com.appthere.drafts.design.ReaderSettings
+import com.appthere.drafts.design.Theme
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -47,6 +48,9 @@ class ReaderControlsTest {
                     s.letterSpacing != ReaderSettings().letterSpacing
                 },
                 "Line length, increase" to { s: ReaderSettings -> s.characters != ReaderSettings().characters },
+                "Paragraph spacing, increase" to { s: ReaderSettings ->
+                    s.paragraphSpacing != ReaderSettings().paragraphSpacing
+                },
                 "Body weight, increase" to { s: ReaderSettings -> s.bodyWeight != ReaderSettings().bodyWeight },
             )
 
@@ -89,7 +93,20 @@ class ReaderControlsTest {
 
             onNodeWithContentDescription("Theme, ${Palettes.Dark.name}").performClick()
 
-            assertEquals(Palettes.Dark, settings.palette)
+            assertEquals(Theme.Fixed(Palettes.Dark), settings.theme)
+        }
+
+    @Test
+    fun `the theme can follow the system`() =
+        runSkikoComposeUiTest(size = Size(WIDTH, HEIGHT)) {
+            // 5.5 lists "system" among the themes. It is a choice like the others, and has to be
+            // reachable the same way.
+            var settings by mutableStateOf(ReaderSettings())
+            setContent { DraftsTheme(settings) { ReaderControls(settings, onChange = { settings = it }) } }
+
+            onNodeWithContentDescription("Theme, ${Theme.System.name}").performClick()
+
+            assertEquals(Theme.System, settings.theme)
         }
 
     @Test

@@ -1,5 +1,6 @@
 package com.appthere.drafts.design
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
@@ -17,7 +18,10 @@ import androidx.compose.ui.unit.TextUnit
 val LocalReaderSettings: ProvidableCompositionLocal<ReaderSettings> =
     staticCompositionLocalOf { ReaderSettings() }
 
-/** The palette in force. Split out from the settings because almost everything reads only this. */
+/**
+ * The palette in force. Split out from the settings because almost everything reads only this, and
+ * because the settings hold a [Theme] choice that only becomes a palette here.
+ */
 val LocalPalette: ProvidableCompositionLocal<Palette> = staticCompositionLocalOf { Palettes.Light }
 
 /** Durations, already resolved against `prefers-reduced-motion`. */
@@ -37,9 +41,13 @@ fun DraftsTheme(
 ) {
     val held = settings.clamped()
 
+    // Read on every composition rather than once, so a document open when the system switches to
+    // dark in the evening follows it -- which is what choosing "system" asked for.
+    val palette = held.theme.paletteFor(systemPrefersDark = isSystemInDarkTheme())
+
     CompositionLocalProvider(
         LocalReaderSettings provides held,
-        LocalPalette provides held.palette,
+        LocalPalette provides palette,
         LocalMotion provides Motion.of(held.reducedMotion),
         content = content,
     )

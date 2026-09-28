@@ -22,7 +22,9 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -33,9 +35,9 @@ import com.appthere.drafts.design.FocusMode
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.Measure
 import com.appthere.drafts.design.Palette
-import com.appthere.drafts.design.Palettes
 import com.appthere.drafts.design.Prose
 import com.appthere.drafts.design.ReaderSettings
+import com.appthere.drafts.design.Theme
 import com.appthere.drafts.i18n.Strings
 import kotlin.math.roundToInt
 
@@ -59,6 +61,7 @@ fun ReaderControls(
     settings: ReaderSettings,
     onChange: (ReaderSettings) -> Unit,
     modifier: Modifier = Modifier,
+    unsaved: Boolean = false,
     onShowLicences: (() -> Unit)? = null,
 ) {
     val palette = LocalPalette.current
@@ -84,8 +87,57 @@ fun ReaderControls(
     ) {
         BasicText(Strings.READER_CONTROLS, style = heading(palette))
 
+        // A failed write of the settings file. Said here, where the reader is changing them, and
+        // in words about what it means for them rather than what went wrong on disk: the change
+        // has happened, and will be gone next time. A polite live region, so a screen reader
+        // hears it without being interrupted mid-announcement of the control just pressed.
+        if (unsaved) {
+            BasicText(
+                text = Strings.SETTINGS_NOT_SAVED,
+                style = body(palette),
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            )
+        }
+
         ThemeChoice(settings, onChange)
 
+        TypeSteppers(settings, onChange)
+
+        TypewriterChoice(settings, onChange)
+
+        FocusChoice(settings, onChange)
+
+        MotionChoice(settings, onChange)
+
+        // 5.1 requires the licence to be reachable. Here rather than in a menu the app does not
+        // have yet, and it is a real target rather than a line of small print.
+        if (onShowLicences != null) {
+            BasicText(
+                text = Strings.LICENCES,
+                style = body(palette).copy(color = palette.accent),
+                modifier =
+                    Modifier
+                        .sizeIn(minHeight = target)
+                        .clickable { onShowLicences() }
+                        .padding(vertical = optionPadding)
+                        .semantics { contentDescription = Strings.LICENCES },
+            )
+        }
+    }
+}
+
+/**
+ * The controls of 5.5 that set the type itself, each a number with a range.
+ *
+ * In the order 5.5 lists them, which is also roughly the order a reader reaches for them: size
+ * first, then the air in and between lines, then the line's length and the weight of its ink.
+ */
+@Composable
+private fun TypeSteppers(
+    settings: ReaderSettings,
+    onChange: (ReaderSettings) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(rowGap)) {
         Stepper(
             label = Strings.TEXT_SIZE,
             value = "${settings.base.value.roundToInt()}sp",
@@ -115,36 +167,30 @@ fun ReaderControls(
         )
 
         Stepper(
+            label = Strings.PARAGRAPH_SPACING,
+            value = "${format(settings.paragraphSpacing)}em",
+            onLess = {
+                onChange(
+                    settings.copy(paragraphSpacing = settings.paragraphSpacing - PARAGRAPH_STEP).clamped(),
+                )
+            },
+            onMore = {
+                onChange(
+                    settings.copy(paragraphSpacing = settings.paragraphSpacing + PARAGRAPH_STEP).clamped(),
+                )
+            },
+        )
+
+        Stepper(
             label = Strings.BODY_WEIGHT,
             value = "${settings.bodyWeight}",
             onLess = { onChange(settings.copy(bodyWeight = settings.bodyWeight - WEIGHT_STEP).clamped()) },
             onMore = { onChange(settings.copy(bodyWeight = settings.bodyWeight + WEIGHT_STEP).clamped()) },
         )
-
-        TypewriterChoice(settings, onChange)
-
-        FocusChoice(settings, onChange)
-
-        MotionChoice(settings, onChange)
-
-        // 5.1 requires the licence to be reachable. Here rather than in a menu the app does not
-        // have yet, and it is a real target rather than a line of small print.
-        if (onShowLicences != null) {
-            BasicText(
-                text = Strings.LICENCES,
-                style = body(palette).copy(color = palette.accent),
-                modifier =
-                    Modifier
-                        .sizeIn(minHeight = target)
-                        .clickable { onShowLicences() }
-                        .padding(vertical = optionPadding)
-                        .semantics { contentDescription = Strings.LICENCES },
-            )
-        }
     }
 }
 
-/** 5.5: "Theme: light, dark, sepia, high contrast, system". System detection is Phase 4's. */
+/** 5.5: "Theme: light, dark, sepia, high contrast, system". */
 @Composable
 private fun ThemeChoice(
     settings: ReaderSettings,
@@ -152,9 +198,9 @@ private fun ThemeChoice(
 ) {
     Choice(
         label = Strings.THEME,
-        options = Palettes.all.map { it.name },
-        selected = settings.palette.name,
-        onSelect = { name -> onChange(settings.copy(palette = paletteNamed(name))) },
+        options = Theme.all.map { it.name },
+        selected = settings.theme.name,
+        onSelect = { name -> Theme.named(name)?.let { onChange(settings.copy(theme = it)) } },
     )
 }
 
@@ -312,8 +358,6 @@ private fun Button(
     )
 }
 
-private fun paletteNamed(name: String): Palette = Palettes.all.first { it.name == name }
-
 /** Two decimals, without pulling in a formatting library for one panel. */
 private fun format(value: Float): String {
     val hundredths = (value * HUNDRED).roundToInt()
@@ -373,6 +417,7 @@ private val headingSize = 18.sp
 
 private const val LINE_HEIGHT_STEP = 0.1f
 private const val SPACING_STEP = 0.01f
+private const val PARAGRAPH_STEP = 0.25f
 private const val MEASURE_STEP = 5f
 private const val WEIGHT_STEP = 50
 private const val HUNDRED = 100

@@ -22,10 +22,16 @@ object Strings {
     const val LINE_HEIGHT = "Line height"
     const val LETTER_SPACING = "Letter spacing"
     const val MEASURE = "Line length"
+    const val PARAGRAPH_SPACING = "Paragraph spacing"
     const val BODY_WEIGHT = "Body weight"
     const val MOTION = "Motion"
     const val MOTION_FULL = "Full"
     const val MOTION_REDUCED = "Reduced"
+
+    /** A settings file that could not be written: what it means for the reader, not the disk. */
+    const val SETTINGS_NOT_SAVED =
+        "These settings could not be kept. They apply until this window closes, " +
+            "and will need choosing again next time."
 
     /**
      * 12's two reading options, named for what they do rather than for what they are called.
