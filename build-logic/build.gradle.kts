@@ -11,4 +11,11 @@ dependencies {
     implementation(libs.plugin.detekt.gradle)
     implementation(libs.plugin.spotless.gradle)
     implementation(libs.plugin.dependencyAnalysis.gradle)
+
+    testImplementation(kotlin("test"))
+    testImplementation(kotlin("test-junit5"))
+}
+
+tasks.test {
+    useJUnitPlatform()
 }

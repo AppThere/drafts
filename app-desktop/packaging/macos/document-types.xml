@@ -1,0 +1,88 @@
+<!--
+  appthere-drafts.md 9.1 and 9.4, macOS: CFBundleDocumentTypes, and the two type declarations 9.1
+  asks for. Spliced into Info.plist as extra keys, so these are dictionary entries without a
+  surrounding <dict>. No double hyphens in these comments: XML forbids them there, and
+  FileAssociationTest parses this file to catch exactly that.
+
+  Written out rather than generated from per-extension file associations, because those cannot
+  export a type. Fountain has no public UTI and 9.1 says it "must be declared", exporting
+  io.fountain.fountain. Markdown's net.daringfireball.markdown is imported rather than exported:
+  it belongs to its author, and macOS may already know it.
+
+  Untested: there is no Mac in this project's build environment.
+-->
+<key>CFBundleDocumentTypes</key>
+<array>
+    <dict>
+        <key>CFBundleTypeName</key>
+        <string>Markdown document</string>
+        <key>CFBundleTypeRole</key>
+        <string>Editor</string>
+        <key>LSHandlerRank</key>
+        <string>Default</string>
+        <key>LSItemContentTypes</key>
+        <array>
+            <string>net.daringfireball.markdown</string>
+        </array>
+    </dict>
+    <dict>
+        <key>CFBundleTypeName</key>
+        <string>Fountain screenplay</string>
+        <key>CFBundleTypeRole</key>
+        <string>Editor</string>
+        <key>LSHandlerRank</key>
+        <string>Default</string>
+        <key>LSItemContentTypes</key>
+        <array>
+            <string>io.fountain.fountain</string>
+        </array>
+    </dict>
+</array>
+<key>UTImportedTypeDeclarations</key>
+<array>
+    <dict>
+        <key>UTTypeIdentifier</key>
+        <string>net.daringfireball.markdown</string>
+        <key>UTTypeDescription</key>
+        <string>Markdown document</string>
+        <key>UTTypeConformsTo</key>
+        <array>
+            <string>public.plain-text</string>
+        </array>
+        <key>UTTypeTagSpecification</key>
+        <dict>
+            <key>public.filename-extension</key>
+            <array>
+                <string>md</string>
+                <string>markdown</string>
+                <string>mdown</string>
+                <string>mkd</string>
+            </array>
+            <key>public.mime-type</key>
+            <array>
+                <string>text/markdown</string>
+            </array>
+        </dict>
+    </dict>
+</array>
+<key>UTExportedTypeDeclarations</key>
+<array>
+    <dict>
+        <key>UTTypeIdentifier</key>
+        <string>io.fountain.fountain</string>
+        <key>UTTypeDescription</key>
+        <string>Fountain screenplay</string>
+        <key>UTTypeConformsTo</key>
+        <array>
+            <string>public.plain-text</string>
+        </array>
+        <key>UTTypeTagSpecification</key>
+        <dict>
+            <key>public.filename-extension</key>
+            <array>
+                <string>fountain</string>
+                <string>spmd</string>
+            </array>
+        </dict>
+    </dict>
+</array>

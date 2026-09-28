@@ -95,4 +95,8 @@ tasks.register("qualityGate") {
     description = "Everything AGENTS.md 2 phase 1 runs, in one task."
     dependsOn(assertNoDetektBaseline)
     dependsOn(subprojects.map { "${it.path}:check" })
+    // The build's own code, which is not a subproject and so is not in the line above. It decides
+    // what the Linux package tells the desktop, and a mistake there is invisible until someone
+    // double-clicks a file.
+    dependsOn(gradle.includedBuild("build-logic").task(":test"))
 }

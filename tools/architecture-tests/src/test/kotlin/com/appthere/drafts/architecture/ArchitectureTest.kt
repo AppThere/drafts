@@ -56,15 +56,16 @@ class ArchitectureTest {
      *
      * Two exclusions, both of which this test learned the hard way. `scopeFromProduction` drops
      * test source, which keeps out the fixtures in `src/test/resources` that exist precisely to
-     * violate these rules. Filtering `/tools/` drops this module and `:tools-detekt-rules`, which
-     * are build infrastructure rather than product: a Konsist test that reads `java.io.File` to
-     * parse build files is not a violation of "only :platform-files writes to disk", it is the
-     * thing doing the checking.
+     * violate these rules. Filtering [BUILD_INFRASTRUCTURE] drops this module, `:tools-detekt-rules`
+     * and `build-logic`, which are build infrastructure rather than product: a Konsist test that
+     * reads `java.io.File` to parse build files, or a packaging step that repacks a `.deb`, is not a
+     * violation of "only :platform-files writes to disk" -- nothing it writes is a reader's
+     * document, and none of it ships.
      */
     private fun productionFiles(): List<KoFileDeclaration> =
         runCatching { Konsist.scopeFromProduction().files }
             .getOrDefault(emptyList())
-            .filterNot { it.path.contains("/tools/") }
+            .filterNot(::isBuildInfrastructure)
 
     private fun moduleFiles(module: String): List<KoFileDeclaration> =
         runCatching { Konsist.scopeFromModule(module).files }.getOrDefault(emptyList())
@@ -72,7 +73,10 @@ class ArchitectureTest {
     private fun sourceSetFiles(sourceSet: String): List<KoFileDeclaration> =
         runCatching { Konsist.scopeFromSourceSet(sourceSet).files }
             .getOrDefault(emptyList())
-            .filterNot { it.path.contains("/tools/") }
+            .filterNot(::isBuildInfrastructure)
+
+    private fun isBuildInfrastructure(file: KoFileDeclaration): Boolean =
+        BUILD_INFRASTRUCTURE.any { file.path.contains(it) }
 
     /**
      * Applies [rule] to [files] and fails with the offending paths listed.
@@ -95,6 +99,13 @@ class ArchitectureTest {
     }
 
     private companion object {
+        /**
+         * Directories whose code builds or checks the product rather than being it. `build-logic`
+         * joined on 2026-09-28, with the packaging step that corrects the Linux `.deb` -- a
+         * reviewed decision, not a widening made to get a build through.
+         */
+        val BUILD_INFRASTRUCTURE = listOf("/tools/", "/build-logic/")
+
         val EXPORT_MODULES =
             listOf(
                 "core-export-container",
