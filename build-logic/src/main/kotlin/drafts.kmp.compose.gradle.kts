@@ -13,6 +13,20 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// Compose Resources reach an Android app as assets of the library that holds them, and the KMP
+// Android library plugin builds libraries with Android resources off unless asked. Off, the fonts
+// in :design-system were compiled against but never packaged: the APK had no font files at all,
+// every `Res.font` lookup fell through to the platform's default typeface, and nothing failed --
+// the document simply rendered in Roboto instead of Atkinson (5.1). The desktop was unaffected,
+// because there the resources travel inside the jar.
+kotlin {
+    androidLibrary {
+        androidResources {
+            enable = true
+        }
+    }
+}
+
 // Compose Resources adds a copy-to-assets task per Android variant, and for the device-test variant
 // it configures no output directory -- so the task fails Gradle's own property validation and takes
 // whatever depends on it down with it. That includes `buildHealth`, which is how this surfaced: the
