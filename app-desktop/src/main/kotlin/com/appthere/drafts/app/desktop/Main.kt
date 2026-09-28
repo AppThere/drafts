@@ -34,6 +34,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.appthere.drafts.app.DocumentOpening
 import com.appthere.drafts.app.DraftsApp
+import com.appthere.drafts.app.SampleDocument
 import com.appthere.drafts.app.SettingsStore
 import com.appthere.drafts.app.SnapshotKeeper
 import com.appthere.drafts.app.rememberOpenDocument

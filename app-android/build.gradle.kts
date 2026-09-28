@@ -4,4 +4,5 @@ plugins {
 
 dependencies {
     implementation(project(":app-shared"))
+    implementation(libs.androidx.activity.compose)
 }

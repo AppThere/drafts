@@ -1,4 +1,4 @@
-package com.appthere.drafts.app.desktop
+package com.appthere.drafts.app
 
 /**
  * A document to open the spike on.
@@ -6,8 +6,11 @@ package com.appthere.drafts.app.desktop
  * Chosen to exercise what 4.1 says reveal must and must not change: headings of several levels,
  * inline emphasis and code, a list, a quote, and a fenced block. Clicking into any of them should
  * show its markup without the line moving.
+ *
+ * Here rather than in a host because every host that can come up without a file opens on it: the
+ * desktop with no path argument, and Android until Phase 6 gives it a document Activity.
  */
-internal object SampleDocument {
+object SampleDocument {
     val TEXT: String =
         """
         # Drafts
