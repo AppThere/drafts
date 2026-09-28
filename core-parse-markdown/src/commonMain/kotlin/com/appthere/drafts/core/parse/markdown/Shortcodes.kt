@@ -6,8 +6,8 @@ import com.appthere.drafts.core.model.SourceSpan
 /**
  * A Hugo shortcode found in the source, and the span it occupies.
  *
- * `markdown-dialect.md`: shortcodes are "tokenised into opaque atomic spans before parsing,
- * restored verbatim on serialise. Never parsed, never reformatted." Opaque is the operative word --
+ * `markdown-dialect.md`: shortcodes are "collapsed into opaque atomic spans after parsing ...
+ * Restored verbatim on serialise. Never reformatted." Opaque is the operative word --
  * nothing downstream may look inside [text], and no transform may touch it.
  */
 internal data class ShortcodeRegion(

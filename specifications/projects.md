@@ -427,23 +427,30 @@ Recent projects list, pinnable, with the same persisted access tokens described 
 
 ---
 
-## 13. Open questions
+## 13. Settled questions
 
-1. **Should a folder become a project implicitly?** Opening any folder and treating it as a
-   project (creating `.drafts/` on first metadata write) is friendlier than an explicit "create
-   project" step, and it means every folder of notes is already usable. The cost is that the app
-   scatters `.drafts/` directories. Suggested default: implicit, but `.drafts/` is only created
-   when the user does something that needs it.
-2. **Nested projects?** A `.drafts/` inside a subfolder of another project. Simplest answer is
-   that the nearest ancestor wins and nesting is unsupported; worth deciding before someone
-   does it by accident.
-3. **Non-text files in the binder** — PDFs, images, reference material. Scrivener's Research
-   folder holds them. Drafts could show them and open them externally without ever editing them.
-   Low cost, meaningful benefit for the research use case, and it doesn't compromise the
-   plain-text principle since the app never touches them.
-4. **Per-project export style mappings.** The `{.class}` → office style table from
-   `export-pipeline.md` is naturally a project-level setting. Confirm it belongs in
-   `project.toml` rather than in app preferences.
+These were open until 2026-09-28. Each answer is recorded with its reason, so a later change can
+tell what it would be giving up.
+
+1. **A folder becomes a project implicitly.** Any folder opens as a project, and `.drafts/` is
+   created only when the reader does something that needs it — reordering, per-document metadata
+   in the sidecar, a compile target. A folder that is only browsed is never written to. This keeps
+   every existing folder of notes usable at once without the app scattering sidecars through
+   folders nobody asked it to manage.
+2. **Nesting is unsupported; the nearest `.drafts/` wins.** A file belongs to the project whose
+   `.drafts/` is its nearest ancestor. The app never creates a `.drafts/` inside an existing
+   project, and when it finds one someone made by hand it says so rather than silently choosing.
+   Supporting nesting would mean deciding whose order, whose trash and whose compile targets
+   apply at every boundary; nothing in the use cases needs it.
+3. **Non-text files are shown and opened externally.** PDFs, images and other reference material
+   appear in the binder, take part in ordering, and open in the system's default application.
+   Drafts never edits them. This covers what Scrivener's Research folder is for without touching
+   the plain-text principle, and a binder that hid them would make reordering around invisible
+   files confusing.
+4. **Export style mappings live in `project.toml`.** The `[export.styles]` table from
+   `export-pipeline.md` travels with the project, so a collaborator or a second machine compiles
+   it identically. App preferences may hold a default that new projects copy; once copied, the
+   project's own table is the one that applies.
 
 ---
 

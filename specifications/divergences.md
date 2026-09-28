@@ -12,43 +12,21 @@ Each entry says what the spec asks for, what the code does, why, and what would 
 
 ---
 
-## 8.2 — Atomic save is impossible on Android
-
-**Spec:** "Explicit save uses the same atomic temp-and-rename, then updates `baseDigest` to the
-newly written content."
-
-**Code:** On desktop and Apple targets, exactly that. On Android, where the reader's documents
-arrive as `content://` URIs through the Storage Access Framework, the write truncates the document
-and refills it in place.
-
-**Why:** SAF has no operation that replaces one document with another in one step.
-`DocumentsContract.renameDocument` fails when the target name is taken, and there is no
-rename-over. This is the shape of the API, not a shortcut.
-
-**What holds anyway:** 8.2's digest check is a comparison and a refusal, so it works in full. 8.1's
-snapshot goes to app-private storage through a real filesystem, so it is atomic in full. The words
-survive a crash mid-save even where the file does not, and 8.3 restores them on the next launch.
-`DocumentStore.writesAtomically` makes this a declared property, and `SnapshotStore` refuses to be
-constructed on a store that lacks it, so snapshots cannot be routed through SAF by accident.
-
-**Closes when:** it does not. This should be written into 8.2 as a platform reality.
-
----
-
 ## 8.2 — The conflict dialog offers two of four choices
 
 **Spec:** "[ Save a copy… ] [ Reload and lose my changes ] [ Show differences ] [ Cancel ]"
 
 **Code:** Reload and Cancel. Escape also cancels.
 
-**Why:** "Save a copy…" needs a platform save dialog, which is `:platform-intents` in Phase 5.
-"Show differences" needs a diff view, which nothing has built. A button that does nothing is worse
+**Why:** "Save a copy…" needs a platform save dialog, which Phase 5 did not build as first
+planned. "Show differences" needs a diff view, which nothing has built. A button that does nothing is worse
 than one that is not offered.
 
 **What holds anyway:** the refusal itself — the part that protects the file — does not depend on
 any of the four.
 
-**Closes when:** Phase 5 brings the file dialog, and whenever a diff view is built.
+**Closes when:** the save dialog arrives with §7.4's *Save As* (a Phase 5 deliverable), for
+"Save a copy…"; and whenever a diff view is built, for "Show differences".
 
 ---
 
@@ -79,21 +57,10 @@ needs on launch.
 **Cost:** renaming or moving a file outside the application orphans its snapshot. The work is not
 lost, but nothing will offer it back.
 
-**Closes when:** 7.3's session list exists as a real index, which is Phase 5's "Sessions restore
-across restart".
-
----
-
-## 7.3 — `window` is not recorded
-
-**Spec:** the session record carries `window: { x, y, width, height, placement }`.
-
-**Code:** the field exists and is always null.
-
-**Why:** window geometry belongs to `:platform-windows`, and `IMPLEMENTATION-PLAN.md` puts
-"per-window `WindowState`, persisted" in Phase 5. Phase 4 built the record; Phase 5 fills this in.
-
-**Closes when:** Phase 5.
+**Closes when:** §7.4's untitled documents arrive. Phase 5 restored sessions without an index —
+each snapshot directory is found by its own id — so the index this was waiting for was never
+needed. An untitled document has no location to derive an id from, though, and needs a real one;
+when that exists, file-backed documents should use the same scheme.
 
 ---
 
@@ -138,3 +105,123 @@ question with `;`. 11.1 requires the application to work in those languages, and
 dim the wrong half of a sentence for most of the world.
 
 **Closes when:** 11.5's ICU-style segmentation exists. The sentence option belongs with it.
+
+---
+
+## 7.3 — A vanished file shows an error instead of its snapshot
+
+**Spec:** "A document whose file has vanished opens read-only from its snapshot with a clear
+banner offering *Save As*."
+
+**Code:** the window shows *Could not open this document*, the path, and the underlying error
+text (`OpenDocument.kt`, `Main.kt`). The snapshot is not offered back.
+
+**Why:** *Save As* needs the save dialog, which does not exist yet. The error text is a
+developer's message, not a novelist's, and is joined by concatenation rather than coming from
+resources (§11.1) — that half is simply unfinished.
+
+**Closes when:** §7.4's *Save As* lands (Phase 5).
+
+---
+
+## 8.2 — A failed save is silent
+
+**Spec:** §8.2 and §8.4 — the reader is told about the state of their file; "dialogs only on
+attempted write".
+
+**Code:** Ctrl+S that fails on a full disk, a dropped share or a lost permission does nothing
+visible. Only a conflict is shown (`DraftsApp.kt`). The words are safe — the snapshot holds them —
+but the reader believes a save happened.
+
+**Closes when:** Phase 5, alongside *Save As*, which needs the same failure message.
+
+---
+
+## 9.4 — Every user on a machine shares the single-instance port
+
+**Spec:** "Route to an existing instance via a single-instance lock and a local socket or named
+pipe."
+
+**Code:** a fixed loopback port, 51317, with no user in it (`SingleInstance.kt`). On a machine with
+several signed-in users, one user's double-click can hand the path to another user's running
+application, and the second launch exits.
+
+**Closes when:** the port or pipe is scoped per user — a Unix-domain socket in the user's runtime
+directory, a named pipe with the user's SID. Phase 5.
+
+---
+
+## 10.1, 10.2, 4.2 — The editor has no screen-reader semantics, and motion ignores the OS
+
+**Spec:** §10.1's semantics for the editing surface; §10.2 "Honour `prefers-reduced-motion`";
+§4.2's 120ms cross-fade.
+
+**Code:** no `semantics`, `heading()` or live region anywhere in `:editor-ui`, and `:a11y` is
+empty. Reduced motion is only the reader's own toggle; the operating system's setting is never
+read. The cross-fade does not exist — `Motion.revealMillis` is read nowhere — so reveal is
+instant for everyone.
+
+**Closes when:** before the Phase 5 accessibility audit, which would otherwise spend its time on
+things a review could have found.
+
+---
+
+## 11.1 — Strings are constants, and theme names cannot be translated
+
+**Spec:** "User-facing strings live in resources."
+
+**Code:** `Strings` is a Kotlin object of constants, provisional since Phase 0. Theme names are
+`Palette.name` and `"System"`, which are also the keys settings are saved under, so translating
+them would lose every saved theme. Several labels are built by concatenation.
+
+**Closes when:** before the Phase 5 i18n audit. Separate the saved key from the displayed name
+first; moving to resources is then mechanical.
+
+---
+
+## Markdown round-trip gaps no reader can reach yet
+
+**Spec:** `markdown-dialect.md`'s round-trip contract.
+
+**Code:** footnote references are dropped by the inline writer; heading and image attributes and
+loose definition-list entries are not written back; the attribute, footnote and definition-list
+restorers walk top-level blocks only; heading ids drop code-span text; a `[^x]:` line inside a
+fenced code block is read as a footnote. Definition lists are one line per definition and one
+entry per list.
+
+**Why they are not urgent:** the serialiser writes only blocks the reader edited, and nothing in
+the editor yet creates these constructs.
+
+**Closes when:** before any of them can be produced by editing — at the latest, Phase 10's export
+work, which leans on the same IR.
+
+---
+
+## 10.2 — The shortcut map is fixed and undocumented
+
+**Spec:** "Document the full shortcut map and make it user-remappable."
+
+**Code:** Ctrl+S, Ctrl+Comma, Escape, F11 / Ctrl+Cmd+F and the editor's chords are fixed, and
+written down nowhere a reader would look.
+
+**Closes when:** documented with the Phase 5 settings; remappable by Phase 11, before a second
+platform's conventions have to be reconciled with the first's.
+
+---
+
+## engineering-conventions.md — The detekt configuration is looser than the spec
+
+**Spec:** the thresholds and path exemptions of §2.
+
+**Code:** `MagicNumber` also ignores `2`, property declarations, and all of `:design-system`;
+composables are exempt from both complexity rules with nothing in their place; fixtures,
+`**/resources/**` and test source sets are exempt by path beyond the spec's list. Two rules,
+`UnsafeCallOnNullableType` and `ForbiddenMethodCall`, need type resolution, which is not wired, so
+they never run. dependency-analysis still only warns, for a reason ("the modules are empty") that
+stopped being true in Phase 1.
+
+**Why this is not simply fixed:** each is a gate configuration, and loosening or tightening one is
+a human decision (`AGENTS.md` §3). Some may be right — a design system is mostly numbers — and
+belong in the spec; the rest belong back in the config.
+
+**Closes when:** decided, item by item.

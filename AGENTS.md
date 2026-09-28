@@ -32,7 +32,7 @@ It has two halves, in order: mechanical, then judgment. Neither substitutes for 
 ```sh
 ./gradlew spotlessApply
 ./gradlew detekt
-./gradlew konsistTest
+./gradlew :tools-architecture-tests:test
 ./gradlew allTests
 ./gradlew check
 ```
@@ -45,7 +45,7 @@ Then verify:
 - [ ] No file crossed a **fail** threshold (600 lines, 60-line function, complexity 15, nesting 4)
 - [ ] Files that crossed a **warn** threshold are listed in your report with a justification
 - [ ] Tests pass on **every** target, not just JVM
-- [ ] `./gradlew dependencyAnalysis` reports no unused or misdeclared dependencies
+- [ ] `./gradlew buildHealth` reports no unused or misdeclared dependencies
 
 ### Phase 2 — judgment
 

@@ -74,7 +74,8 @@ Constraints to respect:
 :core-parse-markdown     intellij-markdown + the four dialect extensions
 :core-parse-fountain     hand-written Fountain 1.1 parser
 :core-serialise          IR → Markdown / Fountain, source-preserving
-:core-export-*           XHTML/EPUB, ODF, OOXML backends (write-only)
+:core-export-*           XHTML/EPUB, ODF, OOXML backends (write-only), and the ZIP/XML
+                         container writer they share
 
 :editor-engine           Document session, block list, incremental reparse, undo, selection
 :editor-ui               Compose editing surface, block composables, focus model
@@ -82,9 +83,9 @@ Constraints to respect:
 :i18n                    String resources, locale handling, script/font fallback
 :a11y                    Semantics helpers, announcement policy, preference plumbing
 
-:platform-files          expect/actual document access, URIs, bookmarks, permissions
-:platform-windows        expect/actual multi-window and session restoration
-:platform-intents        expect/actual OS document-open handling
+:platform-files          Document access, URIs, bookmarks, permissions, app-private storage
+:platform-windows        Multi-window and session restoration
+:platform-intents        OS document-open handling, type identification, single instance
 
 :app-shared              Navigation, settings, composition root
 :app-android             Activity, manifest, intent filters
@@ -94,8 +95,11 @@ Constraints to respect:
 ```
 
 Everything from `:core-*` through `:design-system` is pure `commonMain`. The `:platform-*`
-modules are the only place `expect`/`actual` appears, and they are deliberately small — file
-access, windowing, and OS document handoff are the three genuinely divergent areas.
+modules are the only ones with platform source sets — file access, windowing, and OS document
+handoff are the three genuinely divergent areas. They use `expect`/`actual` for thin primitives
+(a digest, a clock, a storage root) and per-platform implementations of a common interface where
+the platform code is more than adaptation, as the document stores are. A module whose logic is
+common stays common: `:platform-windows` has no platform source set at all today.
 
 ---
 
@@ -144,10 +148,11 @@ identical in both states (§4.1), nothing moves — only glyph styling changes. 
 
 **Vertical stability is a hard requirement.** If revealing a block changes its height, the
 document below it jumps while the user is typing. Since markup characters are *added* in reveal
-state, a paragraph near a wrap boundary can gain a line. Mitigation: reserve the reveal-state
-height for the focused block — measure both states, use the larger, and let preview state have
-a little slack at the bottom. This costs one extra measurement pass per focus change and buys
-a completely still page.
+state, a paragraph near a wrap boundary can gain a line. Mitigation: every block reserves its
+reveal-state height — measure both states, use the larger, and let preview state have a little
+slack at the bottom. *Every* block, not only the focused one: the growth is the transition, so
+slack that arrived with focus would arrive too late. The cost is bounded by the viewport, since
+only composed blocks are measured, and it buys a completely still page.
 
 ### 4.3 Implementation approach
 
@@ -190,6 +195,11 @@ Staged approach:
    the engine, draw highlight rectangles per block from each block's `TextLayoutResult`, and
    implement copy/cut/delete against the IR rather than against any text field. Drag handles and
    platform selection menus hook into this layer.
+
+**Pointer and touch want different things from the same drag.** A mouse dragged across the
+document selects. A finger dragged across it scrolls — on a phone there is no other way through
+a document — and a tap places the caret. A stylus is treated as touch. Selecting across blocks by
+touch is the v2 drag handles, never a drag of the text itself.
 
 Prototype the v2 layer **before** committing to the per-block architecture, on a 10,000-word
 fixture, on the slowest target device. If it can't be made to feel right, the architecture
@@ -320,9 +330,14 @@ Exposed in settings, persisted per document type:
 - Line height multiplier (1.3–2.0) — dyslexia support
 - Letter spacing (0 to +0.08em) — dyslexia support
 - Measure (55–85 characters)
-- Paragraph spacing
+- Paragraph spacing (0.5–1.5em, default 0.75em — §5.2's body space-after). Every role's space
+  before and after scales in proportion, so headings keep more air than the paragraphs around
+  them. Never zero: §5.2 separates paragraphs by space alone.
 - Theme: light, dark, sepia, high contrast, system
 - Font weight for body (300–500) — low-vision support
+
+§12's options — typewriter scrolling, focus mode, and whether the chrome auto-hides — sit with
+these controls and are persisted with them, as is an explicit reduced-motion choice (§10.2).
 
 ---
 
@@ -407,6 +422,40 @@ Persist, per open document:
 On launch, restore every session. A document whose file has vanished opens read-only from its
 snapshot with a clear banner offering *Save As*.
 
+### 7.4 New documents
+
+**Launching with nothing to restore opens one untitled document**, ready to type into. Launching
+with sessions to restore restores them (§7.3) and opens nothing else — a launch that always added
+a blank window would leave one to close every time.
+
+**The kind is chosen, not asked for.** An untitled document starts as the kind the reader last
+created — Markdown on first launch — and the chrome shows it: *Untitled · Markdown*. Until the
+first save that label is a control; choosing Fountain re-interprets the same text as Fountain and
+applies the Fountain reader settings (§5.5 persists them per kind). It fades with the rest of the
+chrome (§12). Nothing stands between launching the app and writing.
+
+**Every platform's launcher offers both kinds directly**, routed through the same path as opening
+a file:
+
+| Platform | Entry points |
+|---|---|
+| Android | Static app shortcuts: *New Markdown document*, *New Fountain screenplay* |
+| Linux | `.desktop` `Actions=` entries, which appear in the launcher's context menu |
+| macOS | Dock menu (`applicationDockMenu`), and *File > New* |
+| Windows | Jump list tasks, and *File > New* |
+
+**An untitled document is protected like any other.** It is snapshotted on the §8.1 triggers,
+has a session record whose `uri` is null, and is restored on the next launch. Closing it does not
+ask whether to save: the snapshot already holds the words, and §8.4 allows dialogs only on an
+attempted write. An untitled document that is still empty when closed is discarded — there is
+nothing in it to lose.
+
+**The first save is *Save As*,** through the platform's own picker (`ACTION_CREATE_DOCUMENT` on
+Android, followed by `takePersistableUriPermission` as in §7.3; the export picker on iOS; a save
+dialog on desktop). The suggested name comes from the first heading, or from a Fountain title
+page's `Title:`, and the extension from the kind (§9.1). From then on the document is an ordinary
+file-backed session: it has a `baseDigest`, its kind is its extension, and the label is gone.
+
 ---
 
 ## 8. Document lifecycle and safety
@@ -443,6 +492,13 @@ from `baseDigest`, **do not write**. Present:
 Explicit save uses the same atomic temp-and-rename, then updates `baseDigest` to the newly
 written content.
 
+**Except on Android's Storage Access Framework, where atomic replacement does not exist.**
+A `content://` document has no rename-over — `DocumentsContract.renameDocument` fails when the name
+is taken — so a save truncates the document and refills it in place. The digest check still
+holds in full, being a comparison and a refusal. What survives a crash mid-save is the snapshot
+(§8.1), which lives in app-private storage on a real filesystem and *is* atomic, and §8.3
+restores from it. Snapshots are never routed through SAF.
+
 This matters more than it sounds on mobile, where cloud-sync providers rewrite files under you
 without warning, and on desktop where the same file may be open in another editor.
 
@@ -458,9 +514,12 @@ Never auto-discard a snapshot. Retain snapshots for 30 days after a successful s
 
 ### 8.4 Conflict is a first-class state
 
-A document session is in exactly one of: `clean`, `dirty`, `conflicted`, `orphaned`
-(file deleted or permission lost), or `readOnly`. Surface the state in the window chrome —
-quietly, as a dot or a short label, not a dialog. Dialogs only on attempted write.
+A document session is in exactly one of: `untitled` (no file yet, §7.4), `clean`, `dirty`,
+`conflicted`, `orphaned` (file deleted or permission lost), or `readOnly`. Surface the state in the
+window chrome — quietly, as a dot or a short label, not a dialog. Dialogs only on attempted write.
+
+`untitled` is shown rather than left blank. A reader whose words exist only in a snapshot should
+be able to see that they are not in a file anywhere yet.
 
 ---
 
@@ -535,15 +594,19 @@ files open in place rather than being copied into the app container. Handle
 
 - **macOS:** `CFBundleDocumentTypes` in the app bundle; handle the open-document Apple Event via
   `java.awt.Desktop.setOpenFileHandler`. Reachable from Compose Desktop, but needs care with the
-  JVM packaging step.
+  JVM packaging step. Fountain's UTI is exported (§9.1); Markdown's `net.daringfireball.markdown`
+  is *imported* — it belongs to its author, and macOS may already know it.
 - **Windows:** file-association registry entries written by the installer; the document path
-  arrives as `argv[1]`. Route to an existing instance via a single-instance lock and a local
-  socket or named pipe rather than launching a second process.
-- **Linux:** a `.desktop` file with `MimeType=text/markdown;` and a shared-mime-info XML package
-  declaring the Fountain type. `%f` in `Exec` delivers the path.
+  arrives as `argv[1]`. Fountain has no registered MIME type, so its associations name
+  `text/plain`.
+- **Linux:** a `.desktop` file with `MimeType=text/markdown;text/x-markdown;text/x-fountain;` and
+  a shared-mime-info XML package declaring the Fountain type as `text/x-fountain` — unregistered,
+  and claimed by nothing else. Markdown is the system's own type and is not redeclared. `%f` in
+  `Exec` delivers the path.
 
 In all three cases, an already-running instance should open the document in a **new window**,
-not replace the current one.
+not replace the current one. Route a second launch to it through a single-instance lock and a
+local socket or named pipe rather than running a second process.
 
 ---
 
@@ -657,15 +720,19 @@ Chinese, Japanese, and Thai. Use ICU-style grapheme and word segmentation, not `
 
 ## 12. Distraction-free interface
 
-- **Chrome auto-hides.** On sustained typing, toolbars and rails fade out. Any pointer movement,
-  keypress of a modifier, or edge gesture brings them back.
+- **Chrome auto-hides.** On sustained typing — about a second and a half without interruption —
+  toolbars and rails fade out. Any pointer movement, keypress of a modifier, or edge gesture brings
+  them back. Pausing does not: a writer who stops to think has not asked for the furniture back.
 - **Typewriter scrolling** as an option: keep the caret at a fixed vertical position.
 - **Focus mode** as an option: dim all blocks except the current one, or the current sentence.
 - **Nothing blinks, badges, or notifies.** No unsaved-changes asterisk animation, no word-count
   ticker that updates per keystroke (debounce to 1s).
 - **Word and page targets** shown only on request, never ambiently.
 - **Full-screen** is a first-class mode on every platform that has one.
-- The status indicator (§8.4) is the only persistent chrome, and it's a dot.
+- The only chrome is the status indicator (§8.4) — a dot, with a short label whenever the
+  document is anything but clean, since colour alone may not carry meaning (§10.2) — and one
+  control that opens the reader settings, which a reader without a keyboard could not otherwise
+  reach. Both fade with the rest of the chrome.
 
 ---
 

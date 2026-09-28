@@ -254,6 +254,9 @@ in phase 9.
 - Distraction-free chrome (§12): auto-hide, typewriter scrolling, focus mode, full screen.
 - Settings UI.
 - Packaging for macOS, Windows, Linux.
+- New documents (`appthere-drafts.md` §7.4): an untitled document when there is nothing to restore,
+  the kind chosen in the chrome until first save, *Save As* through a save dialog, the `untitled`
+  state (§8.4), and the Linux, macOS and Windows launcher entry points.
 
 **Acceptance**
 - Double-clicking a `.md` file opens it in a new window of the running instance.
@@ -282,6 +285,9 @@ they constrain the project model in phase 8.
 - Responsive layouts across Compact/Medium/Expanded.
 - Foldable support via `FoldingFeature` — never render text across a hinge.
 - Split-screen with a second instance of the app.
+- New documents on Android (`appthere-drafts.md` §7.4): the document Activity opens an untitled
+  document from the launcher, static app shortcuts for each kind, and *Save As* through
+  `ACTION_CREATE_DOCUMENT`. Replaces the Phase 5 stand-in that opens the sample document.
 
 **Acceptance**
 - Opens from Files, Downloads, Drive, Gmail, and a messaging app.
@@ -479,13 +485,13 @@ already a large tablet app with no XR work at all.
 
 Unresolved questions that should be settled before the phase that depends on them.
 
-| Question | Decide before | Source |
-|---|---|---|
-| Does the AppThere name reverse the standalone intent? | Phase 0 | `appthere-drafts.md` §13 |
-| Implicit vs explicit project creation | Phase 8 | `projects.md` §13.1 |
-| Nested projects: supported or nearest-ancestor-wins? | Phase 8 | `projects.md` §13.2 |
-| Non-text files in the binder (PDFs, images) | Phase 8 | `projects.md` §13.3 |
-| `{.class}` style map in `project.toml` or app prefs? | Phase 10 | `projects.md` §13.4 |
+| Question | Decide before | Source | Decided |
+|---|---|---|---|
+| Does the AppThere name reverse the standalone intent? | Phase 0 | `appthere-drafts.md` §13 | |
+| Implicit vs explicit project creation | Phase 8 | `projects.md` §13.1 | 2026-09-28: implicit, `.drafts/` created lazily |
+| Nested projects: supported or nearest-ancestor-wins? | Phase 8 | `projects.md` §13.2 | 2026-09-28: nearest wins, nesting unsupported |
+| Non-text files in the binder (PDFs, images) | Phase 8 | `projects.md` §13.3 | 2026-09-28: shown, opened externally |
+| `{.class}` style map in `project.toml` or app prefs? | Phase 10 | `projects.md` §13.4 | 2026-09-28: `project.toml` |
 
 ---
 

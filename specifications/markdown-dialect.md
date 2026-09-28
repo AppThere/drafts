@@ -153,7 +153,7 @@ the right single quote.
 - Malformed attribute blocks are literal text, never a parse error.
 
 Auto-generated heading IDs are on, using **GitHub's algorithm** (lowercase, strip punctuation
-except hyphens, spaces to hyphens, Unicode preserved, duplicates suffixed `-1`, `-2`). An
+except hyphens and underscores, spaces to hyphens, Unicode preserved, duplicates suffixed `-1`, `-2`). An
 explicit `{#id}` overrides the generated one.
 
 ## Handled outside the Markdown parser
@@ -161,7 +161,7 @@ explicit `{#id}` overrides the generated one.
 | Layer | Handling |
 |---|---|
 | **Front matter** | TOML (`+++`), YAML (`---`), JSON (`{`). Stripped before parsing, preserved in its original format on save. Never normalised between formats. |
-| **Hugo shortcodes** | `{{< … >}}` and `{{% … %}}` tokenised into opaque atomic spans before parsing, restored verbatim on serialise. Never parsed, never reformatted. |
+| **Hugo shortcodes** | `{{< … >}}` and `{{% … %}}` located in the source and collapsed into opaque atomic spans after parsing — whatever the parser made of their contents is discarded. Restored verbatim on serialise. Never reformatted. |
 
 The YAML front matter delimiter collides with CommonMark's thematic break. Stripping must
 happen first or `---` parses as `<hr>`.
@@ -178,9 +178,10 @@ Because this is an editor, not a renderer, serialisation fidelity is a first-cla
 5. **Unknown constructs pass through.** Anything the parser doesn't recognise is retained as
    literal text rather than dropped.
 
-Only edited subtrees are re-serialised from the AST, using a documented canonical style
-(ATX headings, `-` bullets, fenced code with backticks, reference-style links preserved as
-found).
+Only edited subtrees are re-serialised from the AST, in the spelling the author used — a Setext
+heading stays Setext, a `*` list keeps `*`, a tilde fence stays tilde. Blocks with no source to
+follow, the ones the user created, use the canonical style (ATX headings, `-` bullets, fenced code
+with backticks, reference-style links preserved as found).
 
 ## WYSIWYG implications
 

@@ -49,8 +49,8 @@ import kotlinx.coroutines.launch
  * The composition root (`appthere-drafts.md` 3: ":app-shared  Navigation, settings, composition
  * root").
  *
- * The settings are held here and not persisted. 5.5 says they are "persisted per document type",
- * which needs somewhere to persist to -- the document lifecycle of Phase 4.
+ * The settings are held here. This overload has no document type to persist them under, so they
+ * last as long as the window; the file-backed one below keeps them per type, as 5.5 asks.
  *
  * `MaterialTheme` has gone. The surface here is a document, and the three things Material was
  * providing -- a type scale, a colour scheme and a background -- are exactly what the design

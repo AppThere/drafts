@@ -11,7 +11,8 @@ import kotlinx.serialization.json.Json
  * divergence from 7.3's `"documentId": "uuid"` and a deliberate one: a UUID needs an index
  * somewhere mapping it back to a file, and there is no index yet. A content-addressed id finds its
  * own snapshot with nothing to consult. The cost is that renaming a file outside the application
- * orphans its snapshot; 7.3's session list, when it exists, is what fixes that.
+ * orphans its snapshot. Untitled documents (7.4) have no location to derive an id from, and the
+ * real id they need is what closes this -- see `divergences.md`.
  */
 data class SessionIdentity(
     val documentId: String,

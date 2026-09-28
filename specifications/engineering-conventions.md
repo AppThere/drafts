@@ -2,7 +2,7 @@
 
 Size limits, static analysis configuration, and the code-smell catalogue for AppThere Drafts.
 
-Companion: [`AGENTS.md`](AGENTS.md) — the agent-facing quality pass protocol.
+Companion: [`AGENTS.md`](../AGENTS.md) — the agent-facing quality pass protocol.
 
 ---
 
@@ -99,23 +99,28 @@ relax the global threshold to accommodate it.
 plugins {
     id("io.gitlab.arturbosch.detekt")            // static analysis
     id("com.diffplug.spotless")                  // formatting (wraps ktlint)
-    id("com.lemonappdev.konsist")                // architecture assertions
     id("org.jetbrains.kotlinx.kover")            // coverage
     id("com.autonomousapps.dependency-analysis") // unused / misdeclared dependencies
 }
 
 dependencies {
     detektPlugins("io.nlopez.compose.rules:detekt:<version>")
-    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:<version>")
 }
+
+// Konsist is a test library, not a plugin: the assertions are ordinary tests in
+// :tools-architecture-tests, run by that module's `test` task.
 ```
+
+detekt-formatting is not used. It embeds an older ktlint than Spotless runs, and the two disagree
+about real formatting, so they fight. Formatting belongs to Spotless (below), which is the one
+that auto-fixes.
 
 | Tool | Job |
 |---|---|
 | **detekt** | Size, complexity, smells, custom rules. Primary gate. |
 | **compose-rules** | Compose-specific correctness: modifier conventions, state hoisting, stability |
 | **Spotless / ktlint** | Formatting. Auto-fixed, never argued about. |
-| **Konsist** | Architecture assertions as tests (§5) |
+| **Konsist** | Architecture assertions as tests (§5), in `:tools-architecture-tests` |
 | **Android Lint** | Android-target-specific issues |
 | **Kover** | Coverage, reported not gated |
 | **dependency-analysis** | Unused and undeclared dependencies, `api` vs `implementation` |
@@ -123,7 +128,9 @@ dependencies {
 ### Baselines
 
 A detekt baseline is acceptable **once**, at the moment the tooling is introduced to existing
-code, and it shrinks monotonically thereafter. CI asserts the baseline file has not grown. See
+code, and it shrinks monotonically thereafter. This project introduced its tooling before its
+code, so that moment never came: the correct number of baseline files is zero, and the build
+fails if one exists anywhere (`assertNoDetektBaseline`, run by `qualityGate` and by CI). See
 `AGENTS.md` §4 — regenerating the baseline is the single most common way an agent makes a quality
 gate meaningless.
 
@@ -149,7 +156,7 @@ Configure detekt to fail on these. Non-negotiable.
 | Magic numbers | `MagicNumber`, excluding 0/1/-1 and Compose dimension literals |
 | Mutable top-level state | `TopLevelPropertyNaming` + custom rule |
 | Unused private members | `UnusedPrivateMember` |
-| Wildcard imports | `NoWildcardImports` |
+| Wildcard imports | `WildcardImport` |
 | Platform type in `commonMain` | Konsist assertion (§5) |
 | `Modifier` not the first optional parameter | compose-rules `ModifierWithoutDefault`, `ModifierNotUsedAtRoot` |
 | Mutable state as a composable parameter | compose-rules `MutableParams` |

@@ -4,8 +4,9 @@ package com.appthere.drafts.i18n
  * User-facing strings.
  *
  * **Provisional.** `appthere-drafts.md` 11.1 requires these to live in resources, translatable and
- * adjustable for assistive technology; Compose Multiplatform's resource mechanism arrives with the
- * design system in Phase 3. Until then they live here rather than inline at the usage site, which
+ * adjustable for assistive technology. Compose Multiplatform's resource mechanism has been in the
+ * build since Phase 3 and these have not moved to it yet; `divergences.md` puts that before the
+ * Phase 5 i18n audit. Until then they live here rather than inline at the usage site, which
  * is the part that actually matters: a literal in a composable cannot be moved without touching
  * the UI, and there is no list of what needs translating.
  *

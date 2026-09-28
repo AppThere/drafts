@@ -26,7 +26,7 @@ import androidx.compose.ui.input.pointer.positionChange
  * movement leaves a touch reader with a document they cannot move through. Touch gets taps: the
  * press is reported only once the finger has lifted without travelling, because reporting it on
  * the way down would drop the caret wherever every scroll happened to begin. Selecting across
- * blocks by touch is 10.2's selection handles, and is not a drag of the document at all.
+ * blocks by touch is 4.4's drag handles, and is not a drag of the document at all.
  */
 internal suspend fun PointerInputScope.trackSelectionDrag(
     onPress: (Offset) -> Unit,

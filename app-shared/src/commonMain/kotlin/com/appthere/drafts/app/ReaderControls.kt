@@ -247,7 +247,7 @@ private fun FocusChoice(
     )
 }
 
-/** 10.2: honouring reduced motion is a setting as well as an OS signal. */
+/** 10.2 asks for `prefers-reduced-motion` to be honoured; this is the reader's own say in it. */
 @Composable
 private fun MotionChoice(
     settings: ReaderSettings,

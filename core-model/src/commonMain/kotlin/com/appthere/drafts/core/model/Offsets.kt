@@ -12,10 +12,9 @@ import kotlin.jvm.JvmInline
  *
  * **Unit: UTF-16 code units**, throughout. That is what `intellij-markdown` reports for AST node
  * ranges and what Compose's text field reports for selection, so an offset can pass between the
- * parser and the editor untouched. Note that `export-pipeline.md` describes `source` as a "byte
- * range"; that wording predates the choice of parser and is wrong -- a UTF-8 byte offset would
- * need converting at both boundaries, on a path that runs on every keystroke. The spec should be
- * corrected.
+ * parser and the editor untouched. `export-pipeline.md` once called `source` a "byte range"; it
+ * has since been corrected, because a UTF-8 byte offset would need converting at both boundaries,
+ * on a path that runs on every keystroke.
  *
  * A consequence worth stating: an astral-plane character (an emoji, most CJK extension B) is two
  * code units. Nothing here should ever index into the middle of a surrogate pair, and the parser

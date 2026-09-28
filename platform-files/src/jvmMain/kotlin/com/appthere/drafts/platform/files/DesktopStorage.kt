@@ -61,8 +61,8 @@ fun desktopSettingsRoot(): String = Path.of(desktopDataRoot(), SETTINGS).toStrin
  *
  * `documentId` is the digest of the path rather than 7.3's UUID: a UUID needs an index mapping it
  * back to a file, there is no index yet, and a content-addressed id finds its own snapshot with
- * nothing to consult. Renaming the file outside the application orphans its snapshot -- the cost of
- * not having the index, and what the index will fix.
+ * nothing to consult. Renaming the file outside the application orphans its snapshot; the real id
+ * that untitled documents (7.4) need is what will fix that -- see `divergences.md`.
  */
 fun desktopIdentity(
     path: String,
