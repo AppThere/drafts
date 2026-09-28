@@ -44,7 +44,7 @@ class OpenDocumentTest {
     @Test
     fun `saving writes the text and returns the document to clean`() =
         runTest {
-            val store = FakeDocumentStore(ORIGINAL)
+            val store = FakeDocumentStore(REF, ORIGINAL)
             val document = opened(store)
             document.type("Edited.\n")
 
@@ -61,7 +61,7 @@ class OpenDocumentTest {
             // document would stay dirty and the badge would never go back to clean. And an explicit
             // Ctrl+S is a request, not a suggestion -- it writes again rather than deciding for the
             // reader that it knows better. The digest check makes that safe; skipping it would not.
-            val store = FakeDocumentStore(ORIGINAL)
+            val store = FakeDocumentStore(REF, ORIGINAL)
             val document = opened(store)
             document.type("Edited.\n")
             document.save()
@@ -75,10 +75,10 @@ class OpenDocumentTest {
     fun `a file changed on disk is refused and the document becomes conflicted`() =
         runTest {
             // 8.2 end to end: the digest recorded at open no longer matches, so nothing is written.
-            val store = FakeDocumentStore(ORIGINAL)
+            val store = FakeDocumentStore(REF, ORIGINAL)
             val document = opened(store)
             document.type("Mine.\n")
-            store.changeOnDisk("Theirs.\n")
+            store.changeOnDisk(REF, "Theirs.\n")
 
             val outcome = document.save()
 
@@ -92,10 +92,10 @@ class OpenDocumentTest {
         runTest {
             // The reason the refusal is safe. The work is still in memory and still marked as not on
             // disk, so 8.1's snapshot remains the thing standing between the reader and losing it.
-            val store = FakeDocumentStore(ORIGINAL)
+            val store = FakeDocumentStore(REF, ORIGINAL)
             val document = opened(store)
             document.type("Mine.\n")
-            store.changeOnDisk("Theirs.\n")
+            store.changeOnDisk(REF, "Theirs.\n")
 
             document.save()
 
@@ -107,7 +107,7 @@ class OpenDocumentTest {
         runTest {
             // A full disk. The file is untouched and the edits are not in it, so reporting clean here
             // would tell the reader their work was safe at the moment it definitely was not.
-            val store = FakeDocumentStore(ORIGINAL)
+            val store = FakeDocumentStore(REF, ORIGINAL)
             val document = opened(store)
             document.type("Edited.\n")
             store.failsToWrite = true
@@ -120,10 +120,10 @@ class OpenDocumentTest {
     @Test
     fun `a deleted file orphans the document on an attempted save`() =
         runTest {
-            val store = FakeDocumentStore(ORIGINAL)
+            val store = FakeDocumentStore(REF, ORIGINAL)
             val document = opened(store)
             document.type("Edited.\n")
-            store.remove()
+            store.remove(REF)
 
             document.save()
 
@@ -133,7 +133,7 @@ class OpenDocumentTest {
     @Test
     fun `a read-only document reports read-only rather than clean`() =
         runTest {
-            val document = opened(FakeDocumentStore(ORIGINAL, writable = false))
+            val document = opened(FakeDocumentStore(REF, ORIGINAL, writable = false))
 
             assertEquals(DocumentState.ReadOnly, document.lifecycle.state)
         }
@@ -144,10 +144,10 @@ class OpenDocumentTest {
             // Which digest is compared is the caller's choice, and the wrong choice is invisible in the
             // happy path. Comparing against a digest of the text in memory would match whatever the
             // reader had typed and overwrite the other version every time.
-            val store = FakeDocumentStore(ORIGINAL)
+            val store = FakeDocumentStore(REF, ORIGINAL)
             val document = opened(store)
             document.type("Mine.\n")
-            store.changeOnDisk("Theirs.\n")
+            store.changeOnDisk(REF, "Theirs.\n")
 
             val conflict = assertIs<WriteOutcome.Conflict>(document.save())
 
@@ -161,10 +161,10 @@ class OpenDocumentTest {
             // 8.2's "[ Reload and lose my changes ]". Both halves have to happen: the text becomes what
             // is on disk, and the state stops being conflicted -- a document still marked conflicted
             // after reloading would refuse its own next save against a digest it has already replaced.
-            val store = FakeDocumentStore(ORIGINAL)
+            val store = FakeDocumentStore(REF, ORIGINAL)
             val document = opened(store)
             document.type("Mine.\n")
-            store.changeOnDisk(THEIRS)
+            store.changeOnDisk(REF, THEIRS)
             document.save()
 
             document.reload()
@@ -179,10 +179,10 @@ class OpenDocumentTest {
             // "lose my changes" has to mean it. A reader who reloads and then presses Ctrl+Z out of
             // habit must not get their discarded changes back on top of a document they were never
             // made against -- which is what reusing the editor and its history would do.
-            val store = FakeDocumentStore(ORIGINAL)
+            val store = FakeDocumentStore(REF, ORIGINAL)
             val document = opened(store)
             document.type("Mine.\n")
-            store.changeOnDisk(THEIRS)
+            store.changeOnDisk(REF, THEIRS)
             document.save()
 
             document.reload()
@@ -197,10 +197,10 @@ class OpenDocumentTest {
             // The point of clearing the conflict. The digest recorded at reload is the one the next
             // save compares against, so an ordinary save now goes through rather than being refused
             // against a digest nobody has held since before the reload.
-            val store = FakeDocumentStore(ORIGINAL)
+            val store = FakeDocumentStore(REF, ORIGINAL)
             val document = opened(store)
             document.type("Mine.\n")
-            store.changeOnDisk(THEIRS)
+            store.changeOnDisk(REF, THEIRS)
             document.save()
             document.reload()
 
@@ -215,10 +215,10 @@ class OpenDocumentTest {
         runTest {
             // The reader asked to see what is on disk. Being told there is nothing there is an answer,
             // and a better one than an exception that takes the window with it.
-            val store = FakeDocumentStore(ORIGINAL)
+            val store = FakeDocumentStore(REF, ORIGINAL)
             val document = opened(store)
             document.type("Mine.\n")
-            store.remove()
+            store.remove(REF)
 
             document.reload()
 
@@ -226,7 +226,7 @@ class OpenDocumentTest {
         }
 
     /** Opens through the store the way [rememberOpenDocument] does, without a composition. */
-    private suspend fun opened(store: FakeDocumentStore = FakeDocumentStore(ORIGINAL)): OpenDocument {
+    private suspend fun opened(store: FakeDocumentStore = FakeDocumentStore(REF, ORIGINAL)): OpenDocument {
         val contents = store.read(REF)
         return OpenDocument(
             store = store,
@@ -235,11 +235,15 @@ class OpenDocumentTest {
         )
     }
 
-    /** An edit through the editor's own path, so the revision moves the way a keystroke moves it. */
+    /**
+     * Inserts [text] at the head of the first block, through the editor's own path so the revision
+     * moves the way a keystroke moves it. The whole new block text is handed over because that is
+     * what a field reports; `replace` narrows it back down to the run that actually changed.
+     */
     private fun OpenDocument.type(text: String) {
         val block = editor.blocks.first()
         editor.place(Caret(block.id, 0))
-        editor.replace(requireNotNull(block.block.source), text, text.length)
+        editor.replace(requireNotNull(block.block.source), text + editor.sourceOf(block.block), text.length)
     }
 
     private companion object {

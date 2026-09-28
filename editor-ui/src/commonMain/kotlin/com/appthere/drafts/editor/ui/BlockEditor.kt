@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
@@ -74,6 +76,7 @@ import com.appthere.drafts.editor.engine.EditorBlock
 fun BlockEditor(
     state: EditorState,
     modifier: Modifier = Modifier,
+    scroll: LazyListState = rememberLazyListState(),
 ) {
     val layer = remember { SelectionLayer() }
     val focus = remember { FocusRequester() }
@@ -93,6 +96,7 @@ fun BlockEditor(
         val focused = state.caret?.block
 
         LazyColumn(
+            state = scroll,
             modifier =
                 Modifier
                     .fillMaxWidth()

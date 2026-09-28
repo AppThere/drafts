@@ -1,0 +1,81 @@
+package com.appthere.drafts.platform.files
+
+/**
+ * Autosave, as `appthere-drafts.md` 8.1 defines it.
+ *
+ * "**Autosave never touches the user's file.** It writes a snapshot to app-private storage." That
+ * sentence is the whole design. The user's file is protected by 8.2's digest check, which refuses
+ * writes; a snapshot has nothing to refuse, so it can be written as often as it likes without ever
+ * being able to destroy anything the reader did not ask it to.
+ *
+ * Writes go through [DocumentStore.writeAtomically], so a snapshot gets the same temp-fsync-rename
+ * that 8.1 spells out -- "a crash mid-write leaves the previous snapshot intact". Reusing the store
+ * rather than reaching for the filesystem is also what keeps the Konsist rule true: there is one
+ * place in the project that writes, and this is not another one.
+ *
+ * [root] is supplied by the caller rather than discovered here. App-private storage is a different
+ * question on every platform -- `Context.filesDir`, Application Support, an XDG data directory --
+ * and two of those need a handle this module has no way to hold. The platform entry point knows;
+ * this does not have to.
+ */
+class SnapshotStore(
+    private val store: DocumentStore,
+    private val root: String,
+) {
+    /**
+     * Writes the text and the session record for one document.
+     *
+     * The text goes first. If the process dies between the two writes, a snapshot with a stale
+     * `meta.json` restores the right words at a slightly wrong caret; the other order loses the
+     * words and keeps the caret, which is not a trade anyone would choose.
+     */
+    suspend fun write(
+        session: SessionRecord,
+        text: String,
+    ): Boolean {
+        val written = store.writeAtomically(snapshotOf(session.documentId), text)
+        if (written !is WriteOutcome.Written) return false
+
+        val record = SessionRecord.format.encodeToString(SessionRecord.serializer(), session)
+        return store.writeAtomically(metaOf(session.documentId), record) is WriteOutcome.Written
+    }
+
+    /** The snapshot text, or null if there is none. */
+    suspend fun textOf(documentId: String): String? =
+        runCatching { store.read(snapshotOf(documentId)).text }.getOrNull()
+
+    /**
+     * The session record, or null if it is missing or unreadable.
+     *
+     * A corrupt `meta.json` is null rather than an exception. It is a file on disk that a crash may
+     * have caught mid-rename on a filesystem that did not honour the atomicity, and the text beside
+     * it is still worth restoring -- 8.3's "Never auto-discard a snapshot" applies to the words,
+     * which do not stop being the reader's because the caret position became unreadable.
+     */
+    suspend fun recordOf(documentId: String): SessionRecord? =
+        runCatching {
+            SessionRecord.format.decodeFromString(
+                SessionRecord.serializer(),
+                store.read(metaOf(documentId)).text,
+            )
+        }.getOrNull()
+
+    /** 8.3's pruning, for one document. Both files or neither. */
+    suspend fun discard(documentId: String): Boolean {
+        val text = store.delete(snapshotOf(documentId))
+        val meta = store.delete(metaOf(documentId))
+        return text || meta
+    }
+
+    /** Where 7.3 says the snapshot lives: `.../sessions/<documentId>/snapshot.md`. */
+    fun snapshotOf(documentId: String): DocumentRef = DocumentRef("${directoryOf(documentId)}/$SNAPSHOT")
+
+    fun metaOf(documentId: String): DocumentRef = DocumentRef("${directoryOf(documentId)}/$META")
+
+    private fun directoryOf(documentId: String) = "$root/$documentId"
+
+    companion object {
+        const val SNAPSHOT = "snapshot.md"
+        const val META = "meta.json"
+    }
+}

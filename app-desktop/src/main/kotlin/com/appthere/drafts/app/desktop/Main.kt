@@ -4,17 +4,26 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import com.appthere.drafts.app.DocumentOpening
 import com.appthere.drafts.app.DraftsApp
+import com.appthere.drafts.app.SnapshotKeeper
 import com.appthere.drafts.app.rememberOpenDocument
 import com.appthere.drafts.i18n.Strings
 import com.appthere.drafts.platform.files.DocumentRef
 import com.appthere.drafts.platform.files.PathDocumentStore
+import com.appthere.drafts.platform.files.SnapshotStore
+import com.appthere.drafts.platform.files.SnapshotTrigger
+import com.appthere.drafts.platform.files.desktopIdentity
+import com.appthere.drafts.platform.files.desktopSessionRoot
 
 /**
  * The desktop entry point.
@@ -35,11 +44,26 @@ fun main(args: Array<String>) =
     application {
         val path = args.firstOrNull()
 
-        Window(onCloseRequest = ::exitApplication, title = Strings.WINDOW_TITLE) {
+        // Whatever the open document wants done before the window goes away. 8.1 lists window close
+        // among its triggers, and it is the one trigger that has no later chance to run.
+        var beforeClose: (suspend () -> Unit)? = null
+        var closing by remember { mutableStateOf(false) }
+
+        Window(onCloseRequest = { closing = true }, title = Strings.WINDOW_TITLE) {
             if (path == null) {
                 DraftsApp(initialText = SampleDocument.TEXT)
             } else {
-                FileDocument(path)
+                FileDocument(path) { beforeClose = it }
+            }
+        }
+
+        // The window stays up until the snapshot is down, rather than the main thread being blocked
+        // until it is. On a local file that is a frame nobody sees; on a network share it is the
+        // difference between a window that lingers for a moment and an application that has hung.
+        if (closing) {
+            LaunchedEffect(Unit) {
+                beforeClose?.invoke()
+                exitApplication()
             }
         }
     }
@@ -53,14 +77,35 @@ fun main(args: Array<String>) =
  * that is not there should be told so rather than shown an empty document.
  */
 @Composable
-private fun FileDocument(path: String) {
+private fun FileDocument(
+    path: String,
+    onReadyToClose: (suspend () -> Unit) -> Unit,
+) {
     val store = remember { PathDocumentStore() }
     val ref = remember(path) { DocumentRef(path) }
+    val snapshots = remember { SnapshotStore(store, desktopSessionRoot()) }
 
     when (val opening = rememberOpenDocument(store, ref)) {
-        is DocumentOpening.Opened -> DraftsApp(document = opening.document)
-        DocumentOpening.Opening -> Notice(Strings.OPENING)
-        is DocumentOpening.Failed -> Notice("${Strings.COULD_NOT_OPEN}\n\n$path\n\n${opening.detail}")
+        is DocumentOpening.Opened -> {
+            val keeper =
+                remember(opening.document) {
+                    SnapshotKeeper(opening.document, snapshots, desktopIdentity(path))
+                }
+
+            // 8.1's "Window close, before teardown". Registered upwards rather than handled here,
+            // because by the time the window is closing this composition is on its way out.
+            onReadyToClose { keeper.snapshotOn(SnapshotTrigger.Closing, scrollOffset = 0) }
+
+            DraftsApp(document = opening.document, keeper = keeper)
+        }
+
+        DocumentOpening.Opening -> {
+            Notice(Strings.OPENING)
+        }
+
+        is DocumentOpening.Failed -> {
+            Notice("${Strings.COULD_NOT_OPEN}\n\n$path\n\n${opening.detail}")
+        }
     }
 }
 

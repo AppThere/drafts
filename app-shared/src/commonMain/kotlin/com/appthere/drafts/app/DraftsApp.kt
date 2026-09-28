@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -79,8 +81,20 @@ fun DraftsApp(
     document: OpenDocument,
     modifier: Modifier = Modifier,
     initialSettings: ReaderSettings = ReaderSettings(),
+    keeper: SnapshotKeeper? = null,
 ) {
     val scope = rememberCoroutineScope()
+    val scroll = rememberLazyListState()
+
+    // 8.1's autosave, when the platform has somewhere app-private to put it. Null rather than a
+    // no-op keeper so that a build without snapshot storage is visibly without it.
+    if (keeper != null) {
+        SnapshotEffect(
+            keeper = keeper,
+            revision = document.editor.revision,
+            scrollOffset = { scroll.firstVisibleItemIndex * SCROLL_SCALE + scroll.firstVisibleItemScrollOffset },
+        )
+    }
 
     // A refusal, not a state. 8.4 puts the state in the chrome and allows "dialogs only on
     // attempted write", so the dialog is driven by the outcome of a save and cleared by answering
@@ -91,6 +105,7 @@ fun DraftsApp(
     DraftsWindow(
         editor = document.editor,
         initialSettings = initialSettings,
+        scroll = scroll,
         onDocumentKey = { event ->
             when {
                 // Escape answers the dialog the way Escape answers every dialog.
@@ -153,6 +168,7 @@ private fun DraftsWindow(
     initialSettings: ReaderSettings,
     onDocumentKey: (KeyEvent) -> Boolean,
     modifier: Modifier = Modifier,
+    scroll: LazyListState = rememberLazyListState(),
     chrome: @Composable BoxScope.() -> Unit,
 ) {
     var settings by remember { mutableStateOf(initialSettings) }
@@ -197,7 +213,7 @@ private fun DraftsWindow(
         ) {
             LaunchedEffect(Unit) { root.requestFocus() }
 
-            BlockEditor(state = editor)
+            BlockEditor(state = editor, scroll = scroll)
 
             // Whatever belongs to a document that came from a file: 8.4's badge, and 8.2's
             // refusal when there is one. Placed by the caller, because where they go depends on
@@ -222,6 +238,14 @@ private fun DraftsWindow(
         }
     }
 }
+
+/**
+ * 7.3 stores `scrollOffset` as a single number, and a LazyColumn's position is an index plus an
+ * offset within that item. Folding them together keeps the field one number, at the cost of
+ * assuming no block is taller than this -- which restores to the right block and, for a very tall
+ * one, somewhere inside it.
+ */
+private const val SCROLL_SCALE = 100_000
 
 /** Far enough from the corner to read as a panel over the document rather than part of the frame. */
 private val controlsInset = 16.dp
