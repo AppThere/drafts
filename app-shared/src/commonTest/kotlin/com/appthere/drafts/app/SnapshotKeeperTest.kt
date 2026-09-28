@@ -3,9 +3,11 @@ package com.appthere.drafts.app
 import com.appthere.drafts.editor.engine.Caret
 import com.appthere.drafts.editor.engine.DocumentSession
 import com.appthere.drafts.editor.ui.EditorState
+import com.appthere.drafts.platform.files.CaretRecord
 import com.appthere.drafts.platform.files.DocumentRef
 import com.appthere.drafts.platform.files.DocumentSessionState
 import com.appthere.drafts.platform.files.SessionIdentity
+import com.appthere.drafts.platform.files.SessionRecord
 import com.appthere.drafts.platform.files.SnapshotSchedule
 import com.appthere.drafts.platform.files.SnapshotStore
 import com.appthere.drafts.platform.files.SnapshotTrigger
@@ -168,6 +170,62 @@ class SnapshotKeeperTest {
         }
 
     @Test
+    fun `an untitled document's snapshot records no file`() =
+        runTest {
+            val keeper = untitledKeeper(TWO_BLOCKS)
+            keeper.document.type("Unsaved. ")
+            keeper.subject.edited(START)
+
+            keeper.subject.snapshotOn(SnapshotTrigger.FocusLost, SCROLL)
+
+            val record = requireNotNull(keeper.snapshots.recordOf(UNTITLED.documentId))
+            assertNull(record.uri)
+            assertNull(record.baseDigest)
+            assertEquals("Unsaved. $TWO_BLOCKS", keeper.snapshots.textOf(UNTITLED.documentId))
+        }
+
+    @Test
+    fun `closing an empty untitled document leaves nothing behind`() =
+        runTest {
+            // 7.4: "An untitled document that is still empty when closed is discarded". Its session
+            // too, or the next launch would restore a blank window nobody asked for.
+            val keeper = untitledKeeper("")
+            keeper.snapshots.putRecord(untitledRecord())
+
+            assertTrue(keeper.subject.snapshotOn(SnapshotTrigger.Closing))
+
+            assertNull(keeper.snapshots.recordOf(UNTITLED.documentId))
+            assertNull(keeper.snapshots.textOf(UNTITLED.documentId))
+        }
+
+    @Test
+    fun `closing an untitled document with words in it keeps them`() =
+        runTest {
+            // The ordinary case, and the reason 7.4 needs no "Save changes?" prompt: the words stay
+            // in the snapshot and come back on the next launch.
+            val keeper = untitledKeeper(TWO_BLOCKS)
+            keeper.document.type("Unsaved. ")
+            keeper.subject.edited(START)
+
+            keeper.subject.snapshotOn(SnapshotTrigger.Closing)
+
+            assertEquals("Unsaved. $TWO_BLOCKS", keeper.snapshots.textOf(UNTITLED.documentId))
+        }
+
+    @Test
+    fun `an empty untitled document that only lost focus is kept`() =
+        runTest {
+            // Losing focus is not closing. A reader who switched away before typing has not given up
+            // on the document.
+            val keeper = untitledKeeper("")
+            keeper.snapshots.putRecord(untitledRecord())
+
+            keeper.subject.snapshotOn(SnapshotTrigger.FocusLost)
+
+            assertEquals(untitledRecord().documentId, keeper.snapshots.recordOf(UNTITLED.documentId)?.documentId)
+        }
+
+    @Test
     fun `a captured document is not captured again until it changes`() =
         runTest {
             val keeper = keeper()
@@ -220,6 +278,30 @@ class SnapshotKeeperTest {
         )
     }
 
+    private fun untitledKeeper(text: String): Fixture {
+        val store = FakeDocumentStore(REF, ORIGINAL)
+        val document = openUntitled(store, text)
+        val snapshots = SnapshotStore(store, "/snapshots")
+        return Fixture(
+            subject = SnapshotKeeper(document, snapshots, UNTITLED),
+            document = document,
+            snapshots = snapshots,
+            files = store,
+        )
+    }
+
+    private fun untitledRecord() =
+        SessionRecord(
+            documentId = UNTITLED.documentId,
+            uri = null,
+            displayName = UNTITLED.displayName,
+            kind = UNTITLED.kind,
+            caret = CaretRecord(blockIndex = -1, offset = 0),
+            scrollOffset = 0,
+            baseDigest = null,
+            snapshotPath = "/snapshots/${UNTITLED.documentId}/snapshot.md",
+        )
+
     /**
      * Inserts [text] at the head of the first block, through the editor's own path so the revision
      * moves the way a keystroke moves it. The whole new block text is handed over because that is
@@ -239,6 +321,8 @@ class SnapshotKeeperTest {
         const val START = 1_000_000L
         const val SCROLL = 8_123
         const val OFFSET = 17
+        val UNTITLED =
+            SessionIdentity(documentId = "untitled-1", uri = null, displayName = "Untitled", kind = "markdown")
         val IDENTITY =
             SessionIdentity(
                 documentId = ID,

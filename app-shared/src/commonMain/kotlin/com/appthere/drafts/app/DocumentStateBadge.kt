@@ -91,6 +91,7 @@ private fun Dot(
  */
 private fun labelOf(state: DocumentState): String =
     when (state) {
+        DocumentState.Untitled -> Strings.STATE_UNTITLED
         DocumentState.Clean -> Strings.STATE_CLEAN
         DocumentState.Dirty -> Strings.STATE_DIRTY
         DocumentState.Conflicted -> Strings.STATE_CONFLICTED
@@ -98,7 +99,12 @@ private fun labelOf(state: DocumentState): String =
         DocumentState.ReadOnly -> Strings.STATE_READ_ONLY
     }
 
-/** Worth the accent colour: something has happened to the file, rather than to the text. */
+/**
+ * Worth the accent colour: something has happened to the file, rather than to the text.
+ *
+ * Not `untitled`. Nothing has happened to a file that does not exist yet; the label says the words
+ * are not in one, and that is information rather than an alarm.
+ */
 private fun needsAttention(state: DocumentState): Boolean =
     state == DocumentState.Conflicted || state == DocumentState.Orphaned
 

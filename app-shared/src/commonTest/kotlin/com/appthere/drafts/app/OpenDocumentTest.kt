@@ -3,9 +3,11 @@ package com.appthere.drafts.app
 import com.appthere.drafts.editor.engine.Caret
 import com.appthere.drafts.editor.engine.DocumentSession
 import com.appthere.drafts.editor.ui.EditorState
+import com.appthere.drafts.platform.files.CaretRecord
 import com.appthere.drafts.platform.files.DocumentRef
 import com.appthere.drafts.platform.files.DocumentSessionState
 import com.appthere.drafts.platform.files.DocumentState
+import com.appthere.drafts.platform.files.SessionRecord
 import com.appthere.drafts.platform.files.WriteOutcome
 import com.appthere.drafts.platform.files.sha256
 import kotlinx.coroutines.test.runTest
@@ -13,6 +15,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -235,6 +238,63 @@ class OpenDocumentTest {
         )
     }
 
+    @Test
+    fun `an untitled document says so and has nothing for save to write to`() =
+        runTest {
+            // 7.4. Save returns no outcome, because nothing was attempted: the caller's answer is
+            // Save As, and a silent write to some default location would be worse than either.
+            val store = FakeDocumentStore(REF, ORIGINAL)
+            val document = openUntitled(store, DRAFT)
+            document.type("More. ")
+
+            assertEquals(DocumentState.Untitled, document.lifecycle.state)
+            assertNull(document.save())
+            assertEquals(0, store.writes)
+        }
+
+    @Test
+    fun `save as puts the words in the file and the document becomes clean`() =
+        runTest {
+            val store = FakeDocumentStore(REF, ORIGINAL)
+            val document = openUntitled(store, DRAFT)
+            val target = DocumentRef("/documents/new.md")
+
+            assertIs<WriteOutcome.Written>(document.saveAs(target))
+
+            assertEquals(DRAFT, store.read(target).text)
+            assertEquals(DocumentState.Clean, document.lifecycle.state)
+            assertFalse(document.isUntitled)
+        }
+
+    @Test
+    fun `after save as the next save is checked against what was written`() =
+        runTest {
+            // 8.2 applies from the first save on. Someone else editing the new file between saves
+            // is exactly the conflict the digest check exists to catch.
+            val store = FakeDocumentStore(REF, ORIGINAL)
+            val document = openUntitled(store, DRAFT)
+            val target = DocumentRef("/documents/new.md")
+            document.saveAs(target)
+            store.changeOnDisk(target, THEIRS)
+            document.type("Mine. ")
+
+            assertIs<WriteOutcome.Conflict>(document.save())
+            assertEquals(THEIRS, store.read(target).text)
+        }
+
+    @Test
+    fun `an untitled document reopens with its words and caret`() {
+        // Restored from its snapshot: the only copy of those words there is.
+        val record = RECORD_AT_SECOND_BLOCK
+
+        val document = openUntitled(FakeDocumentStore(REF, ORIGINAL), TWO_BLOCKS, record)
+
+        assertEquals(TWO_BLOCKS, document.editor.text)
+        assertEquals(1, document.editor.blocks.indexOfFirst { it.id == document.editor.caret?.block })
+        assertEquals(record.scrollOffset, document.scrollOffset)
+        assertFalse(document.restoredFromSnapshot, "An untitled document announced a restore it has no file for")
+    }
+
     /**
      * Inserts [text] at the head of the first block, through the editor's own path so the revision
      * moves the way a keystroke moves it. The whole new block text is handed over because that is
@@ -248,6 +308,19 @@ class OpenDocumentTest {
 
     private companion object {
         val REF = DocumentRef("/documents/note.md")
+        const val DRAFT = "A first draft.\n"
+        const val TWO_BLOCKS = "First.\n\nSecond.\n"
+        val RECORD_AT_SECOND_BLOCK =
+            SessionRecord(
+                documentId = "untitled",
+                uri = null,
+                displayName = "Untitled",
+                kind = "markdown",
+                caret = CaretRecord(blockIndex = 1, offset = 2),
+                scrollOffset = 640,
+                baseDigest = null,
+                snapshotPath = "/sessions/untitled/snapshot.md",
+            )
         const val ORIGINAL = "As opened.\n"
         const val THEIRS = "Someone else's edit.\n"
 

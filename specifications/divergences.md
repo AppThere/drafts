@@ -57,10 +57,13 @@ needs on launch.
 **Cost:** renaming or moving a file outside the application orphans its snapshot. The work is not
 lost, but nothing will offer it back.
 
-**Closes when:** §7.4's untitled documents arrive. Phase 5 restored sessions without an index —
-each snapshot directory is found by its own id — so the index this was waiting for was never
-needed. An untitled document has no location to derive an id from, though, and needs a real one;
-when that exists, file-backed documents should use the same scheme.
+**Partly closed:** untitled documents (§7.4) now get a real UUID, since they have no location to
+derive one from. Phase 5 restored sessions without an index — each snapshot directory is found by
+its own id — so the index this was once waiting for was never needed.
+
+**Closes when:** file-backed documents use the same scheme. The first save of an untitled document
+is the natural point to decide it: the session already has a UUID, and deriving a new id from the
+file it was saved to would orphan its own snapshot.
 
 ---
 

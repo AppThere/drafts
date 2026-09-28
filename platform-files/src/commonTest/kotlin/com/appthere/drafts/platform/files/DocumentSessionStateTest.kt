@@ -5,7 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * 8.4's five states, and which one wins when more than one is true.
+ * 8.4's six states, and which one wins when more than one is true.
  *
  * All of this is pure: the state model never touches a file, which is what lets it be tested on
  * every target rather than only where there is a filesystem to borrow.
@@ -128,6 +128,26 @@ class DocumentSessionStateTest {
         val reloaded = opened().reloaded(contents("Same.\n", writable = false))
 
         assertEquals(DocumentState.ReadOnly, reloaded.state)
+    }
+
+    @Test
+    fun `a document with no file is untitled however much it has been edited`() {
+        // 7.4. None of the other five can be true of a document with no file, and "dirty" would
+        // suggest there was a file for the edits to be missing from.
+        assertEquals(DocumentState.Untitled, DocumentSessionState.untitled.state)
+        assertEquals(DocumentState.Untitled, DocumentSessionState.untitled.edited().state)
+    }
+
+    @Test
+    fun `saving an untitled document makes it an ordinary clean one`() {
+        // The first save is Save As. From then on the next save is checked against what it wrote.
+        val written = FileFacts(digest = sha256("Saved.\n".encodeToByteArray()), size = 7, modifiedEpochMillis = 3)
+
+        val after = DocumentSessionState.untitled.edited().savedAs(REF, written)
+
+        assertEquals(DocumentState.Clean, after.state)
+        assertEquals(REF, after.ref)
+        assertEquals(written, after.base)
     }
 
     private fun opened(writable: Boolean = true) = DocumentSessionState.opened(REF, contents("Opened.\n", writable))

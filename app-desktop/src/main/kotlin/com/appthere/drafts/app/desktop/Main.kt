@@ -38,6 +38,7 @@ import com.appthere.drafts.app.SampleDocument
 import com.appthere.drafts.app.SettingsStore
 import com.appthere.drafts.app.SnapshotKeeper
 import com.appthere.drafts.app.rememberOpenDocument
+import com.appthere.drafts.app.rememberUntitledDocument
 import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.i18n.Strings
 import com.appthere.drafts.platform.files.Digest
@@ -313,7 +314,6 @@ private fun FileDocument(
     store: PathDocumentStore,
     onReadyToClose: (suspend () -> Unit) -> Unit,
 ) {
-    val ref = remember(record.documentId) { DocumentRef(record.accessToken ?: record.uri) }
     val identity = remember(record.documentId) { record.identity() }
     val recover: suspend (Digest) -> Recovery =
         remember(identity) { { digest -> snapshots.examine(identity.documentId, digest) } }
@@ -324,7 +324,16 @@ private fun FileDocument(
         value = settings.settingsFor(record.kind) ?: ReaderSettings()
     }
 
-    when (val opening = rememberOpenDocument(store, ref, recover)) {
+    // A record with no file is an untitled document (7.4), whose words live only in its snapshot.
+    val file = record.accessToken ?: record.uri
+    val opening =
+        if (file == null) {
+            rememberUntitledDocument(store, snapshots, record.documentId)
+        } else {
+            rememberOpenDocument(store, remember(file) { DocumentRef(file) }, recover)
+        }
+
+    when (opening) {
         is DocumentOpening.Opened -> {
             val keeper = remember(opening.document) { SnapshotKeeper(opening.document, snapshots, identity) }
 

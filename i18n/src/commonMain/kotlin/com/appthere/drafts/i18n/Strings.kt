@@ -71,6 +71,7 @@ object Strings {
      * document that matches its file.
      */
     const val DOCUMENT_STATE = "Document"
+    const val STATE_UNTITLED = "Not saved yet"
     const val STATE_CLEAN = "Saved"
     const val STATE_DIRTY = "Unsaved"
     const val STATE_CONFLICTED = "Changed on disk"

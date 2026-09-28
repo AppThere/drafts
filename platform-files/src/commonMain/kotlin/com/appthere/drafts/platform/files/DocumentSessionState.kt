@@ -1,10 +1,10 @@
 package com.appthere.drafts.platform.files
 
 /**
- * The five states of `appthere-drafts.md` 8.4.
+ * The six states of `appthere-drafts.md` 8.4.
  *
- * "A document session is in exactly one of: `clean`, `dirty`, `conflicted`, `orphaned` (file
- * deleted or permission lost), or `readOnly`."
+ * "A document session is in exactly one of: `untitled` (no file yet, 7.4), `clean`, `dirty`,
+ * `conflicted`, `orphaned` (file deleted or permission lost), or `readOnly`."
  *
  * Exactly one, which is the part worth taking seriously: the underlying facts are independent --
  * a document can have unsaved edits *and* be read-only *and* have changed on disk -- so something
@@ -12,6 +12,13 @@ package com.appthere.drafts.platform.files
  * [DocumentSessionState.state], rather than being re-derived at each place that displays it.
  */
 enum class DocumentState {
+    /**
+     * Has no file yet (7.4). Its words exist only in the editor and the snapshot, which 8.4 says
+     * the reader should be able to see: "a reader whose words exist only in a snapshot should be
+     * able to see that they are not in a file anywhere yet".
+     */
+    Untitled,
+
     /** Matches the file on disk. Nothing to save. */
     Clean,
 
@@ -44,8 +51,10 @@ enum class DocumentState {
  * and no prompt. It is a state; the dialog belongs to the write that was refused.
  */
 data class DocumentSessionState(
-    val ref: DocumentRef,
-    val base: FileFacts,
+    /** The file, or null for an untitled document (7.4), which has none yet. */
+    val ref: DocumentRef?,
+    /** What the file was at open or at the last save; null exactly when [ref] is. */
+    val base: FileFacts?,
     val hasUnsavedEdits: Boolean = false,
     val writable: Boolean = true,
     val changedOnDiskTo: Digest? = null,
@@ -54,10 +63,18 @@ data class DocumentSessionState(
     val state: DocumentState
         get() =
             when {
+                // First, and unconditionally: none of the other five can be true of a document
+                // that has no file -- nothing to delete, change, or refuse a write to.
+                ref == null -> DocumentState.Untitled
+
                 unreachable -> DocumentState.Orphaned
+
                 changedOnDiskTo != null -> DocumentState.Conflicted
+
                 !writable -> DocumentState.ReadOnly
+
                 hasUnsavedEdits -> DocumentState.Dirty
+
                 else -> DocumentState.Clean
             }
 
@@ -117,7 +134,21 @@ data class DocumentSessionState(
             unreachable = false,
         )
 
+    /**
+     * The first save of an untitled document (7.4's *Save As*) has put its words in [ref].
+     *
+     * From here the session is an ordinary file-backed one: it has a `baseDigest` to check the next
+     * save against (8.2), and every state but `untitled` becomes possible.
+     */
+    fun savedAs(
+        ref: DocumentRef,
+        facts: FileFacts,
+    ): DocumentSessionState = DocumentSessionState(ref = ref, base = facts, writable = true)
+
     companion object {
+        /** 7.4: a document with no file yet. */
+        val untitled: DocumentSessionState = DocumentSessionState(ref = null, base = null)
+
         /** 8.2's "At open, record `baseDigest` (SHA-256 of file contents), size, and mtime." */
         fun opened(
             ref: DocumentRef,

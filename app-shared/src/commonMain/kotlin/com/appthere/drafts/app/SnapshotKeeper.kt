@@ -80,11 +80,26 @@ class SnapshotKeeper(
         trigger: SnapshotTrigger,
         scrollOffset: Int = this.scrollOffset,
     ): Boolean =
-        if (schedule.hasUnsavedEdits) {
-            capture(trigger, scrollOffset)
-        } else {
-            snapshots.rememberPosition(identity.documentId, caretRecord(), scrollOffset)
+        when {
+            closingEmptyAndUntitled(trigger) -> discardUntitled()
+            schedule.hasUnsavedEdits -> capture(trigger, scrollOffset)
+            else -> snapshots.rememberPosition(identity.documentId, caretRecord(), scrollOffset)
         }
+
+    /**
+     * 7.4: "An untitled document that is still empty when closed is discarded -- there is nothing in
+     * it to lose." Its session goes too, or the next launch would restore a blank window nobody
+     * asked for. Only on closing: an empty document that has merely lost focus is still being
+     * written.
+     */
+    private fun closingEmptyAndUntitled(trigger: SnapshotTrigger): Boolean =
+        trigger == SnapshotTrigger.Closing && document.isUntitled && document.editor.text.isBlank()
+
+    private suspend fun discardUntitled(): Boolean {
+        schedule.snapshotted()
+        snapshots.discard(identity.documentId)
+        return true
+    }
 
     /**
      * 8.3's retention clock, started by a successful save.
@@ -136,8 +151,9 @@ class SnapshotKeeper(
             caret = caretRecord(),
             scrollOffset = scrollOffset,
             baseDigest =
-                document.lifecycle.base.digest
-                    .toString(),
+                document.lifecycle.base
+                    ?.digest
+                    ?.toString(),
             accessToken = identity.accessToken,
             snapshotPath = snapshots.snapshotOf(identity.documentId).token,
         )

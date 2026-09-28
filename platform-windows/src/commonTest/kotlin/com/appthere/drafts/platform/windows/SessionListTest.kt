@@ -40,6 +40,22 @@ class SessionListTest {
         }
 
     @Test
+    fun `an untitled document is restorable too`() =
+        runTest {
+            // 7.4: an untitled document "has a session record whose uri is null, and is restored on
+            // the next launch". Leaving it out would make closing the application lose its words.
+            val sessions = sessions()
+            val untitled = SessionIdentity.untitled(kind = "fountain", displayName = "Untitled")
+
+            sessions.opened(untitled)
+
+            val restored = sessions.restorable().single()
+            assertEquals(untitled.documentId, restored.documentId)
+            assertNull(restored.uri)
+            assertEquals("fountain", restored.kind)
+        }
+
+    @Test
     fun `a closed document is not restorable`() =
         runTest {
             val sessions = sessions()

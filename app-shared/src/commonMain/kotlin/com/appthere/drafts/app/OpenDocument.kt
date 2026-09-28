@@ -17,6 +17,8 @@ import com.appthere.drafts.platform.files.DocumentRef
 import com.appthere.drafts.platform.files.DocumentSessionState
 import com.appthere.drafts.platform.files.DocumentStore
 import com.appthere.drafts.platform.files.Recovery
+import com.appthere.drafts.platform.files.SessionRecord
+import com.appthere.drafts.platform.files.SnapshotStore
 import com.appthere.drafts.platform.files.WriteOutcome
 
 /**
@@ -73,20 +75,48 @@ class OpenDocument(
     val lifecycle: DocumentSessionState
         get() = recorded.copy(hasUnsavedEdits = restoredButUnsaved || editor.revision != savedRevision)
 
+    /** True for a document with no file yet (7.4), whose first save has to be [saveAs]. */
+    val isUntitled: Boolean get() = recorded.ref == null
+
     /**
      * 8.2's explicit save: re-read, compare, and write only if the file is untouched.
      *
      * [savedRevision] moves only when the bytes are actually down. A save that was refused, or that
      * failed on a full disk, leaves the document dirty -- which is true, and is what keeps 8.1's
      * snapshot the thing standing between the reader and losing work.
+     *
+     * Null for an untitled document. It has no file to write to, so there was no save to have an
+     * outcome; the caller's answer is [saveAs].
      */
-    suspend fun save(): WriteOutcome {
-        val outcome = store.writeIfUnchanged(recorded.ref, editor.text, recorded.base.digest)
+    suspend fun save(): WriteOutcome? {
+        val ref = recorded.ref
+        val base = recorded.base
+        if (ref == null || base == null) return null
+
+        val outcome = store.writeIfUnchanged(ref, editor.text, base.digest)
         if (outcome is WriteOutcome.Written) {
             savedRevision = editor.revision
             restoredButUnsaved = false
         }
         recorded = recorded.wrote(outcome)
+        return outcome
+    }
+
+    /**
+     * 7.4's *Save As*: puts the words in [ref], and from then on this is an ordinary file-backed
+     * document.
+     *
+     * No digest check, because there is nothing to have changed underneath: [ref] was chosen a
+     * moment ago through the platform's own picker, which asks before replacing a file that is
+     * already there. The write is still atomic -- no write to a reader's file is anything else.
+     */
+    suspend fun saveAs(ref: DocumentRef): WriteOutcome {
+        val outcome = store.writeAtomically(ref, editor.text)
+        if (outcome is WriteOutcome.Written) {
+            savedRevision = editor.revision
+            restoredButUnsaved = false
+            recorded = recorded.savedAs(ref, outcome.facts)
+        }
         return outcome
     }
 
@@ -102,7 +132,9 @@ class OpenDocument(
      * reader asked to see what is on disk; being told there is nothing there is an answer.
      */
     suspend fun reload() {
-        val contents = runCatching { store.read(recorded.ref) }.getOrNull()
+        // An untitled document has no file to go back to; its words are already the only copy.
+        val ref = recorded.ref ?: return
+        val contents = runCatching { store.read(ref) }.getOrNull()
 
         if (contents == null) {
             recorded = recorded.wrote(WriteOutcome.Unavailable(WriteOutcome.Reason.Missing, "could not be re-read"))
@@ -128,6 +160,30 @@ data class Reopening(
     val fromSnapshot: Boolean = false,
     val scrollOffset: Int? = null,
 )
+
+/**
+ * An untitled document (7.4): a new one, or one restored from its snapshot.
+ *
+ * [text] is the snapshot's, or empty for a new document; [record] is 7.3's, when there is one, and
+ * puts the caret and scroll back where the reader left them. There is no restore banner: the badge
+ * already says the words are not in a file, and the banner's *Discard* -- back to the file -- has
+ * no file to go back to.
+ */
+fun openUntitled(
+    store: DocumentStore,
+    text: String = "",
+    record: SessionRecord? = null,
+): OpenDocument {
+    val editor = EditorState(DocumentSession(text))
+    record?.caret?.let { editor.placeAt(it) }
+
+    return OpenDocument(
+        store = store,
+        editor = editor,
+        opened = DocumentSessionState.untitled,
+        reopening = Reopening(scrollOffset = record?.scrollOffset),
+    )
+}
 
 /** Whether the document has arrived yet. Opening is I/O, so there is a moment before it has. */
 sealed interface DocumentOpening {
@@ -168,6 +224,26 @@ fun rememberOpenDocument(
                 .getOrElse { failure ->
                     DocumentOpening.Failed(failure.message ?: failure::class.simpleName.orEmpty())
                 }
+    }
+    return opening
+}
+
+/**
+ * Opens a restored untitled session (7.4) from its snapshot, off the composition thread.
+ *
+ * The snapshot is the only copy of an untitled document's words, so it is read rather than
+ * compared with anything. A session with no snapshot yet -- one opened and closed before 8.1 had a
+ * reason to write -- opens empty, which is what it was.
+ */
+@Composable
+fun rememberUntitledDocument(
+    store: DocumentStore,
+    snapshots: SnapshotStore,
+    documentId: String,
+): DocumentOpening {
+    val opening by produceState<DocumentOpening>(DocumentOpening.Opening, store, snapshots, documentId) {
+        val text = snapshots.textOf(documentId).orEmpty()
+        value = DocumentOpening.Opened(openUntitled(store, text, snapshots.recordOf(documentId)))
     }
     return opening
 }
