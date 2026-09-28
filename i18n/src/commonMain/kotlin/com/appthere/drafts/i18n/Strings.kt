@@ -28,6 +28,20 @@ object Strings {
     const val MOTION_REDUCED = "Reduced"
 
     /**
+     * 12's two reading options, named for what they do rather than for what they are called.
+     *
+     * "Typewriter scrolling" is the term of art and means nothing to someone meeting it for the
+     * first time, so the choice is spelled out: the page moves, or it stays.
+     */
+    const val TYPEWRITER = "While typing"
+    const val TYPEWRITER_ON = "Keep the line centred"
+    const val TYPEWRITER_OFF = "Leave the page still"
+
+    const val FOCUS = "Focus"
+    const val FOCUS_OFF = "Whole document"
+    const val FOCUS_BLOCK = "Current paragraph"
+
+    /**
      * The stepper buttons: a glyph to look at, and a word for anything that reads the screen
      * aloud. "Text size, increase" says what will happen; "Text size, +" says a punctuation mark.
      */

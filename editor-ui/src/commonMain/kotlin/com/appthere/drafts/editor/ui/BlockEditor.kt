@@ -25,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -51,6 +52,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.appthere.drafts.core.model.Block
+import com.appthere.drafts.design.FocusMode
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.LocalReaderSettings
 import com.appthere.drafts.design.Measure
@@ -93,7 +95,27 @@ fun BlockEditor(
         val column = Measure.of(maxWidth, with(density) { settings.base.toDp() }, settings.characters)
 
         val muted = LocalPalette.current.muted
+        val focusMode = LocalReaderSettings.current.focusMode
+        val typewriter = LocalReaderSettings.current.typewriterScrolling
         val focused = state.caret?.block
+
+        // 12: "**Typewriter scrolling** as an option: keep the caret at a fixed vertical position."
+        //
+        // Keyed on the block rather than the offset, so it settles when the caret crosses into
+        // another block rather than fighting the reader for the scroll position on every keystroke
+        // within one. The consequence is that it is the *block* that is held at the line, not the
+        // caret inside it -- exact caret placement needs the text layout of the focused field,
+        // which lives a composable below this one. A paragraph is short enough that the difference
+        // is small; a forty-line one, it is not, and this is the honest first cut.
+        LaunchedEffect(focused, typewriter, scroll) {
+            if (!typewriter || focused == null) return@LaunchedEffect
+
+            val index = state.blocks.indexOfFirst { it.id == focused }
+            val viewport = scroll.layoutInfo.viewportSize.height
+            if (index >= 0 && viewport > 0) {
+                scroll.scrollToItem(index, -(viewport * TYPEWRITER_LINE).toInt())
+            }
+        }
 
         LazyColumn(
             state = scroll,
@@ -135,7 +157,7 @@ fun BlockEditor(
                     content = content,
                     spaceBefore = collapsedSpace(above, content.role),
                     spaceAfter = if (index == state.blocks.lastIndex) proseStyleOf(content.role).spaceAfter else 0.dp,
-                    isFocused = editorBlock.id == focused,
+                    emphasis = emphasisOf(editorBlock.id, focused, focusMode),
                     columnWidth = column.contentWidth,
                 )
             }
@@ -247,7 +269,7 @@ private fun BlockRow(
     content: RowContent,
     spaceBefore: Dp,
     spaceAfter: Dp,
-    isFocused: Boolean,
+    emphasis: RowEmphasis,
     columnWidth: Dp,
     modifier: Modifier = Modifier,
 ) {
@@ -256,6 +278,10 @@ private fun BlockRow(
 
     Column(
         modifier
+            // 12's focus mode. Dimmed rather than hidden: a reader needs to see that there is more
+            // document above and below -- how far through a chapter they are is information -- and
+            // removing it would be a different feature.
+            .alpha(emphasis.alpha)
             // Order matters, and got this wrong for two phases. `fillMaxWidth` fixes the width at
             // the incoming maximum -- minimum as well as maximum -- so a `widthIn` after it has
             // nothing left to constrain, and the measure silently never applied. Capping first and
@@ -282,7 +308,7 @@ private fun BlockRow(
             )
 
         Box(Modifier.fillMaxWidth().heightIn(min = reserved)) {
-            if (isFocused) {
+            if (emphasis == RowEmphasis.Focused) {
                 RevealField(
                     state = state,
                     id = id,
@@ -537,3 +563,57 @@ private val documentPadding = 24.dp
 
 /** Enough to read the highlight through, not so much that the text under it dims. */
 private const val HIGHLIGHT_ALPHA = 0.25f
+
+/**
+ * How prominent one row is, per `appthere-drafts.md` 12's focus mode.
+ *
+ * One value rather than a pair of booleans, because the three states are exclusive and a row that
+ * was somehow both focused and dimmed would be a contradiction the type can simply not express.
+ */
+internal enum class RowEmphasis(
+    val alpha: Float,
+) {
+    /** Holds the caret. Drawn as an editable field rather than a preview. */
+    Focused(1f),
+
+    /** An ordinary row, at full contrast. What every row is when focus mode is off. */
+    Normal(1f),
+
+    /** Focus mode is on and the caret is elsewhere. */
+    Dimmed(DIMMED_ALPHA),
+}
+
+/**
+ * Nothing is dimmed until there is something to focus on.
+ *
+ * With no caret there is no current block, so dimming every row would leave a document that is
+ * uniformly faint for no reason the reader could act on -- which is what would happen on every
+ * launch, before anyone has clicked anything.
+ */
+private fun emphasisOf(
+    id: BlockId,
+    focused: BlockId?,
+    focusMode: FocusMode,
+): RowEmphasis =
+    when {
+        id == focused -> RowEmphasis.Focused
+        focusMode == FocusMode.Off || focused == null -> RowEmphasis.Normal
+        else -> RowEmphasis.Dimmed
+    }
+
+/**
+ * Faint enough to recede, legible enough to still be read.
+ *
+ * 10.1 holds text to a contrast ratio, and this multiplies it -- so the floor is set by what the
+ * palette had spare rather than by what looks calm on one theme.
+ */
+private const val DIMMED_ALPHA = 0.35f
+
+/**
+ * Where down the window the typewriter line sits, as a fraction of the viewport.
+ *
+ * Above the middle rather than on it. What a writer needs to see is the sentence they have just
+ * finished and the shape of the paragraph it belongs to, which is above the caret; below it there
+ * is nothing yet.
+ */
+private const val TYPEWRITER_LINE = 0.4f

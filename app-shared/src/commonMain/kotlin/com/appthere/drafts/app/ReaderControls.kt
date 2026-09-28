@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.appthere.drafts.design.FocusMode
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.Measure
 import com.appthere.drafts.design.Palette
@@ -120,6 +121,10 @@ fun ReaderControls(
             onMore = { onChange(settings.copy(bodyWeight = settings.bodyWeight + WEIGHT_STEP).clamped()) },
         )
 
+        TypewriterChoice(settings, onChange)
+
+        FocusChoice(settings, onChange)
+
         MotionChoice(settings, onChange)
 
         // 5.1 requires the licence to be reachable. Here rather than in a menu the app does not
@@ -150,6 +155,44 @@ private fun ThemeChoice(
         options = Palettes.all.map { it.name },
         selected = settings.palette.name,
         onSelect = { name -> onChange(settings.copy(palette = paletteNamed(name))) },
+    )
+}
+
+/**
+ * 12: "**Typewriter scrolling** as an option: keep the caret at a fixed vertical position."
+ *
+ * Both options are offered here rather than hidden behind a preferences window, because 12 calls
+ * them options and 5.5 already put the reading controls one shortcut away. A reader who finds the
+ * page moving under them should be able to stop it without going looking.
+ */
+@Composable
+private fun TypewriterChoice(
+    settings: ReaderSettings,
+    onChange: (ReaderSettings) -> Unit,
+) {
+    Choice(
+        label = Strings.TYPEWRITER,
+        options = listOf(Strings.TYPEWRITER_OFF, Strings.TYPEWRITER_ON),
+        selected = if (settings.typewriterScrolling) Strings.TYPEWRITER_ON else Strings.TYPEWRITER_OFF,
+        onSelect = { choice ->
+            onChange(settings.copy(typewriterScrolling = choice == Strings.TYPEWRITER_ON))
+        },
+    )
+}
+
+/** 12: "**Focus mode** as an option: dim all blocks except the current one". */
+@Composable
+private fun FocusChoice(
+    settings: ReaderSettings,
+    onChange: (ReaderSettings) -> Unit,
+) {
+    Choice(
+        label = Strings.FOCUS,
+        options = listOf(Strings.FOCUS_OFF, Strings.FOCUS_BLOCK),
+        selected = if (settings.focusMode == FocusMode.Off) Strings.FOCUS_OFF else Strings.FOCUS_BLOCK,
+        onSelect = { choice ->
+            onChange(settings.copy(focusMode = if (choice == Strings.FOCUS_BLOCK) FocusMode.Block else FocusMode.Off))
+        },
     )
 }
 
