@@ -27,6 +27,9 @@ class FakeDocumentStore(
     seed: String,
     private val writable: Boolean = true,
 ) : DocumentStore {
+    /** In memory, so a write either happened or did not. */
+    override val writesAtomically: Boolean = true
+
     private val files: MutableMap<String, String> = mutableMapOf(seedRef.token to seed)
     private var modified: Long = 1
 

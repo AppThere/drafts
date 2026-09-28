@@ -14,15 +14,22 @@ import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
 
 /**
- * The desktop [DocumentStore]: a [DocumentRef] is an absolute path.
+ * A [DocumentStore] over a filesystem path: a [DocumentRef]'s token is an absolute path.
  *
- * Desktop is the one platform where that is true. Android hands out `content://` URIs and iOS
- * security-scoped bookmarks, which is why [DocumentRef] is opaque -- this class is allowed to know
- * the token is a path, and nothing above it is.
+ * Shared by desktop and Android, for different reasons. On desktop it is how the reader's own
+ * documents are reached. On Android it is not -- the reader's documents arrive as `content://`
+ * URIs through the Storage Access Framework -- but it is exactly right for app-private storage,
+ * where 8.1's snapshots live and where the application owns the filesystem outright.
+ *
+ * That split is why [DocumentRef] is opaque: this class is allowed to know its token is a path,
+ * and nothing above it is.
  */
 class PathDocumentStore(
     private val io: CoroutineDispatcher = Dispatchers.IO,
 ) : DocumentStore {
+    /** A real filesystem, so the temp-fsync-rename of 8.1 is available in full. */
+    override val writesAtomically: Boolean = true
+
     override suspend fun read(ref: DocumentRef): DocumentContents =
         withContext(io) {
             val path = ref.path()

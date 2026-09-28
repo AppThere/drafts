@@ -94,6 +94,20 @@ sealed interface WriteOutcome {
  * platform is known, and `commonMain` is forbidden from naming it at all.
  */
 interface DocumentStore {
+    /**
+     * Whether this store can honour 8.1's "write, flush and fsync, `rename`".
+     *
+     * Not every platform can. Android's Storage Access Framework hands out `content://` URIs with
+     * no rename-over-an-existing-document operation at all, so a write through it truncates and
+     * refills the file in place. There is no way to fix that from here -- it is the shape of the
+     * API -- so the honest thing is to say so and let [SnapshotStore] refuse to be built on one.
+     *
+     * 8.1's snapshots *must* have it: "a crash mid-write leaves the previous snapshot intact" is
+     * the sentence that makes autosave safe to run every three seconds. 8.2's digest check does
+     * not need it, which is why a document can still be saved on a platform where this is false.
+     */
+    val writesAtomically: Boolean
+
     /** Reads a document and records the facts 8.2 needs to detect a later change. */
     suspend fun read(ref: DocumentRef): DocumentContents
 

@@ -22,6 +22,20 @@ class SnapshotStore(
     private val store: DocumentStore,
     private val root: String,
 ) {
+    init {
+        // 8.1 is specific: "write `snapshot.md.tmp`, flush and fsync, `rename` over `snapshot.md`.
+        // Rename is atomic on every target filesystem; a crash mid-write leaves the previous
+        // snapshot intact." A store that cannot do that would turn autosave from the thing that
+        // protects the reader's work into a way of destroying it every three seconds.
+        //
+        // A check rather than a comment because the mistake is easy and silent: on Android the
+        // reader's documents arrive through a store that cannot rename, and snapshots have to go
+        // to app-private storage through one that can.
+        require(store.writesAtomically) {
+            "Snapshots need a store that writes atomically; ${store::class.simpleName} does not"
+        }
+    }
+
     /**
      * Writes the text and the session record for one document.
      *

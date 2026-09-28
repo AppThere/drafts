@@ -88,7 +88,25 @@ configure<KotlinMultiplatformExtension> {
         freeCompilerArgs.add("-Xexpect-actual-classes")
     }
 
+    // A source set for the two targets that are both the JVM.
+    //
+    // Android and desktop share a standard library, a filesystem API and a `MessageDigest`; what
+    // they do not share is a UI toolkit or an application lifecycle. Without somewhere to put the
+    // overlap, code that is genuinely identical gets written twice -- `:platform-files` had two
+    // copies of the same SHA-256 actual for exactly this reason -- and the second copy is the one
+    // that drifts.
+    //
+    // Named `jvmAndroid` rather than `jvmCommon` so it cannot be mistaken for `commonMain`.
+    applyDefaultHierarchyTemplate()
+
     sourceSets {
+        val jvmAndroidMain = create("jvmAndroidMain") { dependsOn(commonMain.get()) }
+        val jvmAndroidTest = create("jvmAndroidTest") { dependsOn(commonTest.get()) }
+
+        jvmMain.get().dependsOn(jvmAndroidMain)
+        androidMain.get().dependsOn(jvmAndroidMain)
+        jvmTest.get().dependsOn(jvmAndroidTest)
+
         commonTest.dependencies {
             implementation(versions.findLibrary("kotlin-test").get())
         }
