@@ -4,8 +4,8 @@ plugins {
 
 kotlin {
     sourceSets {
-        commonMain.dependencies {
-            api(project(":core-model"))
+        commonTest.dependencies {
+            implementation(libs.kotlinx.coroutines.test)
         }
     }
 }

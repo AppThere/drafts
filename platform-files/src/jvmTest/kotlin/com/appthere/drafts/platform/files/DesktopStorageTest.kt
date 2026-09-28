@@ -69,7 +69,7 @@ class DesktopStorageTest {
     fun `a relative path is recorded as an absolute one`() {
         // A session recorded from one working directory has to resolve from another on the next
         // launch, and nothing guarantees the application starts where it started last time.
-        val identity = desktopIdentity("chapter.md")
+        val identity = desktopIdentity("chapter.md", "markdown")
 
         assertTrue(identity.accessToken.orEmpty().startsWith("/"), "Token was ${identity.accessToken}")
     }
@@ -77,8 +77,8 @@ class DesktopStorageTest {
     @Test
     fun `two different documents get different ids`() {
         assertNotEquals(
-            desktopIdentity("/documents/one.md").documentId,
-            desktopIdentity("/documents/two.md").documentId,
+            desktopIdentity("/documents/one.md", "markdown").documentId,
+            desktopIdentity("/documents/two.md", "markdown").documentId,
         )
     }
 
@@ -87,14 +87,16 @@ class DesktopStorageTest {
         // The id is how a snapshot is found again after a restart. If it varied, every session
         // would create a new directory and 8.3 would never find the work it saved.
         assertEquals(
-            desktopIdentity("/documents/one.md").documentId,
-            desktopIdentity("/documents/./one.md").documentId,
+            desktopIdentity("/documents/one.md", "markdown").documentId,
+            desktopIdentity("/documents/./one.md", "markdown").documentId,
         )
     }
 
     @Test
-    fun `a fountain document is recorded as fountain`() {
-        assertEquals("fountain", desktopIdentity("/documents/big-fish.fountain").kind)
-        assertEquals("markdown", desktopIdentity("/documents/chapter.md").kind)
+    fun `the kind it is told is the kind it records`() {
+        // Recognising the kind is 9.1's table in `:platform-intents`; this module only records
+        // what it is handed. It used to guess, and guessed `.spmd` wrong.
+        assertEquals("fountain", desktopIdentity("/documents/big-fish.fountain", "fountain").kind)
+        assertEquals("markdown", desktopIdentity("/documents/chapter.md", "markdown").kind)
     }
 }

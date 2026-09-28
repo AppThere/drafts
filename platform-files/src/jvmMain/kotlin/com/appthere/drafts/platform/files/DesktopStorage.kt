@@ -51,19 +51,27 @@ fun desktopSessionRoot(): String = Path.of(desktopDataRoot(), SESSIONS).toString
  * `engineering-conventions.md` 4.2 puts every `java.nio.file` import in this module. The Konsist
  * rule caught the first attempt at putting this in the entry point, which is the rule doing its job.
  *
+ * The kind is passed in rather than guessed from the extension. 9.1 gives four extensions for
+ * Markdown and two for Fountain, and the table that knows them belongs to `:platform-intents`,
+ * which is the module about what the operating system hands over. A guess here was wrong for
+ * `.spmd` -- a screenplay that opened as prose with every scene heading flattened.
+ *
  * `documentId` is the digest of the path rather than 7.3's UUID: a UUID needs an index mapping it
  * back to a file, there is no index yet, and a content-addressed id finds its own snapshot with
  * nothing to consult. Renaming the file outside the application orphans its snapshot -- the cost of
  * not having the index, and what the index will fix.
  */
-fun desktopIdentity(path: String): SessionIdentity {
+fun desktopIdentity(
+    path: String,
+    kind: String,
+): SessionIdentity {
     val file = Path.of(path).toAbsolutePath().normalize()
 
     return SessionIdentity(
         documentId = sha256(file.toString().encodeToByteArray()).hex,
         uri = file.toUri().toString(),
         displayName = file.fileName.toString(),
-        kind = if (file.toString().endsWith(FOUNTAIN)) "fountain" else "markdown",
+        kind = kind,
         // 7.3: "**Desktop:** absolute path, with existence re-checked on restore." Absolute and
         // normalised, so a session recorded from a relative path still resolves from a different
         // working directory on the next launch.
@@ -82,7 +90,6 @@ fun desktopIdentity(path: String): SessionIdentity {
 fun resolveDesktopToken(token: String): DocumentRef? =
     Path.of(token).takeIf { Files.isReadable(it) }?.let { DocumentRef(it.toString()) }
 
-private const val FOUNTAIN = ".fountain"
 private const val VENDOR = "AppThere"
 private const val APPLICATION = "Drafts"
 private const val SESSIONS = "sessions"

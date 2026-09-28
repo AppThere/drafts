@@ -41,10 +41,14 @@ import com.appthere.drafts.platform.files.WindowRecord
 import com.appthere.drafts.platform.files.desktopIdentity
 import com.appthere.drafts.platform.files.desktopSessionRoot
 import com.appthere.drafts.platform.files.epochMillis
+import com.appthere.drafts.platform.intents.DocumentKind
+import com.appthere.drafts.platform.intents.SingleInstance
 import com.appthere.drafts.platform.windows.SessionList
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
+import java.awt.Desktop
 
 /**
  * The desktop entry point.
@@ -59,62 +63,140 @@ import kotlinx.coroutines.flow.distinctUntilChanged
  *
  * File > Open is still absent. It needs a platform file dialog, which is `:platform-intents`.
  */
-fun main(args: Array<String>) =
-    application {
-        val store = remember { PathDocumentStore() }
-        val snapshots = remember { SnapshotStore(store, desktopSessionRoot()) }
-        val sessions = remember { SessionList(snapshots) }
+fun main(args: Array<String>) {
+    val instance = SingleInstance()
+    val opened = Channel<String>(Channel.UNLIMITED)
 
-        // 7.2's "List<DocumentSession> in the application state".
-        val open = remember { mutableStateListOf<SessionRecord>() }
-        var restored by remember { mutableStateOf(false) }
+    if (!becameTheRunningInstance(instance, args, opened)) return
 
-        LaunchedEffect(Unit) {
-            // 8.3's pruning, before anything is restored: a session whose work reached a file more
-            // than thirty days ago has no snapshot worth reopening.
-            snapshots.prune(epochMillis())
+    application { DraftsApplication(args, opened) }
+    instance.release()
+}
 
-            open += sessions.restorable()
-            args.firstOrNull()?.let { path ->
-                val record = sessions.opened(desktopIdentity(path))
-                if (open.none { it.documentId == record.documentId }) open += record
-            }
-            restored = true
-        }
+/**
+ * Decides whether this launch is the application or a message to it.
+ *
+ * 9.4: "Route to an existing instance ... rather than launching a second process", and "an
+ * already-running instance should open the document in a **new window**, not replace the current
+ * one."
+ *
+ * Claims first and hands off only if the claim fails, so the decision is the one the operating
+ * system arbitrated rather than a guess about who started when. A launch that cannot claim and has
+ * nothing to hand over has nothing to do: the running instance is already showing everything.
+ */
+private fun becameTheRunningInstance(
+    instance: SingleInstance,
+    args: Array<String>,
+    opened: Channel<String>,
+): Boolean {
+    if (!instance.claim { path -> opened.trySend(path) }) {
+        args.firstOrNull()?.let { instance.handOff(it) }
+        return false
+    }
+    installOpenFileHandler(opened)
+    return true
+}
 
-        open.forEach { record ->
-            // Keyed on the document, so dragging one window does not recompose another's.
-            key(record.documentId) {
-                DocumentWindow(
-                    record = record,
-                    sessions = sessions,
-                    snapshots = snapshots,
-                    store = store,
-                    onClose = { open.removeAll { it.documentId == record.documentId } },
-                )
-            }
-        }
-
-        // An invisible window while the session list is being read.
-        //
-        // `application { }` exits the moment its composition holds no windows, and reading the
-        // sessions is I/O that finishes a frame or two later -- so without something here the
-        // application starts, finds nothing to show, and quits before the restore arrives. Found
-        // by running it: the process exited in under a second with the session file already
-        // written. Invisible rather than a "loading" window, because a real one would flash up and
-        // be replaced by windows in different places.
-        if (!restored) {
-            Window(onCloseRequest = ::exitApplication, visible = false, title = Strings.WINDOW_TITLE) {}
-        }
-
-        // Nothing to restore and nothing asked for: the sample, in a window of its own that no
-        // session knows about. There is no document to record, because there is no file.
-        if (restored && open.isEmpty()) {
-            Window(onCloseRequest = ::exitApplication, title = Strings.WINDOW_TITLE) {
-                DraftsApp(initialText = SampleDocument.TEXT)
-            }
+/**
+ * 9.4 on macOS: "handle the open-document Apple Event via `java.awt.Desktop.setOpenFileHandler`".
+ *
+ * That is how a double-click reaches a running instance there; the path does not arrive as an
+ * argument the way it does on Windows and Linux. Unsupported everywhere else, which is not an
+ * error -- and `Desktop` throws rather than reporting on some headless setups, so the whole thing
+ * is guarded.
+ */
+private fun installOpenFileHandler(opened: Channel<String>) {
+    runCatching {
+        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.APP_OPEN_FILE)) {
+            Desktop.getDesktop().setOpenFileHandler { event -> event.files.forEach { opened.trySend(it.path) } }
         }
     }
+}
+
+/**
+ * The application: 7.2's session list, one `Window` per entry.
+ *
+ * "Compose Desktop's `application { }` scope hosts multiple `Window` composables. Maintain a
+ * `List<DocumentSession>` in the application state and emit one `Window` per entry, each with its
+ * own `WindowState` (position, size, placement) persisted."
+ */
+@Composable
+private fun ApplicationScope.DraftsApplication(
+    args: Array<String>,
+    opened: Channel<String>,
+) {
+    val store = remember { PathDocumentStore() }
+    val snapshots = remember { SnapshotStore(store, desktopSessionRoot()) }
+    val sessions = remember { SessionList(snapshots) }
+
+    val open = remember { mutableStateListOf<SessionRecord>() }
+    var restored by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        // 8.3's pruning, before anything is restored: a session whose work reached a file more
+        // than thirty days ago has no snapshot worth reopening.
+        snapshots.prune(epochMillis())
+
+        open += sessions.restorable()
+        args.firstOrNull()?.let { open.show(it, sessions) }
+        restored = true
+
+        // Documents handed over by later launches, and by macOS. A new window each, per 9.4.
+        for (path in opened) open.show(path, sessions)
+    }
+
+    open.forEach { record ->
+        // Keyed on the document, so dragging one window does not recompose another's.
+        key(record.documentId) {
+            DocumentWindow(
+                record = record,
+                sessions = sessions,
+                snapshots = snapshots,
+                store = store,
+                onClose = { open.removeAll { it.documentId == record.documentId } },
+            )
+        }
+    }
+
+    // An invisible window while the session list is being read.
+    //
+    // `application { }` exits the moment its composition holds no windows, and reading the
+    // sessions is I/O that finishes a frame or two later -- so without something here the
+    // application starts, finds nothing to show, and quits before the restore arrives. Found by
+    // running it: the process exited in under a second with the session file already written.
+    // Invisible rather than a "loading" window, because a real one would flash up and be replaced
+    // by windows in different places.
+    //
+    // It also keeps a first instance launched with no document alive, so it is there to receive
+    // one.
+    if (!restored) {
+        Window(onCloseRequest = ::exitApplication, visible = false, title = Strings.WINDOW_TITLE) {}
+    }
+
+    // Nothing to restore and nothing asked for: the sample, in a window of its own that no session
+    // knows about. There is no document to record, because there is no file.
+    if (restored && open.isEmpty()) {
+        Window(onCloseRequest = ::exitApplication, title = Strings.WINDOW_TITLE) {
+            DraftsApp(initialText = SampleDocument.TEXT)
+        }
+    }
+}
+
+/**
+ * Adds a document to the session list and to the windows on screen, unless it is already there.
+ *
+ * Already-open is the ordinary case when a reader double-clicks a file they have open: 9.4 asks
+ * for a new window per document, not per double-click.
+ */
+private suspend fun MutableList<SessionRecord>.show(
+    path: String,
+    sessions: SessionList,
+) {
+    val kind = DocumentKind.of(path) ?: DocumentKind.Markdown
+    val record = sessions.opened(desktopIdentity(path, kind.id))
+
+    if (none { it.documentId == record.documentId }) this += record
+}
 
 /**
  * One document, in one window, remembering where it was put.
