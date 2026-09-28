@@ -15,6 +15,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ApplicationScope
@@ -230,6 +237,24 @@ private fun ApplicationScope.DocumentWindow(
         onCloseRequest = { closed = true },
         state = state,
         title = record.displayName,
+        // 12: "**Full-screen** is a first-class mode on every platform that has one."
+        //
+        // Handled at the window rather than inside the document, because the placement belongs to
+        // the window and nothing below it can reach one. F11 is the convention on Linux and
+        // Windows; macOS uses Ctrl+Cmd+F, which arrives here as the same event with meta held.
+        onPreviewKeyEvent = { event ->
+            if (togglesFullScreen(event)) {
+                state.placement =
+                    if (state.placement == WindowPlacement.Fullscreen) {
+                        WindowPlacement.Floating
+                    } else {
+                        WindowPlacement.Fullscreen
+                    }
+                true
+            } else {
+                false
+            }
+        },
     ) {
         FileDocument(
             record = record,
@@ -318,6 +343,16 @@ private fun SessionRecord.identity() =
         kind = kind,
         accessToken = accessToken,
     )
+
+/**
+ * F11, or Ctrl+Cmd+F where that is the convention.
+ *
+ * Checked before the document sees it: full screen is a window operation, and a key the editor
+ * might otherwise take is one the reader could not use to leave full screen again.
+ */
+private fun togglesFullScreen(event: KeyEvent): Boolean =
+    event.type == KeyEventType.KeyDown &&
+        (event.key == Key.F11 || (event.isCtrlPressed && event.isMetaPressed && event.key == Key.F))
 
 /** 7.3's `window` record: "x, y, width, height, placement". */
 private fun WindowState.geometry() =

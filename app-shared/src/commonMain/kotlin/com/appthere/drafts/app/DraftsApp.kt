@@ -1,5 +1,7 @@
 package com.appthere.drafts.app
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
@@ -14,9 +16,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
@@ -27,15 +31,20 @@ import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.unit.dp
 import com.appthere.drafts.design.DraftsTheme
+import com.appthere.drafts.design.LocalMotion
 import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.editor.engine.DocumentSession
 import com.appthere.drafts.editor.ui.BlockEditor
 import com.appthere.drafts.editor.ui.EditorState
 import com.appthere.drafts.editor.ui.handleShortcut
 import com.appthere.drafts.platform.files.WriteOutcome
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -85,6 +94,19 @@ fun DraftsApp(
 ) {
     val scope = rememberCoroutineScope()
     val scroll = rememberLazyListState()
+    val chrome = remember(document) { ChromeVisibility() }
+    var chromeHidden by remember(document) { mutableStateOf(false) }
+
+    ChromeEffect(
+        visibility = chrome,
+        revision = document.editor.revision,
+        onChange = { chromeHidden = it },
+    )
+
+    val rouse = {
+        chrome.roused()
+        chromeHidden = false
+    }
 
     // 8.1's autosave, when the platform has somewhere app-private to put it. Null rather than a
     // no-op keeper so that a build without snapshot storage is visibly without it.
@@ -118,7 +140,12 @@ fun DraftsApp(
         editor = document.editor,
         initialSettings = initialSettings,
         scroll = scroll,
+        onRouse = rouse,
         onDocumentKey = { event ->
+            // 12: "keypress of a modifier ... brings them back". Reaching for Ctrl is reaching for
+            // something, whether or not the shortcut that follows is one this application knows.
+            if (rouses(event)) rouse()
+
             when {
                 // Escape answers the dialog the way Escape answers every dialog.
                 //
@@ -152,8 +179,14 @@ fun DraftsApp(
         },
         modifier = modifier,
     ) {
+        // 12: "The status indicator (8.4) is the only persistent chrome, and it's a dot" -- and
+        // "**Chrome auto-hides.** On sustained typing, toolbars and rails fade out."
+        //
+        // The dot is what fades. The controls panel, the conflict dialog and the restore banner
+        // are each summoned deliberately and stay until answered: fading something the reader just
+        // asked for, or is about to Tab into, would be the interface taking it away from them.
         Box(Modifier.align(Alignment.TopStart).padding(controlsInset)) {
-            DocumentStateBadge(document.lifecycle.state)
+            FadingChrome(hidden = chromeHidden) { DocumentStateBadge(document.lifecycle.state) }
         }
 
         if (announceRestored) {
@@ -206,6 +239,7 @@ private fun DraftsWindow(
     onDocumentKey: (KeyEvent) -> Boolean,
     modifier: Modifier = Modifier,
     scroll: LazyListState = rememberLazyListState(),
+    onRouse: () -> Unit = {},
     chrome: @Composable BoxScope.() -> Unit,
 ) {
     var settings by remember { mutableStateOf(initialSettings) }
@@ -221,6 +255,20 @@ private fun DraftsWindow(
                 .background(settings.palette.background)
                 .focusRequester(root)
                 .focusable()
+                // 12: "Any pointer movement ... brings them back." Observed on the final pass and
+                // never consumed, so this sees the event after the selection handling below has
+                // had it rather than competing for it.
+                //
+                // There is no edge gesture here. 12 lists one and desktop has no such thing; it
+                // arrives with the touch platforms.
+                .pointerInput(onRouse) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Final)
+                            if (event.type == PointerEventType.Move) onRouse()
+                        }
+                    }
+                }
                 // Every shortcut in the app, in one place.
                 //
                 // Key events travel from the focus owner outwards, so a handler anywhere below
@@ -286,6 +334,81 @@ private const val SCROLL_SCALE = 100_000
 
 /** Far enough from the corner to read as a panel over the document rather than part of the frame. */
 private val controlsInset = 16.dp
+
+/**
+ * Runs 12's auto-hide for as long as the document is on screen.
+ *
+ * Its own composable with its own clock, for the reason the snapshot effect has one: with a real
+ * monotonic source, `delay` obeys a test's virtual clock while the deadline arithmetic obeys the
+ * wall clock, the deadline never arrives, and the test proves only that the two disagree.
+ *
+ * The deadline is slept to rather than polled, so nothing wakes once a frame to ask whether a
+ * second and a half has gone by.
+ */
+@Composable
+internal fun ChromeEffect(
+    visibility: ChromeVisibility,
+    revision: Int,
+    onChange: (Boolean) -> Unit,
+    now: () -> Long = Elapsed::millis,
+) {
+    val currentTime by rememberUpdatedState(now)
+    val report by rememberUpdatedState(onChange)
+
+    LaunchedEffect(visibility, revision) {
+        // Revision zero is the document as opened. Treating it as typing would have the chrome
+        // fade out three seconds after every launch, before anyone had touched anything.
+        if (revision == 0) return@LaunchedEffect
+
+        visibility.typed(currentTime())
+        val deadline = visibility.hidesAt() ?: return@LaunchedEffect
+
+        delay((deadline - currentTime()).coerceAtLeast(0))
+        report(visibility.isHidden(currentTime()))
+    }
+}
+
+/**
+ * A fade that honours 10.2's reduced-motion preference.
+ *
+ * Inside the theme rather than outside it, because that is where the preference is readable. The
+ * duration is the design system's own `chromeMillis`, which is already zero under reduced motion
+ * -- 12 asks for a fade and 10.2 asks for that to be somebody's choice, and the number for it
+ * existed before this did.
+ */
+@Composable
+private fun FadingChrome(
+    hidden: Boolean,
+    content: @Composable () -> Unit,
+) {
+    val motion = LocalMotion.current
+    val alpha by animateFloatAsState(
+        targetValue = if (hidden) 0f else 1f,
+        animationSpec = tween(motion.chromeMillis),
+    )
+
+    Box(Modifier.alpha(alpha)) { content() }
+}
+
+/**
+ * A modifier going down, which 12 counts as reaching for the chrome.
+ *
+ * The key itself, not a shortcut using it: pressing Ctrl and thinking better of it is still the
+ * reader looking for something.
+ */
+private fun rouses(event: KeyEvent): Boolean =
+    event.type == KeyEventType.KeyDown &&
+        event.key in
+        setOf(
+            Key.CtrlLeft,
+            Key.CtrlRight,
+            Key.ShiftLeft,
+            Key.ShiftRight,
+            Key.AltLeft,
+            Key.AltRight,
+            Key.MetaLeft,
+            Key.MetaRight,
+        )
 
 /** Escape, which cancels whatever is being asked. */
 private fun dismisses(event: KeyEvent): Boolean = event.type == KeyEventType.KeyDown && event.key == Key.Escape
