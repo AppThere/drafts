@@ -149,22 +149,6 @@ dim the wrong half of a sentence for most of the world.
 
 ---
 
-## 7.3 — A vanished file shows an error instead of its snapshot
-
-**Spec:** "A document whose file has vanished opens read-only from its snapshot with a clear
-banner offering *Save As*."
-
-**Code:** the window shows *Could not open this document*, the path, and the underlying error
-text (`OpenDocument.kt`, `Main.kt`). The snapshot is not offered back.
-
-**Why:** *Save As* needs the save dialog, which does not exist yet. The error text is a
-developer's message, not a novelist's, and is joined by concatenation rather than coming from
-resources (§11.1) — that half is simply unfinished.
-
-**Closes when:** §7.4's *Save As* lands (Phase 5).
-
----
-
 ## 10.1, 10.2, 4.2 — The editor has no screen-reader semantics, and motion ignores the OS
 
 **Spec:** §10.1's semantics for the editing surface; §10.2 "Honour `prefers-reduced-motion`";

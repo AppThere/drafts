@@ -3,6 +3,7 @@ package com.appthere.drafts.platform.files
 import kotlinx.coroutines.test.runTest
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.PosixFilePermissions
 import kotlin.io.path.createTempDirectory
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.readText
@@ -12,6 +13,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -29,6 +31,28 @@ class PathDocumentStoreTest {
     fun clean() {
         directory.toFile().deleteRecursively()
     }
+
+    @Test
+    fun `a file that is there exists even when it cannot be read`() =
+        runTest {
+            // 7.3: a vanished file and one that cannot be read need different answers, and the
+            // file's facts cannot tell them apart -- an unreadable file has none.
+            val locked = directory.resolve("locked.md").also { it.writeText("Words.\n") }
+            Files.setPosixFilePermissions(locked, PosixFilePermissions.fromString("---------"))
+
+            try {
+                assertTrue(store.exists(DocumentRef(locked.toString())), "An unreadable file was reported gone")
+                assertNull(store.facts(DocumentRef(locked.toString())))
+            } finally {
+                Files.setPosixFilePermissions(locked, PosixFilePermissions.fromString("rw-r--r--"))
+            }
+        }
+
+    @Test
+    fun `a file that is gone does not exist`() =
+        runTest {
+            assertFalse(store.exists(DocumentRef(directory.resolve("never.md").toString())))
+        }
 
     @Test
     fun `a written document reads back as it was written`() =

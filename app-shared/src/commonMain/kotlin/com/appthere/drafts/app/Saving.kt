@@ -31,11 +31,11 @@ internal class Saving(
         private set
 
     /**
-     * Ctrl+S. An untitled document has no file to save to, so its save is [saveAs] -- 7.4: "The
-     * first save is *Save As*".
+     * Ctrl+S. A document with no file to save to -- untitled, or one whose file vanished -- is
+     * saved with [saveAs]: 7.4, "The first save is *Save As*".
      */
     suspend fun save(saveAs: (suspend () -> WriteOutcome?)?) =
-        settle(if (document.isUntitled) saveAs?.invoke() else document.save())
+        settle(if (document.needsSaveAs) saveAs?.invoke() else document.save())
 
     /** Ctrl+Shift+S, or the first save of an untitled document. Null from [saveAs] is a cancel. */
     suspend fun saveAs(saveAs: (suspend () -> WriteOutcome?)?) = settle(saveAs?.invoke())

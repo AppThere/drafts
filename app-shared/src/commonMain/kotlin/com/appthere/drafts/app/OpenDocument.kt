@@ -79,6 +79,12 @@ class OpenDocument(
     val isUntitled: Boolean get() = recorded.ref == null
 
     /**
+     * True when there is no file for [save] to write to: an untitled document, or one whose file
+     * vanished before it could be read (7.3). Either way the next save has to choose where.
+     */
+    val needsSaveAs: Boolean get() = recorded.base == null
+
+    /**
      * 8.2's explicit save: re-read, compare, and write only if the file is untouched.
      *
      * [savedRevision] moves only when the bytes are actually down. A save that was refused, or that
@@ -194,10 +200,21 @@ sealed interface DocumentOpening {
         val document: OpenDocument,
     ) : DocumentOpening
 
-    /** The file could not be read at all, so there is no session to put into a state. */
+    /** There is no document to show, and [reason] says why in terms the reader can act on. */
     data class Failed(
-        val detail: String,
+        val reason: Reason,
     ) : DocumentOpening
+
+    enum class Reason {
+        /** The file is not there: deleted, moved, or on a drive that has gone (7.3). */
+        Missing,
+
+        /** The file is there and could not be read: permissions, a lock, a failing disk. */
+        Unreadable,
+
+        /** The file is not there, and no snapshot of its words was ever kept either. */
+        NothingKept,
+    }
 }
 
 /**
@@ -221,11 +238,41 @@ fun rememberOpenDocument(
         value =
             runCatching { store.read(ref) }
                 .map { contents -> DocumentOpening.Opened(openedWith(store, ref, contents, recover)) }
-                .getOrElse { failure ->
-                    DocumentOpening.Failed(failure.message ?: failure::class.simpleName.orEmpty())
+                .getOrElse {
+                    // Gone, or there and unreadable: the two need different answers.
+                    val there = runCatching { store.exists(ref) }.getOrDefault(false)
+                    DocumentOpening.Failed(
+                        if (there) DocumentOpening.Reason.Unreadable else DocumentOpening.Reason.Missing,
+                    )
                 }
     }
     return opening
+}
+
+/**
+ * A document whose file vanished, reopened from its snapshot (7.3).
+ *
+ * "A document whose file has vanished opens read-only from its snapshot with a clear banner
+ * offering *Save As*." It keeps the file it came from, so the badge says *File missing* and Save As
+ * offers its old name. It has no facts of that file to compare a save against, which is what sends
+ * its next save to *Save As*. Editing stays possible, as it does for any `readOnly` document -- the
+ * reader may be about to save these words somewhere new.
+ */
+fun openVanished(
+    store: DocumentStore,
+    ref: DocumentRef,
+    text: String,
+    record: SessionRecord? = null,
+): OpenDocument {
+    val editor = EditorState(DocumentSession(text))
+    record?.caret?.let { editor.placeAt(it) }
+
+    return OpenDocument(
+        store = store,
+        editor = editor,
+        opened = DocumentSessionState(ref = ref, base = null, unreachable = true),
+        reopening = Reopening(scrollOffset = record?.scrollOffset),
+    )
 }
 
 /**

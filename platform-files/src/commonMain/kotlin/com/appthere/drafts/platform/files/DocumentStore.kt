@@ -115,6 +115,15 @@ interface DocumentStore {
     suspend fun facts(ref: DocumentRef): FileFacts?
 
     /**
+     * Whether there is a document at [ref] at all, readable or not.
+     *
+     * 7.3 answers a vanished file differently from one that is there and cannot be read, and the
+     * reader should be told which. The default asks [facts], which cannot tell the two apart -- a
+     * file it cannot read has no facts either -- so a store that can, says so.
+     */
+    suspend fun exists(ref: DocumentRef): Boolean = facts(ref) != null
+
+    /**
      * Writes [text] to the user's file, but only if it still matches [expected].
      *
      * The check and the write are the same operation on purpose. Splitting them would leave a

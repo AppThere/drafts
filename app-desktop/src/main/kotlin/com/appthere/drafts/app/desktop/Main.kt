@@ -1,6 +1,8 @@
 package com.appthere.drafts.app.desktop
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
@@ -40,6 +42,7 @@ import com.appthere.drafts.app.SampleDocument
 import com.appthere.drafts.app.SettingsStore
 import com.appthere.drafts.app.SnapshotKeeper
 import com.appthere.drafts.app.rememberOpenDocument
+import com.appthere.drafts.app.rememberSessionDocument
 import com.appthere.drafts.app.rememberUntitledDocument
 import com.appthere.drafts.app.suggestedFileName
 import com.appthere.drafts.design.ReaderSettings
@@ -343,8 +346,6 @@ private fun FileDocument(
     onReadyToClose: (suspend () -> Unit) -> Unit,
 ) {
     val identity = remember(record.documentId) { record.identity() }
-    val recover: suspend (Digest) -> Recovery =
-        remember(identity) { { digest -> stores.snapshots.examine(identity.documentId, digest) } }
 
     // 5.5's settings for this document's type, read before the window is drawn so the reader never
     // sees the defaults flash up and be replaced by their own typography.
@@ -352,18 +353,8 @@ private fun FileDocument(
         value = stores.settings.settingsFor(record.kind) ?: ReaderSettings()
     }
 
-    // A record with no file is an untitled document (7.4), whose words live only in its snapshot.
-    //
-    // Decided once, when the window opens. After Save As the record has a file, and deciding again
-    // would re-read the document from it -- a new editor, with the undo history and the caret gone,
-    // for a document that had not changed.
-    val file = remember(record.documentId) { record.accessToken ?: record.uri }
-    val opening =
-        if (file == null) {
-            rememberUntitledDocument(stores.files, stores.snapshots, record.documentId)
-        } else {
-            rememberOpenDocument(stores.files, remember(file) { DocumentRef(file) }, recover)
-        }
+    // From the file, or -- untitled, or with a file that has vanished -- from its snapshot.
+    val opening = rememberSessionDocument(stores.files, stores.snapshots, record)
     val moved by rememberUpdatedState(onMove)
     val saving = remember(stores) { SaveAs(stores.sessions) { moved(it) } }
     val kinds = remember(stores) { KindChange(stores.sessions, stores.settings) { moved(it) } }
@@ -407,22 +398,43 @@ private fun FileDocument(
         }
 
         DocumentOpening.Opening -> {
-            Notice(Strings.OPENING)
+            Notice(message = Strings.OPENING)
         }
 
         is DocumentOpening.Failed -> {
-            Notice("${Strings.COULD_NOT_OPEN}\n\n${record.displayName}\n\n${opening.detail}")
+            Notice(message = messageFor(opening.reason), name = record.displayName)
         }
     }
 }
 
 /** A message on its own in the window, for when there is no document to show. */
 @Composable
-private fun Notice(text: String) {
+private fun Notice(
+    message: String,
+    name: String? = null,
+) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        BasicText(text)
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(noticeGap),
+        ) {
+            BasicText(message)
+            name?.let { BasicText(it) }
+        }
     }
 }
+
+/**
+ * Why a document is not showing, in words about the reader's situation rather than the exception
+ * (11.1). A file that is missing with a snapshot never gets here: it opens from the snapshot.
+ */
+private fun messageFor(reason: DocumentOpening.Reason): String =
+    when (reason) {
+        DocumentOpening.Reason.Unreadable -> Strings.COULD_NOT_READ
+        DocumentOpening.Reason.Missing, DocumentOpening.Reason.NothingKept -> Strings.FILE_GONE_NOTHING_KEPT
+    }
+
+private val noticeGap = 12.dp
 
 private fun kindOf(id: String): DocumentKind = DocumentKind.entries.firstOrNull { it.id == id } ?: DocumentKind.Markdown
 

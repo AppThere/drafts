@@ -119,10 +119,6 @@ fun DraftsApp(
     // still conflicted afterwards, so the dialog would come straight back.
     val saving = remember(document, keeper) { Saving(document, keeper) }
 
-    // 8.3's banner. Separate state from `restoredFromSnapshot`, which is a fact about how the
-    // document opened and does not stop being true once the reader has answered.
-    var announceRestored by remember(document) { mutableStateOf(document.restoredFromSnapshot) }
-
     DraftsWindow(
         editor = document.editor,
         initialSettings = initialSettings,
@@ -180,43 +176,7 @@ fun DraftsApp(
             modifier = Modifier.align(Alignment.TopStart).padding(controlsInset),
         )
 
-        if (announceRestored) {
-            RestoredBanner(
-                onKeep = { announceRestored = false },
-                onDiscard = {
-                    // Back to the file, and the snapshot goes with it. Reloading without discarding
-                    // would leave the snapshot to be restored again on the next launch, which is
-                    // the reader being asked the same question until they answer it differently.
-                    scope.launch {
-                        document.reload()
-                        keeper?.discard()
-                        announceRestored = false
-                    }
-                },
-                modifier = Modifier.align(Alignment.BottomCenter).padding(controlsInset),
-            )
-        }
-
-        if (saving.refusal != null) {
-            ConflictDialog(
-                onReload = {
-                    scope.launch {
-                        document.reload()
-                        saving.answered()
-                    }
-                },
-                onCancel = saving::answered,
-                modifier = Modifier.align(Alignment.Center).padding(controlsInset),
-            )
-        }
-
-        // At the top, clear of 8.3's banner at the foot: both can be showing at once.
-        if (saving.failed) {
-            SaveFailedBanner(
-                onDismiss = saving::acknowledged,
-                modifier = Modifier.align(Alignment.TopCenter).padding(controlsInset),
-            )
-        }
+        DocumentPrompts(document, keeper, saving, saveAs)
     }
 }
 

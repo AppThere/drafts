@@ -93,6 +93,27 @@ fun RestoredBanner(
 }
 
 /**
+ * 7.3's vanished file: "A document whose file has vanished opens ... from its snapshot with a clear
+ * banner offering *Save As*."
+ *
+ * Said as what it means: the words are here, and the file they came from is not. The one answer is
+ * the one that fixes it -- there is no Dismiss, because a reader who does not choose a file for
+ * these words is a reader whose words are in a snapshot and nowhere else.
+ */
+@Composable
+fun FileGoneBanner(
+    onSaveAs: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Banner(
+        message = Strings.FILE_GONE,
+        choices = listOf(Strings.SAVE_AS_CHOICE to onSaveAs),
+        modifier = modifier,
+        announce = true,
+    )
+}
+
+/**
  * A save that did not happen, said out loud.
  *
  * In words about what it means for the reader, not what went wrong on disk: the words are not in

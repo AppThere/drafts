@@ -46,6 +46,9 @@ class PathDocumentStore(
             runCatching { factsOf(ref.path(), Files.readAllBytes(ref.path())) }.getOrNull()
         }
 
+    /** A file that is there but cannot be read still exists, which [facts] cannot say. */
+    override suspend fun exists(ref: DocumentRef): Boolean = withContext(io) { Files.exists(ref.path()) }
+
     /**
      * 8.2, with the re-read and the write in one place.
      *

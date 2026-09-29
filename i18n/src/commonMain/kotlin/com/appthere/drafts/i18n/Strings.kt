@@ -97,7 +97,19 @@ object Strings {
     const val STATE_READ_ONLY = "Read-only"
 
     const val OPENING = "Opening\u2026"
-    const val COULD_NOT_OPEN = "Could not open this document"
+
+    /** A document that could not be opened, in words about the reader's situation (7.3). */
+    const val COULD_NOT_READ =
+        "This document could not be read. It may be somewhere Drafts cannot reach just now, such as " +
+            "a drive that is not connected."
+    const val FILE_GONE_NOTHING_KEPT =
+        "This document's file is no longer there, and no copy of its words was kept here."
+
+    /** 7.3's banner for a document whose file vanished, and the answer it offers. */
+    const val FILE_GONE =
+        "The file this document was saved in is no longer there. Its words are safe here. Choose a " +
+            "place to save them again."
+    const val SAVE_AS_CHOICE = "Save As\u2026"
 
     /**
      * 8.3's banner, in its own words.

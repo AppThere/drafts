@@ -419,8 +419,12 @@ Persist, per open document:
 - **iOS:** security-scoped bookmark data, resolved with `startAccessingSecurityScopedResource`.
 - **Desktop:** absolute path, with existence re-checked on restore.
 
-On launch, restore every session. A document whose file has vanished opens read-only from its
-snapshot with a clear banner offering *Save As*.
+On launch, restore every session. A document whose file has vanished opens from its snapshot,
+marked *File missing* (§8.4), with a clear banner offering *Save As*; its next save chooses where.
+Like a `readOnly` document it can still be edited — the reader may be about to save these words
+somewhere new, and the snapshot keeps them meanwhile. A vanished file with no snapshot, and a file
+that is there but cannot be read, are each said plainly, in words about the reader's situation
+rather than the error.
 
 ### 7.4 New documents
 
