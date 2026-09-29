@@ -50,6 +50,32 @@ internal class BlockPreview(
         return run.previewOffsetAt(sourceOffset)
     }
 
+    /**
+     * The preview's words without its decoration, for 10.1's spoken description.
+     *
+     * Decoration is what the preview draws that the document does not contain -- a quote's rule, a
+     * list's bullets, a section break's line -- and a screen reader would otherwise read it out: "box
+     * drawings light vertical" before every quotation. What is kept is every character a run maps to
+     * the source. A decoration line break becomes a space, so two list items do not run together.
+     */
+    val spoken: String by lazy {
+        val fromSource = BooleanArray(text.length)
+        runs.forEach { run -> for (at in run.previewStart until run.previewEnd) fromSource[at] = true }
+
+        val words =
+            buildString {
+                text.text.forEachIndexed { at, char ->
+                    if (fromSource[at]) {
+                        append(char)
+                    } else if (char == '\n') {
+                        append(' ')
+                    }
+                }
+            }.replace(whitespace, " ").trim()
+
+        words.ifEmpty { text.text }
+    }
+
     /** The preview range covering a block-relative source range, clamped to this block. */
     fun previewRangeOf(
         sourceStart: Int,
@@ -135,3 +161,5 @@ internal class PreviewBuilder(
 
     fun build() = BlockPreview(out.toAnnotatedString(), runs.sortedBy { it.previewStart })
 }
+
+private val whitespace = Regex("""\s+""")

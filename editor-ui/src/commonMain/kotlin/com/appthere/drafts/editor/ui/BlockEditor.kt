@@ -117,6 +117,10 @@ fun BlockEditor(
             }
         }
 
+        // 10.1's structural announcements, beside the list rather than in it: the list's rows come
+        // and go as they scroll, and the thing speaking must not.
+        StructureAnnouncer(state)
+
         LazyColumn(
             state = scroll,
             modifier =
@@ -323,6 +327,7 @@ private fun BlockRow(
                     id = id,
                     preview = content.preview,
                     style = prose.textStyle,
+                    modifier = Modifier.spoken(content.spoken),
                 )
             }
         }

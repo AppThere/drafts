@@ -18,6 +18,24 @@ object Strings {
     /** 7.4: the name a new document has until its first save gives it one. */
     const val UNTITLED = "Untitled"
 
+    /**
+     * 10.1's names for blocks, as a screen reader announces them. Named for what a writer calls
+     * them, not for the Markdown construct: "Section break", not "thematic break".
+     */
+    const val BLOCK_PARAGRAPH = "Paragraph"
+    const val BLOCK_HEADING_LEVEL = "Heading level"
+    const val BLOCK_QUOTE = "Block quote"
+    const val BLOCK_CODE = "Code block"
+    const val BLOCK_BULLETED_LIST = "Bulleted list"
+    const val BLOCK_NUMBERED_LIST = "Numbered list"
+    const val BLOCK_DEFINITION_LIST = "Definition list"
+    const val BLOCK_TABLE = "Table"
+    const val BLOCK_SECTION_BREAK = "Section break"
+    const val BLOCK_FIGURE = "Figure"
+    const val BLOCK_RAW = "HTML"
+    const val BLOCK_LINK_REFERENCE = "Link reference"
+    const val BLOCKS_JOINED = "Joined with the block above."
+
     /** 7.4's choice of kind for an untitled document, named as a writer would name them. */
     const val KIND = "Kind"
     const val KIND_MARKDOWN = "Markdown"

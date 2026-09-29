@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import com.appthere.drafts.a11y.BlockNames
 import com.appthere.drafts.core.model.Block
 import com.appthere.drafts.core.model.BlockQuote
 import com.appthere.drafts.core.model.CodeBlock
@@ -95,12 +96,14 @@ class EditorState(
         // long document would still accumulate. Dropping the lot is fine -- it rebuilds on demand.
         if (rows.size > ROW_CACHE_LIMIT) rows.clear()
 
+        val preview = previewOfBlock(editorBlock.block, muted)
         val content =
             RowContent(
-                preview = previewOfBlock(editorBlock.block, muted),
+                preview = preview,
                 source = source,
                 role = roleOf(editorBlock.block),
                 softWrapped = editorBlock.block is Paragraph,
+                spoken = spokenOf(editorBlock.block, preview),
             )
         rows[editorBlock.id] = CachedRow(source, muted, content)
         return content
@@ -311,7 +314,37 @@ internal data class RowContent(
      * line and reserved the other three.
      */
     val softWrapped: Boolean,
+    /** What a screen reader is told about the block beyond its text (10.1). */
+    val spoken: Spoken,
 )
+
+/**
+ * 10.1's semantics for a block shown in preview: whether it is a heading, the prefix naming any
+ * other kind -- "Block quote", "Code block, Kotlin" -- and the words that follow it. Built with the
+ * rest of the row, so a block that merely moved keeps the same value and is not composed again.
+ */
+@Immutable
+internal data class Spoken(
+    val heading: Boolean,
+    val prefix: String?,
+    val text: String,
+)
+
+/**
+ * The words are the preview's without its decoration -- except for code. A code block's preview
+ * shows its fences on purpose (see `appendCode`), and they map to real source, so nothing in the
+ * preview can tell them from the code; read aloud they are "grave accent" three times over. The
+ * code itself is the block's text, and the language is already in the prefix.
+ */
+internal fun spokenOf(
+    block: Block,
+    preview: BlockPreview,
+): Spoken =
+    Spoken(
+        heading = block is Heading,
+        prefix = BlockNames.prefixOf(block),
+        text = if (block is CodeBlock) block.text.trimEnd() else preview.spoken,
+    )
 
 /**
  * Which role in the prose scale a block is set in.
