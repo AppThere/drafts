@@ -36,6 +36,33 @@ object Strings {
     const val BLOCK_LINK_REFERENCE = "Link reference"
     const val BLOCKS_JOINED = "Joined with the block above."
 
+    /**
+     * 10.2's shortcut map: the keys' names, and what each shortcut does, said as the reader would
+     * say it. Ctrl stands for ⌘ as well on a Mac, and the list says so once rather than every time.
+     */
+    const val KEY_CTRL = "Ctrl"
+    const val KEY_SHIFT = "Shift"
+    const val KEY_ESCAPE = "Esc"
+    const val KEY_BACKSPACE = "Backspace"
+    const val KEY_DELETE = "Delete"
+    const val SHORTCUT_SELECT_ALL = "Select everything"
+    const val SHORTCUT_COPY = "Copy"
+    const val SHORTCUT_CUT = "Cut"
+    const val SHORTCUT_PASTE = "Paste"
+    const val SHORTCUT_UNDO = "Undo"
+    const val SHORTCUT_REDO = "Redo"
+    const val SHORTCUT_DELETE_SELECTION = "Delete what is selected"
+    const val SHORTCUT_SAVE = "Save"
+    const val SHORTCUT_SAVE_AS = "Save As, or save a copy somewhere else"
+    const val SHORTCUT_READER_CONTROLS = "Show or hide the reader controls"
+    const val SHORTCUT_LIST = "Show or hide this list"
+    const val SHORTCUT_CLOSE = "Close what is open"
+    const val SHORTCUT_FULL_SCREEN = "Enter or leave full screen (on a Mac, also Ctrl+\u2318+F)"
+    const val KEYBOARD_SHORTCUTS = "Keyboard shortcuts"
+    const val SHORTCUTS_WRITING = "Writing"
+    const val SHORTCUTS_DOCUMENT = "The document and the window"
+    const val SHORTCUTS_ON_A_MAC = "On a Mac, \u2318 works wherever Ctrl is shown."
+
     /** 7.4's choice of kind for an untitled document, named as a writer would name them. */
     const val KIND = "Kind"
     const val KIND_MARKDOWN = "Markdown"

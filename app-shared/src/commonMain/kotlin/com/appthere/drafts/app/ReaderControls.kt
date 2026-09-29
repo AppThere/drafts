@@ -63,7 +63,7 @@ fun ReaderControls(
     modifier: Modifier = Modifier,
     unsaved: Boolean = false,
     onClose: (() -> Unit)? = null,
-    onShowLicences: (() -> Unit)? = null,
+    links: @Composable () -> Unit = {},
 ) {
     val palette = LocalPalette.current
     val metrics = panelMetrics()
@@ -114,20 +114,10 @@ fun ReaderControls(
 
         MotionChoice(settings, onChange)
 
-        // 5.1 requires the licence to be reachable. Here rather than in a menu the app does not
-        // have yet, and it is a real target rather than a line of small print.
-        if (onShowLicences != null) {
-            BasicText(
-                text = Strings.LICENCES,
-                style = body(palette).copy(color = palette.accent),
-                modifier =
-                    Modifier
-                        .sizeIn(minHeight = target)
-                        .clickable { onShowLicences() }
-                        .padding(vertical = optionPadding)
-                        .semantics { contentDescription = Strings.LICENCES },
-            )
-        }
+        // Ways on to the other panels: 5.1's licences, which have to be reachable, and 10.2's
+        // shortcut list. Here rather than in a menu the app does not have yet, and the caller's to
+        // supply, since which panels there are is the window's business rather than the panel's.
+        links()
     }
 }
 

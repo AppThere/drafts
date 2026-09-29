@@ -47,6 +47,7 @@ import com.appthere.drafts.app.rememberSessionDocument
 import com.appthere.drafts.app.rememberUntitledDocument
 import com.appthere.drafts.app.suggestedFileName
 import com.appthere.drafts.design.ReaderSettings
+import com.appthere.drafts.editor.ui.Shortcut
 import com.appthere.drafts.i18n.Strings
 import com.appthere.drafts.platform.files.Digest
 import com.appthere.drafts.platform.files.DocumentRef
@@ -375,6 +376,8 @@ private fun FileDocument(
                     keeper = keeper,
                     settingsStore = stores.settings,
                     kind = record.kind,
+                    // Listed with the rest, though the window rather than the document answers it.
+                    hostShortcuts = listOf(fullScreen),
                     saveAs = {
                         // 7.4: the name comes from the first heading or the title page while the
                         // document is untitled; once it has a file, Save As offers that file's name.
@@ -481,11 +484,15 @@ private class Stores(
  * F11, or Ctrl+Cmd+F where that is the convention.
  *
  * Checked before the document sees it: full screen is a window operation, and a key the editor
- * might otherwise take is one the reader could not use to leave full screen again.
+ * might otherwise take is one the reader could not use to leave full screen again. The Mac's
+ * chord is the one key in the application that needs Ctrl and ⌘ at once, which [Shortcut] does not
+ * describe; the list says it in words instead.
  */
+private val fullScreen = Shortcut(Strings.SHORTCUT_FULL_SCREEN, Key.F11, "F11")
+
 private fun togglesFullScreen(event: KeyEvent): Boolean =
-    event.type == KeyEventType.KeyDown &&
-        (event.key == Key.F11 || (event.isCtrlPressed && event.isMetaPressed && event.key == Key.F))
+    fullScreen.matches(event) ||
+        (event.type == KeyEventType.KeyDown && event.isCtrlPressed && event.isMetaPressed && event.key == Key.F)
 
 /** 7.3's `window` record: "x, y, width, height, placement". */
 private fun WindowState.geometry() =

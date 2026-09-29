@@ -23,6 +23,7 @@ import com.appthere.drafts.design.Palettes
 import com.appthere.drafts.design.Prose
 import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.design.Theme
+import com.appthere.drafts.i18n.Strings
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -175,7 +176,11 @@ class ReaderControlsTest {
             // controls below "Letter spacing" were clipped away entirely -- motion among them,
             // which someone reading at 200% is more likely than most to want.
             val settings = ReaderSettings()
-            setContent { DraftsTheme(settings) { ReaderControls(settings, onChange = {}, onShowLicences = {}) } }
+            setContent {
+                DraftsTheme(settings) {
+                    ReaderControls(settings, onChange = {}, links = { PanelLink(Strings.LICENCES, onClick = {}) })
+                }
+            }
 
             listOf(
                 "Text size, increase",
@@ -206,7 +211,11 @@ class ReaderControlsTest {
             // alone takes most of the width, so the theme options have to wrap or the last of them
             // is off the side of the screen.
             val settings = ReaderSettings()
-            setContent { DraftsTheme(settings) { ReaderControls(settings, onChange = {}, onShowLicences = {}) } }
+            setContent {
+                DraftsTheme(settings) {
+                    ReaderControls(settings, onChange = {}, links = { PanelLink(Strings.LICENCES, onClick = {}) })
+                }
+            }
 
             listOf("Theme, ${Palettes.HighContrast.name}", "Text size, increase", "Motion, Reduced")
                 .forEach { control ->
@@ -224,7 +233,11 @@ class ReaderControlsTest {
             // `performScrollTo` fails outright if there is no scrollable ancestor, so this asserts
             // both that the panel scrolls and that the last control can be got to.
             val settings = ReaderSettings()
-            setContent { DraftsTheme(settings) { ReaderControls(settings, onChange = {}, onShowLicences = {}) } }
+            setContent {
+                DraftsTheme(settings) {
+                    ReaderControls(settings, onChange = {}, links = { PanelLink(Strings.LICENCES, onClick = {}) })
+                }
+            }
 
             onNodeWithContentDescription("Licences").performScrollTo().assertIsDisplayed()
         }

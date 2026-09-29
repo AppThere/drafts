@@ -15,6 +15,7 @@ plugins {
 
 dependencies {
     implementation(project(":app-shared"))
+    implementation(project(":editor-ui"))
     implementation(project(":i18n"))
     implementation(compose.desktop.currentOs)
     implementation(libs.kotlinx.coroutines.swing)

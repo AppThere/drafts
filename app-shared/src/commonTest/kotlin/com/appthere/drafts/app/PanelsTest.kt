@@ -23,6 +23,19 @@ class PanelsTest {
     }
 
     @Test
+    fun `the shortcut list closes before the controls it was opened from`() {
+        val panels =
+            Panels().apply {
+                openControls()
+                openShortcuts()
+            }
+
+        assertTrue(panels.closeTopmost())
+        assertFalse(panels.shortcuts)
+        assertTrue(panels.controls, "Closing the shortcut list closed the controls too")
+    }
+
+    @Test
     fun `with nothing open there is nothing to close`() {
         // False lets the key go on to whatever else wants it, rather than Escape vanishing.
         assertFalse(Panels().closeTopmost())

@@ -15,6 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -28,12 +29,13 @@ import com.appthere.drafts.design.Prose
 import com.appthere.drafts.i18n.Strings
 
 /**
- * The panels that open over a document -- the reader controls and the licences -- and which of
- * them is showing.
+ * The panels that open over a document -- the reader controls, the licences and the keyboard
+ * shortcuts -- and which of them is showing.
  *
- * One rule for closing, whatever asked: the one on top goes first. The licences open from the
- * controls, so they are on top whenever both are showing, and Escape or Back takes them away and
- * leaves the reader where they were.
+ * One rule for closing, whatever asked: the one on top goes first. The licences and the shortcuts
+ * open from the controls, so they are on top whenever the controls are showing too, and Escape or
+ * Back takes them away and leaves the reader where they were. The shortcuts are drawn last, so they
+ * go first.
  */
 @Stable
 internal class Panels {
@@ -43,7 +45,10 @@ internal class Panels {
     var licences by mutableStateOf(false)
         private set
 
-    val anyOpen: Boolean get() = controls || licences
+    var shortcuts by mutableStateOf(false)
+        private set
+
+    val anyOpen: Boolean get() = controls || licences || shortcuts
 
     fun toggleControls() {
         controls = !controls
@@ -65,9 +70,53 @@ internal class Panels {
         licences = false
     }
 
+    fun toggleShortcuts() {
+        shortcuts = !shortcuts
+    }
+
+    fun openShortcuts() {
+        shortcuts = true
+    }
+
+    fun closeShortcuts() {
+        shortcuts = false
+    }
+
+    /**
+     * The keys that open and close panels, answered; false for any other key.
+     *
+     * Escape closes what is open, the way it does everywhere -- only when there is something, so
+     * that otherwise the key goes on to whatever else wants it.
+     */
+    fun answer(event: KeyEvent): Boolean =
+        when {
+            WindowShortcuts.ReaderControls.matches(event) -> {
+                toggleControls()
+                true
+            }
+
+            WindowShortcuts.KeyboardShortcuts.matches(event) -> {
+                toggleShortcuts()
+                true
+            }
+
+            WindowShortcuts.Dismiss.matches(event) -> {
+                closeTopmost()
+            }
+
+            else -> {
+                false
+            }
+        }
+
     /** Closes whichever panel is on top, and says whether there was one. */
     fun closeTopmost(): Boolean =
         when {
+            shortcuts -> {
+                shortcuts = false
+                true
+            }
+
             licences -> {
                 licences = false
                 true
@@ -131,6 +180,34 @@ internal fun ReaderControlsButton(
     )
 }
 
+/**
+ * A way from one panel to another, set as a link in the panel's own text.
+ *
+ * A real target rather than a line of small print: 48dp tall, and a button to a screen reader.
+ */
+@Composable
+fun PanelLink(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val palette = LocalPalette.current
+
+    BasicText(
+        text = text,
+        style = TextStyle(color = palette.accent, fontSize = labelSize),
+        modifier =
+            modifier
+                .sizeIn(minHeight = target)
+                .clickable(onClick = onClick)
+                .padding(vertical = linkPadding)
+                .semantics {
+                    contentDescription = text
+                    role = Role.Button
+                },
+    )
+}
+
 /** A bordered text button at 10.2's 48dp target, the one shape of button the panels use. */
 @Composable
 private fun PanelButton(
@@ -165,3 +242,4 @@ private val corner = 6.dp
 private val buttonPadding = 12.dp
 private val labelSize = 14.sp
 private val headingSize = 18.sp
+private val linkPadding = 10.dp

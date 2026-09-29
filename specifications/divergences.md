@@ -198,15 +198,17 @@ work, which leans on the same IR.
 
 ---
 
-## 10.2 — The shortcut map is fixed and undocumented
+## 10.2 — The shortcut map is fixed
 
 **Spec:** "Document the full shortcut map and make it user-remappable."
 
-**Code:** Ctrl+S, Ctrl+Comma, Escape, F11 / Ctrl+Cmd+F and the editor's chords are fixed, and
-written down nowhere a reader would look.
+**Code:** documented. Every shortcut is listed in a panel opened with Ctrl+/ or from the reader
+controls, read from the same tables (`EditorShortcuts`, `WindowShortcuts`, and the host's full
+screen) the handlers match against, so the list and the keys cannot disagree. They are not yet
+remappable: the tables are constants.
 
-**Closes when:** documented with the Phase 5 settings; remappable by Phase 11, before a second
-platform's conventions have to be reconciled with the first's.
+**Closes when:** remappable by Phase 11, before a second platform's conventions have to be
+reconciled with the first's. The tables are the one place a remapping has to change.
 
 ---
 

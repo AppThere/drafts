@@ -43,7 +43,9 @@ import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.editor.engine.DocumentSession
 import com.appthere.drafts.editor.ui.BlockEditor
 import com.appthere.drafts.editor.ui.EditorState
+import com.appthere.drafts.editor.ui.Shortcut
 import com.appthere.drafts.editor.ui.handleShortcut
+import com.appthere.drafts.i18n.Strings
 import com.appthere.drafts.platform.files.WriteOutcome
 import com.appthere.drafts.platform.intents.DocumentKind
 import kotlinx.coroutines.launch
@@ -76,7 +78,7 @@ fun DraftsApp(
     DraftsWindow(
         editor = editor,
         initialSettings = initialSettings,
-        onDocumentKey = ::saves,
+        onDocumentKey = WindowShortcuts.Save::matches,
         // Nowhere to keep them, which is not the same as failing to: nothing to tell the reader.
         onSettingsChange = { true },
         modifier = modifier,
@@ -95,6 +97,9 @@ fun DraftsApp(
  *
  * [onKindChange] is 7.4's choice of kind while the document is untitled. The host records it; the
  * window only offers it, and only while there is no file whose extension already says.
+ *
+ * [hostShortcuts] are the keys the host answers outside the window -- full screen, on the desktop
+ * -- listed with the window's own so that 10.2's shortcut list is the whole of it.
  */
 @Composable
 fun DraftsApp(
@@ -106,6 +111,7 @@ fun DraftsApp(
     kind: String = DEFAULT_KIND,
     saveAs: (suspend () -> WriteOutcome?)? = null,
     onKindChange: ((DocumentKind) -> Unit)? = null,
+    hostShortcuts: List<Shortcut> = emptyList(),
 ) {
     val scope = rememberCoroutineScope()
     val scroll = rememberLazyListState()
@@ -125,6 +131,7 @@ fun DraftsApp(
         // No store is a build without settings storage, not a failed write, and says nothing.
         onSettingsChange = { changed -> settingsStore?.remember(kind, changed) ?: true },
         scroll = scroll,
+        hostShortcuts = hostShortcuts,
         onRouse = autoHide::rouse,
         chromeHidden = autoHide.hidden,
         onDocumentKey = { event ->
@@ -140,17 +147,17 @@ fun DraftsApp(
                 // visible effect and no test can tell the difference. It stays because the day the
                 // editor does want Escape -- clearing a selection is the obvious candidate -- a
                 // handler that had been swallowing it since now would be a silent dead key.
-                saving.refusal != null && dismisses(event) -> {
+                saving.refusal != null && WindowShortcuts.Dismiss.matches(event) -> {
                     saving.answered()
                     true
                 }
 
-                savesAs(event) -> {
+                WindowShortcuts.SaveAs.matches(event) -> {
                     scope.launch { saving.saveAs(saveAs) }
                     true
                 }
 
-                saves(event) -> {
+                WindowShortcuts.Save.matches(event) -> {
                     scope.launch { saving.save(saveAs) }
                     true
                 }
@@ -203,6 +210,7 @@ private fun DraftsWindow(
     onSettingsChange: suspend (ReaderSettings) -> Boolean,
     modifier: Modifier = Modifier,
     scroll: LazyListState = rememberLazyListState(),
+    hostShortcuts: List<Shortcut> = emptyList(),
     onRouse: () -> Unit = {},
     chromeHidden: Boolean = false,
     chrome: @Composable BoxScope.() -> Unit,
@@ -256,29 +264,12 @@ private fun DraftsWindow(
                 // remains an ancestor of whatever takes it next, so this is the only position that
                 // sees every keystroke. 10.2 asks for "complete keyboard operation"; that has to
                 // include the first keystroke after opening a file.
+                //
+                // The panels first, then whatever depends on there being a file -- saving, and
+                // answering 8.2's refusal, which the window cannot know about and so asks -- and
+                // then the editor.
                 .onPreviewKeyEvent { event ->
-                    when {
-                        togglesControls(event) -> {
-                            panels.toggleControls()
-                            true
-                        }
-
-                        // Escape closes what is open, the way it does everywhere. Only when there
-                        // is something: otherwise the key belongs to whatever else wants it.
-                        dismisses(event) && panels.closeTopmost() -> {
-                            true
-                        }
-
-                        // Anything that depends on there being a file: saving, and answering
-                        // 8.2's refusal. The window does not know whether it has one, so it asks.
-                        onDocumentKey(event) -> {
-                            true
-                        }
-
-                        else -> {
-                            editor.handleShortcut(event, clipboard)
-                        }
-                    }
+                    panels.answer(event) || onDocumentKey(event) || editor.handleShortcut(event, clipboard)
                 },
         ) {
             LaunchedEffect(Unit) { root.requestFocus() }
@@ -314,14 +305,24 @@ private fun DraftsWindow(
                     unsaved = settings.unsaved,
                     modifier = Modifier.align(Alignment.TopEnd).padding(controlsInset),
                     onClose = refocused(panels::closeControls),
-                    onShowLicences = panels::openLicences,
-                )
+                ) {
+                    PanelLink(Strings.KEYBOARD_SHORTCUTS, onClick = panels::openShortcuts)
+                    PanelLink(Strings.LICENCES, onClick = panels::openLicences)
+                }
             }
 
             if (panels.licences) {
                 Licences(
                     onClose = refocused(panels::closeLicences),
                     modifier = Modifier.align(Alignment.Center).padding(controlsInset),
+                )
+            }
+
+            if (panels.shortcuts) {
+                ShortcutList(
+                    onClose = refocused(panels::closeShortcuts),
+                    modifier = Modifier.align(Alignment.Center).padding(controlsInset),
+                    hostShortcuts = hostShortcuts,
                 )
             }
         }
