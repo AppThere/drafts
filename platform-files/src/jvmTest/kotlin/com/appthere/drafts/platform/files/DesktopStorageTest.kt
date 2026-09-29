@@ -99,4 +99,39 @@ class DesktopStorageTest {
         assertEquals("fountain", desktopIdentity("/documents/big-fish.fountain", "fountain").kind)
         assertEquals("markdown", desktopIdentity("/documents/chapter.md", "markdown").kind)
     }
+
+    @Test
+    fun `the single-instance socket lives in the user's runtime directory`() {
+        // 9.4, one instance per user: XDG_RUNTIME_DIR is the user's own and is cleared at logout.
+        assertEquals(
+            "/run/user/1000/appthere-drafts.sock",
+            desktopInstanceAddress(runtime = "/run/user/1000", dataRoot = "/unused"),
+        )
+    }
+
+    @Test
+    fun `without a runtime directory it lives in the user's own data`() {
+        // macOS, Windows, and a Linux session with no runtime directory.
+        assertEquals(
+            "/home/writer/.local/share/AppThere/Drafts/appthere-drafts.sock",
+            desktopInstanceAddress(runtime = null, dataRoot = "/home/writer/.local/share/AppThere/Drafts"),
+        )
+    }
+
+    @Test
+    fun `the socket's path fits the limit a unix socket has`() {
+        // About a hundred bytes on Linux and macOS. The usual locations must fit with room to spare.
+        val linux = desktopInstanceAddress(runtime = "/run/user/1000", dataRoot = "/unused")
+        val mac =
+            desktopInstanceAddress(
+                runtime = null,
+                dataRoot = desktopDataRoot(home = "/Users/a.writer.with.a.long.name", os = "Mac OS X", xdg = null),
+            )
+
+        assertTrue(linux.length < SOCKET_PATH_LIMIT, linux)
+        assertTrue(mac.length < SOCKET_PATH_LIMIT, mac)
+    }
 }
+
+/** A Unix-domain socket path is limited to about a hundred bytes on Linux and macOS. */
+private const val SOCKET_PATH_LIMIT = 100

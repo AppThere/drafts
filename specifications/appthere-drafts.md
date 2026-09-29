@@ -608,7 +608,9 @@ files open in place rather than being copied into the app container. Handle
 
 In all three cases, an already-running instance should open the document in a **new window**,
 not replace the current one. Route a second launch to it through a single-instance lock and a
-local socket or named pipe rather than running a second process.
+local socket or named pipe rather than running a second process — **one instance per user**, at an
+address only that user can reach, so a second person signed in to the same machine neither blocks
+nor reaches the first person's application.
 
 ---
 

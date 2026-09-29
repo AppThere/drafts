@@ -41,6 +41,37 @@ fun desktopDataRoot(
     return base.resolve(VENDOR).resolve(APPLICATION).toString()
 }
 
+/**
+ * Where 9.4's single-instance socket lives: somewhere only this user can reach.
+ *
+ * `XDG_RUNTIME_DIR` on Linux, which is the user's own (mode 0700) and cleared at logout, so a socket
+ * left behind by a killed instance does not outlive the session. Elsewhere -- macOS, Windows, and a
+ * Linux session without one -- the app-private data directory, which belongs to the user as well.
+ * Either way a second user on the same machine has their own, and cannot reach this one.
+ *
+ * Short on purpose: a Unix-domain socket's path is limited to about a hundred bytes.
+ */
+fun desktopInstanceAddress(
+    runtime: String? = System.getenv("XDG_RUNTIME_DIR"),
+    dataRoot: String = desktopDataRoot(),
+): String {
+    val folder = runtime?.takeIf { it.isNotBlank() }?.let { Path.of(it) } ?: Path.of(dataRoot)
+    return folder.resolve(INSTANCE_SOCKET).toString()
+}
+
+/** Makes sure the folder [address] sits in exists, as it may not on a first launch. */
+fun prepareInstanceAddress(address: String) {
+    Path.of(address).parent?.let { Files.createDirectories(it) }
+}
+
+/**
+ * Removes the socket file at [address], left by an instance that could not remove its own -- one
+ * killed outright, or lost with the machine. Only ever called once nothing answers at it.
+ */
+fun removeStaleInstance(address: String) {
+    Files.deleteIfExists(Path.of(address))
+}
+
 /** 7.3 puts each document's snapshot in `sessions/<documentId>/`. */
 fun desktopSessionRoot(): String = Path.of(desktopDataRoot(), SESSIONS).toString()
 
@@ -97,3 +128,6 @@ private const val VENDOR = "AppThere"
 private const val APPLICATION = "Drafts"
 private const val SESSIONS = "sessions"
 private const val SETTINGS = "settings"
+
+// Named for the application, because a runtime directory is shared by everything the user runs.
+private const val INSTANCE_SOCKET = "appthere-drafts.sock"

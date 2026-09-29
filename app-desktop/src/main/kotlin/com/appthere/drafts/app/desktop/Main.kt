@@ -55,9 +55,12 @@ import com.appthere.drafts.platform.files.SnapshotTrigger
 import com.appthere.drafts.platform.files.WindowRecord
 import com.appthere.drafts.platform.files.chooseSaveLocation
 import com.appthere.drafts.platform.files.desktopIdentity
+import com.appthere.drafts.platform.files.desktopInstanceAddress
 import com.appthere.drafts.platform.files.desktopSessionRoot
 import com.appthere.drafts.platform.files.desktopSettingsRoot
 import com.appthere.drafts.platform.files.epochMillis
+import com.appthere.drafts.platform.files.prepareInstanceAddress
+import com.appthere.drafts.platform.files.removeStaleInstance
 import com.appthere.drafts.platform.intents.DocumentKind
 import com.appthere.drafts.platform.intents.LaunchRequest
 import com.appthere.drafts.platform.intents.SingleInstance
@@ -87,11 +90,18 @@ import java.awt.Taskbar
  * File > Open is still absent. The save dialog it would sit beside is in `:platform-files`.
  */
 fun main(args: Array<String>) {
-    val instance = SingleInstance()
+    // 9.4's single instance, one per user: the socket lives where only this user can reach it.
+    val address = desktopInstanceAddress().also(::prepareInstanceAddress)
+    val instance = SingleInstance(address, ::removeStaleInstance)
     val request = LaunchRequest.of(args.toList())
     val requests = Channel<LaunchRequest>(Channel.UNLIMITED)
 
     if (!becameTheRunningInstance(instance, request, requests)) return
+
+    // Released when the last window closes, below, and also when the process is told to stop -- a
+    // logout or shutdown sends SIGTERM, which ends the JVM without returning here. A socket left
+    // behind is recovered by the next launch either way; this just does not leave one.
+    Runtime.getRuntime().addShutdownHook(Thread(instance::release, "drafts-release-instance"))
 
     application { DraftsApplication(request, requests) }
     instance.release()

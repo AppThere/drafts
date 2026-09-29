@@ -165,20 +165,6 @@ resources (§11.1) — that half is simply unfinished.
 
 ---
 
-## 9.4 — Every user on a machine shares the single-instance port
-
-**Spec:** "Route to an existing instance via a single-instance lock and a local socket or named
-pipe."
-
-**Code:** a fixed loopback port, 51317, with no user in it (`SingleInstance.kt`). On a machine with
-several signed-in users, one user's double-click can hand the path to another user's running
-application, and the second launch exits.
-
-**Closes when:** the port or pipe is scoped per user — a Unix-domain socket in the user's runtime
-directory, a named pipe with the user's SID. Phase 5.
-
----
-
 ## 10.1, 10.2, 4.2 — The editor has no screen-reader semantics, and motion ignores the OS
 
 **Spec:** §10.1's semantics for the editing surface; §10.2 "Honour `prefers-reduced-motion`";

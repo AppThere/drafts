@@ -1,37 +1,45 @@
 package com.appthere.drafts.platform.intents
 
-import java.io.BufferedReader
+import java.io.ByteArrayOutputStream
 import java.io.IOException
-import java.net.InetAddress
-import java.net.ServerSocket
-import java.net.Socket
-import java.net.SocketTimeoutException
+import java.net.StandardProtocolFamily
+import java.net.UnixDomainSocketAddress
+import java.nio.ByteBuffer
+import java.nio.channels.SelectionKey
+import java.nio.channels.Selector
+import java.nio.channels.ServerSocketChannel
+import java.nio.channels.SocketChannel
 import kotlin.concurrent.thread
 
 /**
- * One running application, however many times it is launched.
+ * One running application per user, however many times it is launched.
  *
- * `appthere-drafts.md` 9.4 on Windows: "Route to an existing instance via a single-instance lock
- * and a local socket or named pipe rather than launching a second process." And for all three
- * desktops: "an already-running instance should open the document in a **new window**, not replace
- * the current one."
+ * `appthere-drafts.md` 9.4: "Route to an existing instance via a single-instance lock and a local
+ * socket or named pipe rather than launching a second process", and "an already-running instance
+ * should open the document in a **new window**, not replace the current one."
  *
- * The socket *is* the lock. Binding a port is an atomic claim the operating system arbitrates, so
- * there is no lock file to go stale when a process is killed -- and `SnapshotKillTest` is a
- * reminder that processes here do get killed. A lock file would also have meant a second module
- * touching the filesystem, which `engineering-conventions.md` 4.2 reserves to `:platform-files`.
+ * A Unix-domain socket at [address], which is in a folder only this user can reach (the caller's
+ * business -- see `desktopInstanceAddress` in `:platform-files`). That makes the instance one *per
+ * user*: a second person signed in to the same machine has their own, and cannot hand documents to
+ * this one. A loopback TCP port could not promise either. Every user shared it, so one user's
+ * running instance stopped another's from starting at all, and anything on the machine could ask
+ * it to open files. Java supports these sockets on Linux and macOS, and on Windows 10 and later.
  *
- * Loopback only. [InetAddress.getLoopbackAddress] is not a configuration choice: bound to any
- * interface this would accept a document path from anything on the network and open it.
+ * The socket is the lock: binding is an atomic claim the operating system arbitrates. What binding
+ * a file cannot do is clean up after a process that was killed -- `SnapshotKillTest` is a reminder
+ * that processes here do get killed -- so a socket file nobody answers at is [removeStale]d and
+ * claimed. Removing it is the filesystem's business, and `engineering-conventions.md` 4.2 reserves
+ * that to `:platform-files`; the caller passes the means in.
  *
- * The greeting is what stops a stray service on the same port being mistaken for the application.
- * The server speaks first and the client sends nothing until it recognises what it heard, so the
- * worst a collision costs is a launch that decides it is the first instance.
+ * The greeting still guards the conversation. The server speaks first and the client sends nothing
+ * until it recognises what it heard, so the worst anything unexpected at the address costs is a
+ * launch that decides it is the first instance.
  */
 class SingleInstance(
-    private val port: Int = DEFAULT_PORT,
+    private val address: String,
+    private val removeStale: (String) -> Unit,
 ) {
-    private var server: ServerSocket? = null
+    private var server: ServerSocketChannel? = null
 
     /**
      * Becomes the running instance, or reports that one already exists.
@@ -42,13 +50,7 @@ class SingleInstance(
      * composition rather than touching it.
      */
     fun claim(onMessage: (String) -> Unit): Boolean {
-        val bound =
-            try {
-                ServerSocket(port, BACKLOG, InetAddress.getLoopbackAddress())
-            } catch (expectedWhenAlreadyRunning: IOException) {
-                // The ordinary second launch. Somebody else holds the port, which is the answer.
-                return false
-            }
+        val bound = bind() ?: return false
 
         server = bound
         thread(isDaemon = true, name = "drafts-single-instance") { accept(bound, onMessage) }
@@ -58,23 +60,19 @@ class SingleInstance(
     /**
      * Hands [message] to the running instance. False when there is nobody to hand it to.
      *
-     * False is also what a stranger on the port gets, and what a timeout gets. In every one of
-     * those cases the right answer is the same: carry on as the first instance. Refusing to start
-     * because something unexpected answered would make the application unlaunchable for a reason
-     * the reader could not possibly diagnose.
+     * False is also what anything that is not the application gets, and what a timeout gets. In
+     * every one of those cases the right answer is the same: carry on as the first instance.
+     * Refusing to start because something unexpected answered would make the application
+     * unlaunchable for a reason the reader could not possibly diagnose.
      */
     fun handOff(message: String): Boolean =
         try {
-            Socket().use { socket ->
-                socket.connect(java.net.InetSocketAddress(InetAddress.getLoopbackAddress(), port), TIMEOUT_MILLIS)
-                socket.soTimeout = TIMEOUT_MILLIS
-
-                val reader = socket.getInputStream().bufferedReader()
-                if (reader.readLine() != GREETING) {
+            SocketChannel.open(socketAddress()).use { channel ->
+                channel.configureBlocking(false)
+                if (channel.readLine(TIMEOUT_MILLIS) != GREETING) {
                     false
                 } else {
-                    socket.getOutputStream().write((message + "\n").toByteArray())
-                    socket.getOutputStream().flush()
+                    channel.writeLine(message)
                     true
                 }
             }
@@ -83,60 +81,153 @@ class SingleInstance(
             false
         }
 
-    /** Stops listening. The port is released, so the next launch becomes the running instance. */
+    /**
+     * Stops listening. The socket file goes, so the next launch becomes the running instance.
+     *
+     * Only the instance that claimed the address removes it. A launch that handed off and is on its
+     * way out must not take the running instance's socket with it.
+     */
+    @Synchronized
     fun release() {
-        runCatching { server?.close() }
+        val listening = server ?: return
+        runCatching { listening.close() }
         server = null
+        runCatching { removeStale(address) }
     }
 
+    /**
+     * Claims [address], clearing a socket file left by an instance that is no longer there.
+     *
+     * Only when nothing answers. Something that does answer is either the application or something
+     * else entirely, and in neither case is the file this launch's to remove.
+     */
+    private fun bind(): ServerSocketChannel? = bindOnce() ?: takeOverStale()
+
+    private fun takeOverStale(): ServerSocketChannel? {
+        if (answers()) return null
+
+        runCatching { removeStale(address) }
+        return bindOnce()
+    }
+
+    private fun bindOnce(): ServerSocketChannel? {
+        val channel = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
+        return try {
+            channel.bind(socketAddress(), BACKLOG)
+        } catch (expectedWhenTaken: IOException) {
+            channel.close()
+            null
+        }
+    }
+
+    private fun answers(): Boolean =
+        try {
+            SocketChannel.open(socketAddress()).use { true }
+        } catch (expectedWhenStale: IOException) {
+            false
+        }
+
     private fun accept(
-        bound: ServerSocket,
+        bound: ServerSocketChannel,
         onMessage: (String) -> Unit,
     ) {
-        while (!bound.isClosed) {
+        while (bound.isOpen) {
             val handled = runCatching { bound.accept().use { greet(it, onMessage) } }
 
             // A failed connection is one launch that did not get through, not a reason to stop
             // listening -- the application would then silently stop accepting documents for the
             // rest of the session.
-            if (handled.isFailure && bound.isClosed) return
+            if (handled.isFailure && !bound.isOpen) return
         }
     }
 
     private fun greet(
-        socket: Socket,
+        channel: SocketChannel,
         onMessage: (String) -> Unit,
     ) {
-        socket.soTimeout = TIMEOUT_MILLIS
-        socket.getOutputStream().write((GREETING + "\n").toByteArray())
-        socket.getOutputStream().flush()
+        channel.configureBlocking(false)
+        channel.writeLine(GREETING)
 
-        val message = readMessage(socket.getInputStream().bufferedReader())
+        // Something that connected and said nothing -- a launch that died between connecting and
+        // writing -- times out to null. It is not a message.
+        val message = channel.readLine(TIMEOUT_MILLIS)
         if (!message.isNullOrBlank()) onMessage(message)
     }
 
-    private fun readMessage(reader: BufferedReader): String? =
-        try {
-            reader.readLine()
-        } catch (expectedWhenPeerSaysNothing: SocketTimeoutException) {
-            // Something connected and said nothing: a port scanner, or a launch that died between
-            // connecting and writing. Neither is a document.
-            null
-        }
+    private fun socketAddress() = UnixDomainSocketAddress.of(address)
 
     companion object {
-        /**
-         * Chosen once and fixed, because both sides have to agree on it without a file to share.
-         *
-         * In the IANA dynamic range, so nothing is registered here, and specific enough to this
-         * application that a collision is a coincidence rather than a pattern. The greeting is
-         * what makes a collision harmless.
-         */
-        const val DEFAULT_PORT = 51_317
-
         const val GREETING = "appthere-drafts 1"
 
         private const val BACKLOG = 8
-        private const val TIMEOUT_MILLIS = 2_000
+        private const val TIMEOUT_MILLIS = 2_000L
     }
 }
+
+/**
+ * Reads one line, or gives up at the deadline.
+ *
+ * Unix-domain channels have no read timeout of their own, so the wait is a [Selector]'s. A peer that
+ * never finishes its line must not hold a launch -- or the instance's only listening thread -- for
+ * longer than that.
+ */
+private fun SocketChannel.readLine(timeoutMillis: Long): String? {
+    val line = LineBuffer()
+    val deadline = System.currentTimeMillis() + timeoutMillis
+
+    Selector.open().use { selector ->
+        register(selector, SelectionKey.OP_READ)
+        var done = false
+        while (!done) {
+            val left = deadline - System.currentTimeMillis()
+            done = left <= 0 || line.tooLong
+            if (!done && selector.select(left) > 0) {
+                selector.selectedKeys().clear()
+                done = line.readFrom(this)
+            }
+        }
+    }
+    return line.finished
+}
+
+/** The bytes of one line as they arrive, and the line once it has. */
+private class LineBuffer {
+    private val bytes = ByteArrayOutputStream()
+    private val chunk = ByteBuffer.allocate(READ_CHUNK)
+
+    /** The whole line, or what there was of it when the peer went away; null until then. */
+    var finished: String? = null
+        private set
+
+    /** Past any request's length: whatever is talking is not the application. */
+    val tooLong: Boolean get() = bytes.size() > MAX_LINE_BYTES
+
+    /** Takes what [channel] has; true once the line is complete or the peer has gone. */
+    fun readFrom(channel: SocketChannel): Boolean {
+        chunk.clear()
+        val ended = channel.read(chunk) < 0
+        chunk.flip()
+
+        var complete = false
+        while (chunk.hasRemaining() && !complete) {
+            val byte = chunk.get()
+            if (byte == NEWLINE) complete = true else bytes.write(byte.toInt())
+        }
+
+        val text = bytes.toString(Charsets.UTF_8)
+        finished = if (complete) text else text.takeIf { ended && it.isNotEmpty() }
+        return complete || ended
+    }
+}
+
+/** Writes one line; a request is small enough that a non-blocking channel takes it whole. */
+private fun SocketChannel.writeLine(text: String) {
+    val bytes = ByteBuffer.wrap((text + "\n").toByteArray(Charsets.UTF_8))
+    while (bytes.hasRemaining()) write(bytes)
+}
+
+private const val READ_CHUNK = 512
+
+/** Far longer than any path or request; anything past it is not the application talking. */
+private const val MAX_LINE_BYTES = 64 * 1024
+private const val NEWLINE = '\n'.code.toByte()
