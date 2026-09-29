@@ -12,21 +12,21 @@ Each entry says what the spec asks for, what the code does, why, and what would 
 
 ---
 
-## 8.2 — The conflict dialog offers two of four choices
+## 8.2 — The conflict dialog offers three of four choices
 
 **Spec:** "[ Save a copy… ] [ Reload and lose my changes ] [ Show differences ] [ Cancel ]"
 
-**Code:** Reload and Cancel. Escape also cancels.
+**Code:** Save a copy, Reload, and Cancel; Escape also cancels. "Save a copy…" is §7.4's *Save As*,
+offering the name marked as the reader's own version so the dialog does not open on the file
+being kept.
 
-**Why:** "Show differences" needs a diff view, which nothing has built. "Save a copy…" needed a
-platform save dialog, which now exists (§7.4's *Save As*); the button is not wired to it yet. A button that does nothing is worse
-than one that is not offered.
+**Why:** "Show differences" needs a diff view, which nothing has built. A button that does nothing
+is worse than one that is not offered.
 
 **What holds anyway:** the refusal itself — the part that protects the file — does not depend on
-any of the four.
+any of the four, and the answer that loses nothing, keeping both versions, is there.
 
-**Closes when:** "Save a copy…" is wired to the save dialog, which is a small change now; and
-whenever a diff view is built, for "Show differences".
+**Closes when:** a diff view is built.
 
 ---
 

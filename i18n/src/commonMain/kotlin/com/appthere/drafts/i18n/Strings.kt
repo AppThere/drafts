@@ -141,6 +141,10 @@ object Strings {
      * would not have been told.
      */
     const val CONFLICT = "This file has changed on disk since you opened it."
+    const val SAVE_COPY = "Save a copy\u2026"
     const val RELOAD = "Reload and lose my changes"
+
+    /** What "Save a copy" calls the copy, so the dialog does not open on the file being kept. */
+    const val MY_VERSION = "my version"
     const val CANCEL = "Cancel"
 }

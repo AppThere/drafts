@@ -29,6 +29,21 @@ fun EditorState.suggestedFileName(
     return "$base.${kind.extensions.first()}"
 }
 
+/**
+ * [name] marked as the reader's own version, for 8.2's "Save a copy...": `chapter.md` becomes
+ * `chapter (my version).md`.
+ *
+ * The copy has to be called something else. Offered the conflicted file's own name, the save dialog
+ * would open on the one version the reader chose to keep, one Return away from replacing it.
+ */
+fun copyName(
+    name: String,
+    label: String,
+): String {
+    val dot = name.lastIndexOf('.').takeIf { it > 0 } ?: name.length
+    return "${name.substring(0, dot)} ($label)${name.substring(dot)}"
+}
+
 private fun EditorState.firstHeading(): String? =
     blocks
         .asSequence()

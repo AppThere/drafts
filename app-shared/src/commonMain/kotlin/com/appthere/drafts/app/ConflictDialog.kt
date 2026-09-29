@@ -5,7 +5,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
@@ -37,12 +38,19 @@ import com.appthere.drafts.i18n.Strings
  * edits unsaved and the other version on disk; reloading is the only destructive choice and it says
  * so in the button. There is no default action and no dismissal by clicking away, because both
  * would let a reader lose work by pressing Return at the wrong moment.
+ *
+ * [onSaveCopy] is 8.2's "Save a copy...": the reader's version goes to a new file through 7.4's
+ * *Save As*, and the version on disk is left as it is. Keeping both is the answer that loses
+ * nothing, which is why it comes first, as it does in the spec. Null where the platform has no save
+ * dialog to offer.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ConflictDialog(
     onReload: () -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
+    onSaveCopy: (() -> Unit)? = null,
 ) {
     val palette = LocalPalette.current
 
@@ -60,7 +68,12 @@ fun ConflictDialog(
             style = TextStyle(color = palette.ink, fontSize = messageSize, fontWeight = Prose.H5.weight),
         )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(buttonGap)) {
+        // Wraps rather than overflowing: three answers do not fit one line at 200% text (10.2).
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(buttonGap),
+            verticalArrangement = Arrangement.spacedBy(buttonGap),
+        ) {
+            onSaveCopy?.let { Choice(label = Strings.SAVE_COPY, onChoose = it) }
             Choice(label = Strings.RELOAD, onChoose = onReload)
             Choice(label = Strings.CANCEL, onChoose = onCancel)
         }

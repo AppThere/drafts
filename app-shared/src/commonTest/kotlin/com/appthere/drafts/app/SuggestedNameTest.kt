@@ -64,6 +64,19 @@ class SuggestedNameTest {
         assertEquals("Untitled.md", name("# CON\n"))
     }
 
+    @Test
+    fun `a copy is named as the reader's own version`() {
+        // 8.2's "Save a copy...". Offered the conflicted file's own name, the dialog would open on
+        // the version the reader chose to keep.
+        assertEquals("chapter (my version).md", copyName("chapter.md", "my version"))
+        assertEquals("The Salt Road (my version).fountain", copyName("The Salt Road.fountain", "my version"))
+    }
+
+    @Test
+    fun `a name with no extension is still marked`() {
+        assertEquals("NOTES (my version)", copyName("NOTES", "my version"))
+    }
+
     private fun name(
         text: String,
         kind: DocumentKind = DocumentKind.Markdown,

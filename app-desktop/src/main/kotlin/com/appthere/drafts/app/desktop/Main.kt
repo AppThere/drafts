@@ -41,6 +41,7 @@ import com.appthere.drafts.app.KindChange
 import com.appthere.drafts.app.SampleDocument
 import com.appthere.drafts.app.SettingsStore
 import com.appthere.drafts.app.SnapshotKeeper
+import com.appthere.drafts.app.copyName
 import com.appthere.drafts.app.rememberOpenDocument
 import com.appthere.drafts.app.rememberSessionDocument
 import com.appthere.drafts.app.rememberUntitledDocument
@@ -49,6 +50,7 @@ import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.i18n.Strings
 import com.appthere.drafts.platform.files.Digest
 import com.appthere.drafts.platform.files.DocumentRef
+import com.appthere.drafts.platform.files.DocumentState
 import com.appthere.drafts.platform.files.PathDocumentStore
 import com.appthere.drafts.platform.files.Recovery
 import com.appthere.drafts.platform.files.SessionIdentity
@@ -376,11 +378,21 @@ private fun FileDocument(
                     saveAs = {
                         // 7.4: the name comes from the first heading or the title page while the
                         // document is untitled; once it has a file, Save As offers that file's name.
+                        val document = opening.document
                         val suggested =
-                            if (record.uri == null) {
-                                opening.document.editor.suggestedFileName(kindOf(record.kind), Strings.UNTITLED)
-                            } else {
-                                record.displayName
+                            when {
+                                record.uri == null -> {
+                                    document.editor.suggestedFileName(kindOf(record.kind), Strings.UNTITLED)
+                                }
+
+                                // 8.2's "Save a copy...": not the name of the version being kept.
+                                document.lifecycle.state == DocumentState.Conflicted -> {
+                                    copyName(record.displayName, Strings.MY_VERSION)
+                                }
+
+                                else -> {
+                                    record.displayName
+                                }
                             }
 
                         chooseSaveLocation(parent, Strings.SAVE_AS, suggested, near = record.accessToken)

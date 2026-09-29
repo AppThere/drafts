@@ -71,6 +71,8 @@ internal fun BoxScope.DocumentPrompts(
             },
             onCancel = saving::answered,
             modifier = Modifier.align(Alignment.Center).padding(inset),
+            // A successful copy settles the refusal; a cancelled one leaves the question open.
+            onSaveCopy = saveAs?.let { { scope.launch { saving.saveAs(it) } } },
         )
     }
 
