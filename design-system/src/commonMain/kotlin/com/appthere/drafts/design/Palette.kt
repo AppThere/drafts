@@ -17,7 +17,15 @@ import androidx.compose.ui.graphics.Color
  */
 @Immutable
 data class Palette(
-    val name: String,
+    /**
+     * A stable identifier, never shown to anybody.
+     *
+     * 11.1 puts user-facing strings in resources, which means they get translated -- and this value
+     * is the key a reader's chosen theme is saved under. A name that is both would lose every saved
+     * theme the first time the application was translated, so the two are separate and this is the
+     * half that never changes.
+     */
+    val id: String,
     val background: Color,
     val ink: Color,
     val muted: Color,
@@ -38,7 +46,7 @@ object Palettes {
     /** Paper under warm light. */
     val Light =
         Palette(
-            name = "Light",
+            id = "light",
             background = Color(0xFFFDFCFA),
             ink = Color(0xFF1B1B1B),
             muted = Color(0xFF5C5C5C),
@@ -48,7 +56,7 @@ object Palettes {
     /** Not black: a true black ground makes light text bloom, which is worse to read, not better. */
     val Dark =
         Palette(
-            name = "Dark",
+            id = "dark",
             background = Color(0xFF14161A),
             ink = Color(0xFFE8E6E3),
             muted = Color(0xFF9BA0A6),
@@ -58,7 +66,7 @@ object Palettes {
     /** The long-session palette: lower blue, lower contrast between ink and ground than Light. */
     val Sepia =
         Palette(
-            name = "Sepia",
+            id = "sepia",
             background = Color(0xFFF4ECD8),
             ink = Color(0xFF2E2619),
             muted = Color(0xFF5A4B36),
@@ -68,7 +76,7 @@ object Palettes {
     /** 10.2: "The high-contrast theme targets 7:1." Everything here clears it, including muted. */
     val HighContrast =
         Palette(
-            name = "High contrast",
+            id = "high-contrast",
             background = Color(0xFF000000),
             ink = Color(0xFFFFFFFF),
             muted = Color(0xFFD6D6D6),

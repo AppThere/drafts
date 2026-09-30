@@ -121,7 +121,7 @@ class SettingsStore(
 
 private fun ReaderSettings.toRecord() =
     ReaderSettingsRecord(
-        palette = theme.name,
+        palette = theme.id,
         baseSp = base.value,
         lineHeight = lineHeight,
         letterSpacing = letterSpacing,
@@ -159,7 +159,7 @@ private fun ReaderSettingsRecord.motionPreference(): MotionPreference =
  */
 private fun ReaderSettingsRecord.toSettings(): ReaderSettings =
     ReaderSettings(
-        theme = Theme.named(palette) ?: ReaderSettings().theme,
+        theme = Theme.withId(palette) ?: ReaderSettings().theme,
         base = baseSp.sp,
         lineHeight = lineHeight,
         letterSpacing = letterSpacing,

@@ -36,6 +36,7 @@ import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.Measure
 import com.appthere.drafts.design.MotionPreference
 import com.appthere.drafts.design.Palette
+import com.appthere.drafts.design.Palettes
 import com.appthere.drafts.design.Prose
 import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.design.Theme
@@ -194,9 +195,9 @@ private fun ThemeChoice(
 ) {
     Choice(
         label = Strings.THEME,
-        options = Theme.all.map { it.name },
-        selected = settings.theme.name,
-        onSelect = { name -> Theme.named(name)?.let { onChange(settings.copy(theme = it)) } },
+        options = Theme.all.map(::labelOf),
+        selected = labelOf(settings.theme),
+        onSelect = { label -> themeLabelled(label)?.let { onChange(settings.copy(theme = it)) } },
     )
 }
 
@@ -438,3 +439,22 @@ private fun preferenceOf(label: String): MotionPreference =
         Strings.MOTION_REDUCED -> MotionPreference.Reduced
         else -> MotionPreference.System
     }
+
+/**
+ * A theme as the reader sees it.
+ *
+ * Deliberately not `Theme.id`. That is the key their choice is saved under and it must survive
+ * 11.1's translation; this is the word, and words change language. Keeping them the same string
+ * would mean a reader who switched the application to French lost the theme they had chosen.
+ */
+private fun labelOf(theme: Theme): String =
+    when (theme.id) {
+        Palettes.Light.id -> Strings.THEME_LIGHT
+        Palettes.Dark.id -> Strings.THEME_DARK
+        Palettes.Sepia.id -> Strings.THEME_SEPIA
+        Palettes.HighContrast.id -> Strings.THEME_HIGH_CONTRAST
+        else -> Strings.THEME_SYSTEM
+    }
+
+/** And back, for the control that offers the words. */
+private fun themeLabelled(label: String): Theme? = Theme.all.firstOrNull { labelOf(it) == label }

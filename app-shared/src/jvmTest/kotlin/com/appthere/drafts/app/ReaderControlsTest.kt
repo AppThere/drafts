@@ -93,7 +93,7 @@ class ReaderControlsTest {
             var settings by mutableStateOf(ReaderSettings())
             setContent { DraftsTheme(settings) { ReaderControls(settings, onChange = { settings = it }) } }
 
-            onNodeWithContentDescription("Theme, ${Palettes.Dark.name}").performClick()
+            onNodeWithContentDescription("Theme, ${Strings.THEME_DARK}").performClick()
 
             assertEquals(Theme.Fixed(Palettes.Dark), settings.theme)
         }
@@ -106,7 +106,7 @@ class ReaderControlsTest {
             var settings by mutableStateOf(ReaderSettings())
             setContent { DraftsTheme(settings) { ReaderControls(settings, onChange = { settings = it }) } }
 
-            onNodeWithContentDescription("Theme, ${Theme.System.name}").performClick()
+            onNodeWithContentDescription("Theme, ${Strings.THEME_SYSTEM}").performClick()
 
             assertEquals(Theme.System, settings.theme)
         }
@@ -131,7 +131,7 @@ class ReaderControlsTest {
             setContent { DraftsTheme(settings) { ReaderControls(settings, onChange = {}) } }
 
             val targets =
-                listOf("Text size, increase", "Text size, decrease", "Theme, ${Palettes.Sepia.name}", "Motion, Full")
+                listOf("Text size, increase", "Text size, decrease", "Theme, ${Strings.THEME_SEPIA}", "Motion, Full")
 
             targets.forEach { description ->
                 onNodeWithContentDescription(description)
@@ -189,7 +189,7 @@ class ReaderControlsTest {
                 "Letter spacing, increase",
                 "Line length, increase",
                 "Body weight, increase",
-                "Theme, ${Palettes.HighContrast.name}",
+                "Theme, ${Strings.THEME_HIGH_CONTRAST}",
                 "Motion, Reduced",
                 "Licences",
             ).forEach { control ->
@@ -218,7 +218,7 @@ class ReaderControlsTest {
                 }
             }
 
-            listOf("Theme, ${Palettes.HighContrast.name}", "Text size, increase", "Motion, Reduced")
+            listOf("Theme, ${Strings.THEME_HIGH_CONTRAST}", "Text size, increase", "Motion, Reduced")
                 .forEach { control ->
                     val bounds = onNodeWithContentDescription(control).getBoundsInRoot()
 

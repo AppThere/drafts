@@ -83,6 +83,19 @@ object Strings {
     const val READER_CONTROLS = "Reader"
     const val OPEN_READER_CONTROLS = "Reader controls"
     const val THEME = "Theme"
+
+    /**
+     * The theme names a reader sees, which are not the keys their choice is saved under.
+     *
+     * 11.1 will translate everything in this object. A theme's identifier must survive that, so it
+     * lives on `Palette.id` and never comes through here -- these are the words, and words change
+     * language.
+     */
+    const val THEME_LIGHT = "Light"
+    const val THEME_DARK = "Dark"
+    const val THEME_SEPIA = "Sepia"
+    const val THEME_HIGH_CONTRAST = "High contrast"
+    const val THEME_SYSTEM = "Follow the system"
     const val TEXT_SIZE = "Text size"
     const val LINE_HEIGHT = "Line height"
     const val LETTER_SPACING = "Letter spacing"

@@ -165,16 +165,22 @@ report on what exists without it.
 
 ---
 
-## 11.1 — Strings are constants, and theme names cannot be translated
+## 11.1 — Strings are constants
 
 **Spec:** "User-facing strings live in resources."
 
-**Code:** `Strings` is a Kotlin object of constants, provisional since Phase 0. Theme names are
-`Palette.name` and `"System"`, which are also the keys settings are saved under, so translating
-them would lose every saved theme. Several labels are built by concatenation.
+**Code:** `Strings` is a Kotlin object of constants, provisional since Phase 0. Several labels are
+still built by concatenation.
 
-**Closes when:** before the Phase 5 i18n audit. Separate the saved key from the displayed name
-first; moving to resources is then mechanical.
+Theme names no longer block this. Identifiers and labels used to be one string -- `Palette.name` was
+both what a reader saw and the key their choice was saved under -- so translating the application
+would have reset every saved theme. They are now separate: `Palette.id` and `Theme.id` are stable,
+lowercase and never shown, the words live in `Strings`, and settings written before the split still
+resolve. `MotionPreference`, `FocusMode` and `DocumentKind` were already separated this way.
+
+**Closes when:** the constants move to Compose Resources. That is mechanical now -- 170 call sites
+across `:a11y`, `:editor-ui` and `:app-shared`, each a constant becoming a resource lookup -- and
+nothing it touches can lose a reader's settings any more.
 
 ---
 

@@ -11,11 +11,13 @@ import androidx.compose.runtime.Immutable
  * choice and the palette are separate values: [ReaderSettings] holds the choice, and [DraftsTheme]
  * turns it into the palette in force.
  *
- * [name] is what goes to disk, and is stable across versions for that reason.
+ * [id] is what goes to disk, and is stable across versions for that reason. What the reader sees is
+ * a separate string that 11.1 will translate; conflating the two would lose every saved theme the
+ * first time this application spoke another language.
  */
 @Immutable
 sealed interface Theme {
-    val name: String
+    val id: String
 
     /** The palette this choice means, given whether the system currently prefers dark. */
     fun paletteFor(systemPrefersDark: Boolean): Palette
@@ -24,7 +26,7 @@ sealed interface Theme {
     data class Fixed(
         val palette: Palette,
     ) : Theme {
-        override val name: String get() = palette.name
+        override val id: String get() = palette.id
 
         override fun paletteFor(systemPrefersDark: Boolean): Palette = palette
     }
@@ -36,7 +38,7 @@ sealed interface Theme {
      * no system preference says which of them anyone wants.
      */
     data object System : Theme {
-        override val name: String = "System"
+        override val id: String = "system"
 
         override fun paletteFor(systemPrefersDark: Boolean): Palette =
             if (systemPrefersDark) Palettes.Dark else Palettes.Light
@@ -46,7 +48,23 @@ sealed interface Theme {
         /** Every choice, in the order 5.5 lists them. */
         val all: List<Theme> = Palettes.all.map(::Fixed) + System
 
-        /** The choice with [name], or null if no theme is called that. */
-        fun named(name: String): Theme? = all.firstOrNull { it.name == name }
+        /**
+         * The choice saved as [id], or null if nothing is.
+         *
+         * Settings written before the identifier and the label were separated say "Light", "Dark",
+         * "Sepia", "High contrast" or "System" -- the old names, which were also what was shown.
+         * Those still resolve, because a reader changing version should not find their theme reset.
+         */
+        fun withId(id: String): Theme? = all.firstOrNull { it.id == id } ?: all.firstOrNull { it.id == LEGACY[id] }
+
+        /** What the names written before the split meant. */
+        private val LEGACY =
+            mapOf(
+                "Light" to "light",
+                "Dark" to "dark",
+                "Sepia" to "sepia",
+                "High contrast" to "high-contrast",
+                "System" to "system",
+            )
     }
 }

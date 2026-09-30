@@ -34,7 +34,7 @@ class PaletteTest {
             val ratio = Contrast.ratio(palette.ink, palette.background)
             assertTrue(
                 ratio >= palette.minimumContrast,
-                "${palette.name}: ink on background is ${round(ratio)}:1, below ${palette.minimumContrast}:1",
+                "${palette.id}: ink on background is ${round(ratio)}:1, below ${palette.minimumContrast}:1",
             )
         }
     }
@@ -47,7 +47,7 @@ class PaletteTest {
             val ratio = Contrast.ratio(palette.muted, palette.background)
             assertTrue(
                 ratio >= palette.minimumContrast,
-                "${palette.name}: muted on background is ${round(ratio)}:1, below ${palette.minimumContrast}:1",
+                "${palette.id}: muted on background is ${round(ratio)}:1, below ${palette.minimumContrast}:1",
             )
         }
     }
@@ -58,7 +58,7 @@ class PaletteTest {
             val ratio = Contrast.ratio(palette.accent, palette.background)
             assertTrue(
                 ratio >= palette.minimumContrast,
-                "${palette.name}: accent on background is ${round(ratio)}:1, below ${palette.minimumContrast}:1",
+                "${palette.id}: accent on background is ${round(ratio)}:1, below ${palette.minimumContrast}:1",
             )
         }
     }
@@ -72,7 +72,7 @@ class PaletteTest {
             val ink = Contrast.ratio(palette.ink, palette.background)
             val muted = Contrast.ratio(palette.muted, palette.background)
 
-            assertTrue(muted < ink, "${palette.name}: muted is not quieter than ink")
+            assertTrue(muted < ink, "${palette.id}: muted is not quieter than ink")
         }
     }
 
@@ -83,7 +83,7 @@ class PaletteTest {
 
         others.forEach { palette ->
             val ratio = Contrast.ratio(palette.ink, palette.background)
-            assertTrue(high > ratio, "High contrast (${round(high)}:1) is not above ${palette.name}")
+            assertTrue(high > ratio, "High contrast (${round(high)}:1) is not above ${palette.id}")
         }
     }
 
@@ -92,7 +92,7 @@ class PaletteTest {
         assertEquals(
             Palettes.all.size,
             Palettes.all
-                .map { it.name }
+                .map { it.id }
                 .toSet()
                 .size,
             "Two palettes share a name",
