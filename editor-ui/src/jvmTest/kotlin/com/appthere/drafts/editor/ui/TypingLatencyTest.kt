@@ -215,8 +215,16 @@ class TypingLatencyTest {
 
         const val TEN_THOUSAND = 10_000
 
-        const val KEYSTROKES = 40
-        const val WARMUP = 10
+        /**
+         * Enough samples that the median is a measurement rather than a draw.
+         *
+         * At forty keystrokes after ten of warm-up, repeated runs of identical code spread across
+         * about 800 microseconds -- which straddles the frame budget the test asserts, so the same
+         * code passed and failed depending on the run. The budget is not the problem; the estimate
+         * was. More warm-up settles the JIT and more samples narrow the median.
+         */
+        const val KEYSTROKES = 120
+        const val WARMUP = 60
         const val TAIL_SAMPLE = 5
 
         /** So the trivial recomposition changes its text rather than repeating one value. */

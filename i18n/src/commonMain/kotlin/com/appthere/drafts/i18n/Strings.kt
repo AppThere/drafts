@@ -93,6 +93,9 @@ object Strings {
     const val MOTION_FULL = "Full"
     const val MOTION_REDUCED = "Reduced"
 
+    /** 10.2: following the operating system is the default, and has to be sayable. */
+    const val MOTION_SYSTEM = "Follow the system"
+
     /** A settings file that could not be written: what it means for the reader, not the disk. */
     const val SETTINGS_NOT_SAVED =
         "These settings could not be kept. They apply until this window closes, " +

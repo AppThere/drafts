@@ -2,6 +2,7 @@ package com.appthere.drafts.app
 
 import androidx.compose.ui.unit.sp
 import com.appthere.drafts.design.FocusMode
+import com.appthere.drafts.design.MotionPreference
 import com.appthere.drafts.design.Prose
 import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.design.Theme
@@ -35,7 +36,13 @@ internal data class ReaderSettingsRecord(
     val paragraphSpacing: Float = Prose.Body.spaceAfter,
     val characters: Float,
     val bodyWeight: Int,
-    val reducedMotion: Boolean,
+    /**
+     * Null in files written before motion became a three-way choice. [toSettings] reads the old
+     * boolean when it is, so a reader who had asked for reduced motion keeps it.
+     */
+    val motion: String? = null,
+    /** Only ever read, never written. See [motionPreference]. */
+    val reducedMotion: Boolean = false,
     val typewriterScrolling: Boolean,
     val focusMode: String,
     val autoHideChrome: Boolean,
@@ -121,11 +128,24 @@ private fun ReaderSettings.toRecord() =
         paragraphSpacing = paragraphSpacing,
         characters = characters,
         bodyWeight = bodyWeight,
-        reducedMotion = reducedMotion,
+        motion = motion.name,
         typewriterScrolling = typewriterScrolling,
         focusMode = focusMode.name,
         autoHideChrome = autoHideChrome,
     )
+
+/**
+ * The motion preference a file expresses, whichever way it expresses it.
+ *
+ * Motion used to be a boolean, so files exist that say `reducedMotion` and nothing else. Reading
+ * those as the new default would silently give animation back to a reader who had turned it off,
+ * which is the one group of readers for whom that is not a small matter.
+ *
+ * A name that is not a preference falls back to the default rather than failing the load.
+ */
+private fun ReaderSettingsRecord.motionPreference(): MotionPreference =
+    motion?.let(MotionPreference::named)
+        ?: if (reducedMotion) MotionPreference.Reduced else ReaderSettings().motion
 
 /**
  * Back to settings, clamped.
@@ -146,7 +166,7 @@ private fun ReaderSettingsRecord.toSettings(): ReaderSettings =
         paragraphSpacing = paragraphSpacing,
         characters = characters,
         bodyWeight = bodyWeight,
-        reducedMotion = reducedMotion,
+        motion = motionPreference(),
         typewriterScrolling = typewriterScrolling,
         focusMode = FocusMode.entries.firstOrNull { it.name == focusMode } ?: FocusMode.Off,
         autoHideChrome = autoHideChrome,

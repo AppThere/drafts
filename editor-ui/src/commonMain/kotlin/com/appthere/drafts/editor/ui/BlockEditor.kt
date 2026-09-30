@@ -1,5 +1,7 @@
 package com.appthere.drafts.editor.ui
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -53,6 +55,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.appthere.drafts.core.model.Block
 import com.appthere.drafts.design.FocusMode
+import com.appthere.drafts.design.LocalMotion
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.LocalReaderSettings
 import com.appthere.drafts.design.Measure
@@ -228,23 +231,37 @@ private fun BlockRow(
             )
 
         Box(Modifier.fillMaxWidth().heightIn(min = reserved)) {
-            if (emphasis == RowEmphasis.Focused) {
-                RevealField(
-                    state = state,
-                    id = id,
-                    source = content.source,
-                    style = prose.textStyle,
-                    softWrapped = content.softWrapped,
-                )
-            } else {
-                PreviewText(
-                    state = state,
-                    layer = layer,
-                    id = id,
-                    preview = content.preview,
-                    style = prose.textStyle,
-                    modifier = Modifier.spoken(content.spoken),
-                )
+            // 4.2: "Cross-fade inline decoration over 120ms with no layout animation. Because block
+            // metrics are identical in both states (4.1), nothing moves -- only glyph styling
+            // changes. Respect `prefers-reduced-motion`: at reduced motion the switch is
+            // instantaneous."
+            //
+            // No layout animation is the reserved height above, which both states already share.
+            // This fades only what is drawn inside it, and the duration is the one token the design
+            // system has for it -- zero under reduced motion, which makes the switch instant
+            // without a branch here to forget.
+            Crossfade(
+                targetState = emphasis == RowEmphasis.Focused,
+                animationSpec = tween(LocalMotion.current.revealMillis),
+            ) { revealed ->
+                if (revealed) {
+                    RevealField(
+                        state = state,
+                        id = id,
+                        source = content.source,
+                        style = prose.textStyle,
+                        softWrapped = content.softWrapped,
+                    )
+                } else {
+                    PreviewText(
+                        state = state,
+                        layer = layer,
+                        id = id,
+                        preview = content.preview,
+                        style = prose.textStyle,
+                        modifier = Modifier.spoken(content.spoken),
+                    )
+                }
             }
         }
     }

@@ -38,7 +38,13 @@ data class ReaderSettings(
     val characters: Float = Measure.MEASURE_EM * 2,
     /** 5.5: 300-500 for body, for low-vision support. */
     val bodyWeight: Int = DEFAULT_BODY_WEIGHT,
-    val reducedMotion: Boolean = false,
+    /**
+     * 10.2's `prefers-reduced-motion`, following the system unless the reader says otherwise.
+     *
+     * The default is [MotionPreference.System] rather than "full": someone who asked their
+     * operating system for less motion has answered this once already.
+     */
+    val motion: MotionPreference = MotionPreference.System,
     /**
      * 12: "**Typewriter scrolling** as an option: keep the caret at a fixed vertical position."
      *

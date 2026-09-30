@@ -149,21 +149,19 @@ dim the wrong half of a sentence for most of the world.
 
 ---
 
-## 10.1, 10.2, 4.2 — No outline view, and motion ignores the OS
+## 10.1 — No outline view
 
-**Spec:** §10.1's outline view ("disproportionately valuable for screen reader users, who cannot
-skim"); §10.2 "Honour `prefers-reduced-motion`"; §4.2's 120ms cross-fade.
+**Spec:** §10.1's outline view, "disproportionately valuable for screen reader users, who cannot
+skim".
 
 **Code:** §10.1's block semantics are in place — headings are headings, other blocks are named
 before their words ("Block quote, …", "Code block, Kotlin, …") without the preview's decoration,
 the block being edited is read as its raw source, and structural edits are announced politely
 ("Heading level 2.", "Joined with the block above."). Checked in the semantics tree and in what
-Android hands TalkBack. Not yet: an outline view; reading the operating system's reduced-motion
-setting (only the reader's own toggle exists); and the cross-fade (`Motion.revealMillis` is read
-nowhere), so reveal is instant for everyone.
+Android hands TalkBack. There is no outline view.
 
-**Closes when:** before the Phase 5 accessibility audit. The outline is a feature of its own; the
-OS setting is per-platform plumbing in `:a11y`.
+**Closes when:** it is built. It is a feature of its own rather than plumbing, and the audit can
+report on what exists without it.
 
 ---
 

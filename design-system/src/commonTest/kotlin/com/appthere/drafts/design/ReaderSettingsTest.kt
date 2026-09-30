@@ -23,7 +23,8 @@ class ReaderSettingsTest {
         assertEquals(Prose.DefaultBase, settings.base)
         assertEquals(Theme.Fixed(Palettes.Light), settings.theme)
         assertEquals(ReaderSettings.DEFAULT_BODY_WEIGHT, settings.bodyWeight)
-        assertFalse(settings.reducedMotion)
+        // 10.2 is honoured by default: a reader who told their system already has been heard.
+        assertEquals(MotionPreference.System, settings.motion)
     }
 
     @Test

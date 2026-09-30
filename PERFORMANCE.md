@@ -33,6 +33,17 @@ Scroll also discards two full sweeps before measuring. The first sweep through t
 about three times slower than the third; comparing unwarmed early samples against warmed later ones
 reports the editor slowing down as the reader scrolls, which is the reverse of what happens.
 
+## A correction to how typing is measured
+
+The Phase 4 figures below were taken at 40 keystrokes after 10 of warm-up. Repeated runs of
+identical code spread across about 800 microseconds at that sample size, which straddles the frame
+budget the test asserts -- so the same code passed and failed depending on the run, and the "4% of
+the budget left" recorded for Phase 4 was mostly an under-warmed estimate rather than a real margin.
+
+From Phase 5 the sample is 120 keystrokes after 60 of warm-up. The spread falls to about 600
+microseconds and the median settles around 6,100. **The Phase 4 and Phase 5 typing figures are not
+comparable**: the budget did not move and neither did the code, only the estimate.
+
 ## Measurements
 
 Machine: this development machine (Linux, JVM desktop target). Not "the slowest target device" the
@@ -77,3 +88,24 @@ phase's run on a quiet machine -- the same kind of human the gate already assume
 The typing test *does* assert its budget, and passes with 4% to spare. That margin is thin enough
 that it will eventually fail for reasons that have nothing to do with the change in front of it.
 Worth watching.
+
+### Phase 5 — 2026-09-30
+
+Fixture: 62,724 code units, 512 blocks, 10,000+ words. Same machine.
+
+| Measurement | Value | Budget | Margin |
+|---|---|---|---|
+| Reparse window per keystroke | 216 code units (0.3% of document) | bounded | — |
+| Engine time per edit (median) | 516 us | 8,333 us | 94% spare |
+| Typing latency, attributable (median of four runs) | 6,083 us | 8,333 us | **27% spare** |
+| Scroll per screen, attributable (median) | 2,916 us | 8,333 us | 65% spare |
+
+Typing measured at the new sample size; see the correction above before comparing with Phase 4.
+Four runs gave 5,866 / 6,184 / 5,828 / 6,455.
+
+Phase 5 added 4.2's reveal cross-fade, which is the first animation this application has. Measured
+with and without it at the old sample size: 8,304 against 8,187 microseconds, a difference of about
+120 microseconds inside a spread four times that. It costs nothing that can be distinguished from
+noise.
+
+Engine and scroll figures are unchanged.

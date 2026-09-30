@@ -7,6 +7,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.unit.TextUnit
+import com.appthere.drafts.a11y.systemPrefersReducedMotion
 
 /**
  * The reader's settings, everywhere below [DraftsTheme].
@@ -48,7 +49,7 @@ fun DraftsTheme(
     CompositionLocalProvider(
         LocalReaderSettings provides held,
         LocalPalette provides palette,
-        LocalMotion provides Motion.of(held.reducedMotion),
+        LocalMotion provides held.motion.motionFor(systemPrefersReducedMotion()),
         content = content,
     )
 }

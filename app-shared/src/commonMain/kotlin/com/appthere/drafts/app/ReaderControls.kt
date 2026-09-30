@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import com.appthere.drafts.design.FocusMode
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.Measure
+import com.appthere.drafts.design.MotionPreference
 import com.appthere.drafts.design.Palette
 import com.appthere.drafts.design.Prose
 import com.appthere.drafts.design.ReaderSettings
@@ -245,9 +246,9 @@ private fun MotionChoice(
 ) {
     Choice(
         label = Strings.MOTION,
-        options = listOf(Strings.MOTION_FULL, Strings.MOTION_REDUCED),
-        selected = if (settings.reducedMotion) Strings.MOTION_REDUCED else Strings.MOTION_FULL,
-        onSelect = { choice -> onChange(settings.copy(reducedMotion = choice == Strings.MOTION_REDUCED)) },
+        options = listOf(Strings.MOTION_SYSTEM, Strings.MOTION_FULL, Strings.MOTION_REDUCED),
+        selected = labelOf(settings.motion),
+        onSelect = { choice -> onChange(settings.copy(motion = preferenceOf(choice))) },
     )
 }
 
@@ -416,3 +417,24 @@ private const val PARAGRAPH_STEP = 0.25f
 private const val MEASURE_STEP = 5f
 private const val WEIGHT_STEP = 50
 private const val HUNDRED = 100
+
+/**
+ * The three motion choices, as words.
+ *
+ * "Follow the system" is offered first because it is the default, and because 10.2's promise is
+ * that a reader who has already told their operating system does not have to tell this as well.
+ */
+private fun labelOf(preference: MotionPreference): String =
+    when (preference) {
+        MotionPreference.Full -> Strings.MOTION_FULL
+        MotionPreference.Reduced -> Strings.MOTION_REDUCED
+        MotionPreference.System -> Strings.MOTION_SYSTEM
+    }
+
+/** And back. An unrecognised label follows the system, which is the default. */
+private fun preferenceOf(label: String): MotionPreference =
+    when (label) {
+        Strings.MOTION_FULL -> MotionPreference.Full
+        Strings.MOTION_REDUCED -> MotionPreference.Reduced
+        else -> MotionPreference.System
+    }

@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.appthere.drafts.design.DraftsTheme
 import com.appthere.drafts.design.Measure
+import com.appthere.drafts.design.MotionPreference
 import com.appthere.drafts.design.Palettes
 import com.appthere.drafts.design.Prose
 import com.appthere.drafts.design.ReaderSettings
@@ -118,7 +119,7 @@ class ReaderControlsTest {
 
             onNodeWithContentDescription("Motion, Reduced").performClick()
 
-            assertTrue(settings.reducedMotion)
+            assertEquals(MotionPreference.Reduced, settings.motion)
         }
 
     @Test

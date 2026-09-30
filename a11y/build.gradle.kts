@@ -1,10 +1,8 @@
-// Plain Kotlin Multiplatform, not the Compose convention it was given in Phase 0: what it holds so
-// far -- what blocks are called, and what is announced -- is policy, and has nothing to compose.
-// The Compose compiler refuses a module without the Compose runtime, and adding the runtime only to
-// satisfy it would be a dependency nothing uses. When preference plumbing arrives (10.2's
-// reduced motion from the OS), and needs Compose, this goes back.
+// The preference plumbing 10.2 asks for has arrived, so this is a Compose module again -- reading
+// the operating system's reduced-motion setting needs a `Context` on Android and a composition to
+// read it from, exactly as `isSystemInDarkTheme()` does.
 plugins {
-    id("drafts.kmp")
+    id("drafts.kmp.compose")
 }
 
 kotlin {
@@ -13,6 +11,10 @@ kotlin {
             // What a block is (the model) and what it is called (the strings), for 10.1's names.
             api(project(":core-model"))
             implementation(project(":i18n"))
+
+            implementation(compose.runtime)
+            // `LocalContext`, which is how the Android actual reaches the system settings.
+            implementation(compose.ui)
         }
     }
 }

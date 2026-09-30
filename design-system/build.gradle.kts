@@ -5,6 +5,10 @@ plugins {
 kotlin {
     sourceSets {
         commonMain.dependencies {
+            // 10.2's preference plumbing: the system's reduced-motion setting, which only the
+            // platform can answer. `:a11y` sits alongside this one and below the editor, so this
+            // is a sideways edge rather than a new layer.
+            implementation(project(":a11y"))
             implementation(compose.runtime)
             implementation(compose.ui)
             // For `isSystemInDarkTheme`, which is how 5.5's "system" theme knows what the system is.
