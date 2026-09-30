@@ -129,7 +129,7 @@ class SettingsStoreTest {
         }
 
     @Test
-    fun `following the system is remembered as that, not as the palette it gave today`() =
+    fun `following the system is remembered as following it rather than as today's palette`() =
         runTest {
             // Saved in the evening, a "system" theme resolves to Dark. Remembering Dark would leave
             // the reader in a dark document the next morning, which is not what they chose.
