@@ -181,6 +181,9 @@ fun DraftsApp(
             hidden = autoHide.hidden,
             onKindChange = onKindChange,
             modifier = Modifier.align(Alignment.TopStart).padding(controlsInset),
+            // The same save the Ctrl+S shortcut reaches, for the readers who have no Ctrl. An
+            // untitled document goes through Save As, which `Saving` already decides.
+            onSave = { scope.launch { saving.save(saveAs) } },
         )
 
         DocumentPrompts(document, keeper, saving, saveAs)
@@ -372,6 +375,7 @@ private fun StatusChrome(
     hidden: Boolean,
     onKindChange: ((DocumentKind) -> Unit)?,
     modifier: Modifier = Modifier,
+    onSave: (() -> Unit)? = null,
 ) {
     Box(modifier) {
         FadingChrome(hidden = hidden) {
@@ -379,7 +383,9 @@ private fun StatusChrome(
                 horizontalArrangement = Arrangement.spacedBy(chromeGap),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                DocumentStateBadge(document.lifecycle.state)
+                // Faded chrome cannot be pressed, for the same reason the controls button cannot:
+                // a tap on an empty-looking corner should not save a document.
+                DocumentStateBadge(document.lifecycle.state, onSave = onSave.takeIf { !hidden })
 
                 if (document.isUntitled && onKindChange != null) {
                     KindSwitch(kind = kindOf(kind), enabled = !hidden, onChange = onKindChange)

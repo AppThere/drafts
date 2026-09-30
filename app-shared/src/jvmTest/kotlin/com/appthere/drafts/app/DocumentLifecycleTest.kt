@@ -2,8 +2,11 @@ package com.appthere.drafts.app
 
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SkikoComposeUiTest
+import androidx.compose.ui.test.assertHasNoClickAction
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -11,9 +14,11 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
+import androidx.compose.ui.unit.dp
 import com.appthere.drafts.editor.engine.Caret
 import com.appthere.drafts.editor.engine.DocumentSession
 import com.appthere.drafts.editor.ui.EditorState
@@ -30,6 +35,7 @@ import kotlin.io.path.writeText
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Section 8 through the whole stack, against a real file.
@@ -282,6 +288,72 @@ class DocumentLifecycleTest {
         }
     }
 
+    @Test
+    fun `the document can be saved without a keyboard`() {
+        // A phone has no Ctrl. Until now saving was reachable only by shortcut, so on a touch
+        // device there was no way to save at all -- 10.2's "every action reachable without pointer"
+        // read the other way round.
+        runSkikoComposeUiTest(size = SIZE) {
+            val document = open(ORIGINAL)
+            setContent { DraftsApp(document = document) }
+            type(document, "Mine. ")
+
+            onNodeWithContentDescription(badge(Strings.STATE_DIRTY)).performClick()
+            waitUntil(timeoutMillis = TIMEOUT) { showing(badge(Strings.STATE_CLEAN)) }
+
+            assertEquals("Mine. $ORIGINAL", file().readText())
+        }
+    }
+
+    @Test
+    fun `a screen reader can save the document`() {
+        // The audience this control exists for most. A touch reader navigates by the semantics
+        // tree and activates through it, not by tapping where a sighted reader would -- and
+        // `clearAndSetSemantics` drops the click action along with everything else it clears, so
+        // the button can be perfectly tappable and invisible to them at the same time.
+        runSkikoComposeUiTest(size = SIZE) {
+            val document = open(ORIGINAL)
+            setContent { DraftsApp(document = document) }
+            type(document, "Mine. ")
+
+            onNodeWithContentDescription(badge(Strings.STATE_DIRTY))
+                .performSemanticsAction(SemanticsActions.OnClick)
+            waitUntil(timeoutMillis = TIMEOUT) { showing(badge(Strings.STATE_CLEAN)) }
+
+            assertEquals("Mine. $ORIGINAL", file().readText())
+        }
+    }
+
+    @Test
+    fun `a saved document offers nothing to press`() {
+        // A control that does nothing is worse than no control. With everything already in the
+        // file there is nothing to save, so the indicator is a status and not a button.
+        runSkikoComposeUiTest(size = SIZE) {
+            val document = open(ORIGINAL)
+            setContent { DraftsApp(document = document) }
+            waitForIdle()
+
+            onNodeWithContentDescription(badge(Strings.STATE_CLEAN)).assertHasNoClickAction()
+        }
+    }
+
+    @Test
+    fun `the save target is big enough to hit`() {
+        // 10.2: "Touch targets >= 48dp." The indicator is a dot four across; as a button it has to
+        // be something a thumb can find.
+        runSkikoComposeUiTest(size = SIZE) {
+            val document = open(ORIGINAL)
+            setContent { DraftsApp(document = document) }
+            type(document, "Mine. ")
+
+            val bounds = onNodeWithContentDescription(badge(Strings.STATE_DIRTY)).getBoundsInRoot()
+            val width = bounds.right - bounds.left
+            val height = bounds.bottom - bounds.top
+
+            assertTrue(height >= TOUCH_TARGET && width >= TOUCH_TARGET, "The save target is $width by $height")
+        }
+    }
+
     /** Writes [text] to the one file this test uses and hands back the ref for it. */
     private fun write(text: String): DocumentRef {
         file().writeText(text)
@@ -347,6 +419,9 @@ class DocumentLifecycleTest {
     private companion object {
         val SIZE = Size(1200f, 900f)
         const val TIMEOUT = 5_000L
+
+        /** 10.2's minimum. */
+        val TOUCH_TARGET = 48.dp
 
         const val ORIGINAL = "As opened.\n"
         const val FIRST_LINE = "As opened."

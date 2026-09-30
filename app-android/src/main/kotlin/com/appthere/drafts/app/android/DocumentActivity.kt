@@ -10,8 +10,10 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.appthere.drafts.app.DocumentOpening
 import com.appthere.drafts.app.DraftsApp
 import com.appthere.drafts.app.Notice
@@ -45,10 +47,29 @@ import com.appthere.drafts.platform.windows.SessionList
 class DocumentActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        val uri = documentUri(intent)
-        setContent { Document(uri) }
+        shown = intent
+        setContent { Document(shown?.let(::documentUri)) }
     }
+
+    /**
+     * A later launch for a document this task is already showing.
+     *
+     * `documentLaunchMode="intoExisting"` keys the task on the intent's data, so the intent that
+     * arrives here is for the same document and the words on screen are already the right ones.
+     * What it must not do is nothing at all: `getIntent()` would go on returning the first one, so
+     * anything asking later what this task is about would get a stale answer.
+     *
+     * Observed rather than reasoned about -- opening the same file twice on a device reported
+     * "intent has been delivered to currently running top-most instance" and nothing happened.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        shown = intent
+    }
+
+    /** The intent this task is about, which a later launch can replace. */
+    private var shown: Intent? by mutableStateOf(null)
 
     /**
      * The document this launch is about, wherever the sender chose to put it.

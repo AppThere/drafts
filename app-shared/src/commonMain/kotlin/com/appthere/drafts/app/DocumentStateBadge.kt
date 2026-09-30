@@ -2,10 +2,12 @@ package com.appthere.drafts.app
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
@@ -40,16 +42,42 @@ import com.appthere.drafts.platform.files.DocumentState
 fun DocumentStateBadge(
     state: DocumentState,
     modifier: Modifier = Modifier,
+    onSave: (() -> Unit)? = null,
 ) {
     val palette = LocalPalette.current
     val label = labelOf(state)
     val tint = if (needsAttention(state)) palette.accent else palette.muted
 
+    // Saving is a keyboard shortcut and a phone has no keyboard, so on a touch device there was no
+    // way to save at all. The indicator becomes the way: 12 says it "is the only persistent
+    // chrome", so a second button beside it would be the wrong answer to that -- and the thing
+    // that says there is something to save is the obvious thing to press about it.
+    //
+    // Only when there is. A clean document has nothing to do, and a control that does nothing is
+    // worse than no control.
+    val save = onSave.takeIf { state != DocumentState.Clean }
+
     Row(
-        // One announcement for the whole badge, not one for the dot and another for the label. The
-        // dot carries no text of its own, so without this the state would reach a screen reader as
-        // a bare word with nothing saying what it describes.
-        modifier.clearAndSetSemantics { contentDescription = "${Strings.DOCUMENT_STATE}, $label" },
+        modifier
+            // 10.2: "Touch targets >= 48dp." A dot is four.
+            .then(if (save == null) Modifier else Modifier.sizeIn(minWidth = target, minHeight = target))
+            .then(
+                if (save == null) {
+                    Modifier
+                } else {
+                    // The label is what a screen reader offers instead of "double-tap to
+                    // activate", which says what the gesture is and not what it does.
+                    Modifier.clickable(onClickLabel = Strings.SAVE_NOW, onClick = save)
+                },
+            )
+            // One announcement for the whole badge, not one for the dot and another for the label.
+            // The dot carries no text of its own, so without this the state would reach a screen
+            // reader as a bare word with nothing saying what it describes.
+            //
+            // It does not clear the click above it: `clearAndSetSemantics` clears what is inside
+            // it, and `clickable` is outside. Checked by removing the action and watching a screen
+            // reader still activate it, rather than assumed either way.
+            .clearAndSetSemantics { contentDescription = "${Strings.DOCUMENT_STATE}, $label" },
         horizontalArrangement = Arrangement.spacedBy(dotGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -112,3 +140,6 @@ private val dotSize = 8.dp
 private val dotGap = 6.dp
 private val hairline = 1.dp
 private val labelSize = 12.sp
+
+/** 10.2's minimum touch target. */
+private val target = 48.dp

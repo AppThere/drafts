@@ -143,6 +143,12 @@ object Strings {
     const val CLOSE = "Close"
 
     /**
+     * What pressing the status indicator does, for a reader who has no keyboard to press Ctrl+S
+     * with. Spoken by assistive technology as the indicator's action rather than shown beside it.
+     */
+    const val SAVE_NOW = "Save"
+
+    /**
      * The five states of `appthere-drafts.md` 8.4, as the "short label" it asks for.
      *
      * Written from the reader's side. `conflicted` is a state name; "Changed on disk" is what
