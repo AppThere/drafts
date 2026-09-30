@@ -25,6 +25,17 @@ val LocalReaderSettings: ProvidableCompositionLocal<ReaderSettings> =
  */
 val LocalPalette: ProvidableCompositionLocal<Palette> = staticCompositionLocalOf { Palettes.Light }
 
+/**
+ * Which of 6's bands the window is in.
+ *
+ * Provided by whoever owns the window, because only it knows how big the window is -- the theme
+ * does not. The default is Expanded so that a composable rendered outside a window (a test, a
+ * preview) behaves like the roomiest case rather than the most cramped one, which is the one that
+ * hides things.
+ */
+val LocalWindowSize: ProvidableCompositionLocal<WindowSize> =
+    staticCompositionLocalOf { WindowSize(WidthClass.Expanded, HeightClass.Expanded) }
+
 /** Durations, already resolved against `prefers-reduced-motion`. */
 val LocalMotion: ProvidableCompositionLocal<Motion> = staticCompositionLocalOf { Motion.Standard }
 

@@ -344,4 +344,5 @@ Compose:
     allowedCompositionLocals:
       - LocalPalette
       - LocalMotion
+      - LocalWindowSize
       - LocalReaderSettings

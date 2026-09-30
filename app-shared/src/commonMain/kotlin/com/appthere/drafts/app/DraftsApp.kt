@@ -5,12 +5,15 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,7 +42,10 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.unit.dp
 import com.appthere.drafts.design.DraftsTheme
 import com.appthere.drafts.design.LocalPalette
+import com.appthere.drafts.design.LocalWindowSize
 import com.appthere.drafts.design.ReaderSettings
+import com.appthere.drafts.design.WidthClass
+import com.appthere.drafts.design.WindowSize
 import com.appthere.drafts.editor.engine.DocumentSession
 import com.appthere.drafts.editor.ui.BlockEditor
 import com.appthere.drafts.editor.ui.EditorState
@@ -239,94 +245,106 @@ private fun DraftsWindow(
     val clipboard = LocalClipboardManager.current
 
     DraftsTheme(settings.current) {
-        Box(
-            modifier
-                .fillMaxSize()
-                .background(LocalPalette.current.background)
-                .focusRequester(root)
-                .focusable()
-                // 12: "Any pointer movement ... brings them back." Observed on the final pass and
-                // never consumed, so this sees the event after the selection handling below has
-                // had it rather than competing for it.
-                //
-                // There is no edge gesture here. 12 lists one and desktop has no such thing; it
-                // arrives with the touch platforms.
-                .pointerInput(onRouse) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent(PointerEventPass.Final)
-                            if (event.type == PointerEventType.Move) onRouse()
+        // 6's bands, measured rather than assumed. Only the window knows how big it is; the
+        // theme below it does not, so the size is read here and provided to everything inside.
+        //
+        // `BoxWithConstraints` subcomposes, which is a cost paid when the window changes size
+        // rather than per frame. 6 asks for the layout to respond "continuously rather than
+        // snapping" as a Chromebook or desktop window is dragged, and this is what allows both:
+        // the band changes as the window crosses a boundary while 5.3's column keeps moving
+        // smoothly through it.
+        BoxWithConstraints(modifier.fillMaxSize()) {
+            CompositionLocalProvider(LocalWindowSize provides WindowSize.of(maxWidth, maxHeight)) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(LocalPalette.current.background)
+                        .focusRequester(root)
+                        .focusable()
+                        // 12: "Any pointer movement ... brings them back." Observed on the final pass and
+                        // never consumed, so this sees the event after the selection handling below has
+                        // had it rather than competing for it.
+                        //
+                        // There is no edge gesture here. 12 lists one and desktop has no such thing; it
+                        // arrives with the touch platforms.
+                        .pointerInput(onRouse) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent(PointerEventPass.Final)
+                                    if (event.type == PointerEventType.Move) onRouse()
+                                }
+                            }
+                        }
+                        // Every shortcut in the app, in one place.
+                        //
+                        // Key events travel from the focus owner outwards, so a handler anywhere below
+                        // this only sees events already on their way to it -- which is none at all until
+                        // the reader has clicked something. The root takes focus when a document opens and
+                        // remains an ancestor of whatever takes it next, so this is the only position that
+                        // sees every keystroke. 10.2 asks for "complete keyboard operation"; that has to
+                        // include the first keystroke after opening a file.
+                        //
+                        // The panels first, then whatever depends on there being a file -- saving, and
+                        // answering 8.2's refusal, which the window cannot know about and so asks -- and
+                        // then the editor.
+                        .onPreviewKeyEvent { event ->
+                            panels.answer(event) || onDocumentKey(event) || editor.handleShortcut(event, clipboard)
+                        },
+                ) {
+                    LaunchedEffect(Unit) { root.requestFocus() }
+
+                    // Android's Back, and the edge swipe that stands for it. With nothing listening it
+                    // finishes the activity -- which, for a document that exists only in memory, is the
+                    // reader's text gone. While a panel is open, Back closes it instead.
+                    BackHandler(enabled = panels.anyOpen) { panels.closeTopmost() }
+
+                    BlockEditor(state = editor, scroll = scroll)
+
+                    // Whatever belongs to a document that came from a file: 8.4's badge, and 8.2's
+                    // refusal when there is one. Placed by the caller, because where they go depends on
+                    // what they are and this function does not know.
+                    chrome()
+
+                    // The way in that needs no keyboard. Hidden while the controls are open: the panel is
+                    // in the same corner, with its own Close.
+                    if (!panels.controls) {
+                        Box(Modifier.align(Alignment.TopEnd).padding(controlsInset)) {
+                            FadingChrome(hidden = chromeHidden) {
+                                ReaderControlsButton(enabled = !chromeHidden, onClick = refocused(panels::openControls))
+                            }
                         }
                     }
-                }
-                // Every shortcut in the app, in one place.
-                //
-                // Key events travel from the focus owner outwards, so a handler anywhere below
-                // this only sees events already on their way to it -- which is none at all until
-                // the reader has clicked something. The root takes focus when a document opens and
-                // remains an ancestor of whatever takes it next, so this is the only position that
-                // sees every keystroke. 10.2 asks for "complete keyboard operation"; that has to
-                // include the first keystroke after opening a file.
-                //
-                // The panels first, then whatever depends on there being a file -- saving, and
-                // answering 8.2's refusal, which the window cannot know about and so asks -- and
-                // then the editor.
-                .onPreviewKeyEvent { event ->
-                    panels.answer(event) || onDocumentKey(event) || editor.handleShortcut(event, clipboard)
-                },
-        ) {
-            LaunchedEffect(Unit) { root.requestFocus() }
 
-            // Android's Back, and the edge swipe that stands for it. With nothing listening it
-            // finishes the activity -- which, for a document that exists only in memory, is the
-            // reader's text gone. While a panel is open, Back closes it instead.
-            BackHandler(enabled = panels.anyOpen) { panels.closeTopmost() }
+                    if (panels.controls) {
+                        ReaderControls(
+                            settings = settings.current,
+                            // 5.5: "persisted per document type". Written as the reader changes them, so
+                            // closing the window is not a way to lose them.
+                            onChange = { changed -> settings.change(changed, scope, onSettingsChange) },
+                            unsaved = settings.unsaved,
+                            modifier = panelPlacement(Alignment.TopEnd),
+                            onClose = refocused(panels::closeControls),
+                        ) {
+                            PanelLink(Strings.KEYBOARD_SHORTCUTS, onClick = panels::openShortcuts)
+                            PanelLink(Strings.LICENCES, onClick = panels::openLicences)
+                        }
+                    }
 
-            BlockEditor(state = editor, scroll = scroll)
+                    if (panels.licences) {
+                        Licences(
+                            onClose = refocused(panels::closeLicences),
+                            modifier = panelPlacement(Alignment.Center),
+                        )
+                    }
 
-            // Whatever belongs to a document that came from a file: 8.4's badge, and 8.2's
-            // refusal when there is one. Placed by the caller, because where they go depends on
-            // what they are and this function does not know.
-            chrome()
-
-            // The way in that needs no keyboard. Hidden while the controls are open: the panel is
-            // in the same corner, with its own Close.
-            if (!panels.controls) {
-                Box(Modifier.align(Alignment.TopEnd).padding(controlsInset)) {
-                    FadingChrome(hidden = chromeHidden) {
-                        ReaderControlsButton(enabled = !chromeHidden, onClick = refocused(panels::openControls))
+                    if (panels.shortcuts) {
+                        ShortcutList(
+                            onClose = refocused(panels::closeShortcuts),
+                            modifier = panelPlacement(Alignment.Center),
+                            hostShortcuts = hostShortcuts,
+                        )
                     }
                 }
-            }
-
-            if (panels.controls) {
-                ReaderControls(
-                    settings = settings.current,
-                    // 5.5: "persisted per document type". Written as the reader changes them, so
-                    // closing the window is not a way to lose them.
-                    onChange = { changed -> settings.change(changed, scope, onSettingsChange) },
-                    unsaved = settings.unsaved,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(controlsInset),
-                    onClose = refocused(panels::closeControls),
-                ) {
-                    PanelLink(Strings.KEYBOARD_SHORTCUTS, onClick = panels::openShortcuts)
-                    PanelLink(Strings.LICENCES, onClick = panels::openLicences)
-                }
-            }
-
-            if (panels.licences) {
-                Licences(
-                    onClose = refocused(panels::closeLicences),
-                    modifier = Modifier.align(Alignment.Center).padding(controlsInset),
-                )
-            }
-
-            if (panels.shortcuts) {
-                ShortcutList(
-                    onClose = refocused(panels::closeShortcuts),
-                    modifier = Modifier.align(Alignment.Center).padding(controlsInset),
-                    hostShortcuts = hostShortcuts,
-                )
             }
         }
     }
@@ -410,6 +428,25 @@ private const val SCROLL_SCALE = 100_000
  * without an extension this application recognises.
  */
 private const val DEFAULT_KIND = "markdown"
+
+/**
+ * Where a panel sits, which 6 makes a question about how wide the window is.
+ *
+ * Compact: "Outline and settings as modal sheets", anchored to the bottom edge and reaching both
+ * sides. A phone held one-handed has its thumb at the bottom of the screen and a corner panel puts
+ * every control at the far end of it; a sheet puts them where the hand already is.
+ *
+ * Medium and Expanded: where the panel was, which is beside the thing it belongs to. There is room
+ * for a panel not to cover the document, and a sheet that covered the foot of a wide window would
+ * be hiding text for no reason.
+ */
+@Composable
+private fun BoxScope.panelPlacement(roomy: Alignment): Modifier =
+    if (LocalWindowSize.current.width == WidthClass.Compact) {
+        Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+    } else {
+        Modifier.align(roomy).padding(controlsInset)
+    }
 
 /** Far enough from the corner to read as a panel over the document rather than part of the frame. */
 private val controlsInset = 16.dp

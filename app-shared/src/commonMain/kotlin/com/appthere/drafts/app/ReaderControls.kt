@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -77,6 +78,12 @@ fun ReaderControls(
             // or off the side of any window once the system scale doubled it. Capped first and
             // filled second: the other way round, `fillMaxWidth` fixes the width and the cap has
             // nothing left to do.
+            // No ceiling on a Compact window: 6 asks for settings "as modal sheets" there, and a
+            // sheet that stopped short of both edges is a panel that has been pushed to the bottom.
+            // A pane, and named as one. Assistive technology announces a pane by its title when it
+            // appears, which is what tells a screen reader that the settings have opened rather
+            // than that focus has moved somewhere unexplained.
+            .semantics { paneTitle = Strings.READER_CONTROLS }
             .widthIn(max = metrics.panel)
             .fillMaxWidth()
             .background(palette.background)
