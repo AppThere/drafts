@@ -38,6 +38,7 @@ import androidx.compose.ui.window.rememberWindowState
 import com.appthere.drafts.app.DocumentOpening
 import com.appthere.drafts.app.DraftsApp
 import com.appthere.drafts.app.KindChange
+import com.appthere.drafts.app.Notice
 import com.appthere.drafts.app.SampleDocument
 import com.appthere.drafts.app.SettingsStore
 import com.appthere.drafts.app.SnapshotKeeper
@@ -422,23 +423,6 @@ private fun FileDocument(
     }
 }
 
-/** A message on its own in the window, for when there is no document to show. */
-@Composable
-private fun Notice(
-    message: String,
-    name: String? = null,
-) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(noticeGap),
-        ) {
-            BasicText(message)
-            name?.let { BasicText(it) }
-        }
-    }
-}
-
 /**
  * Why a document is not showing, in words about the reader's situation rather than the exception
  * (11.1). A file that is missing with a snapshot never gets here: it opens from the snapshot.
@@ -448,8 +432,6 @@ private fun messageFor(reason: DocumentOpening.Reason): String =
         DocumentOpening.Reason.Unreadable -> Strings.COULD_NOT_READ
         DocumentOpening.Reason.Missing, DocumentOpening.Reason.NothingKept -> Strings.FILE_GONE_NOTHING_KEPT
     }
-
-private val noticeGap = 12.dp
 
 private fun kindOf(id: String): DocumentKind = DocumentKind.entries.firstOrNull { it.id == id } ?: DocumentKind.Markdown
 

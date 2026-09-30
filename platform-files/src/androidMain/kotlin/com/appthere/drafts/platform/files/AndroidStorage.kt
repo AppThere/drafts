@@ -21,6 +21,9 @@ fun androidDataRoot(context: Context): String = File(context.filesDir, DATA).pat
 /** 7.3 puts each document's snapshot in `sessions/<documentId>/`. */
 fun androidSessionRoot(context: Context): String = File(androidDataRoot(context), SESSIONS).path
 
+/** 5.5's settings, one file per document type, beside the sessions rather than inside them. */
+fun androidSettingsRoot(context: Context): String = File(androidDataRoot(context), SETTINGS).path
+
 /**
  * A session identity for a document the reader picked through the Storage Access Framework.
  *
@@ -29,12 +32,17 @@ fun androidSessionRoot(context: Context): String = File(androidDataRoot(context)
  * access token -- the URI string is only how it is named afterwards -- so it happens here, at open,
  * and not at restore when the grant would already be gone.
  *
+ * The kind is passed in rather than guessed. 9.1 gives Markdown four extensions and Fountain two,
+ * and 9.2 warns that the MIME type may be `application/octet-stream` whatever the file is -- so
+ * deciding needs the name, the type and sometimes the contents, which is the caller's job.
+ *
  * Returns null when the grant cannot be taken. That is not an error worth throwing: it means this
  * document cannot be restored next launch, and the caller may still want to open it now.
  */
 fun androidIdentity(
     context: Context,
     uri: Uri,
+    kind: String,
 ): SessionIdentity? {
     val granted =
         runCatching {
@@ -50,7 +58,7 @@ fun androidIdentity(
         documentId = sha256(uri.toString().encodeToByteArray()).hex,
         uri = uri.toString(),
         displayName = name,
-        kind = if (name.endsWith(FOUNTAIN)) "fountain" else "markdown",
+        kind = kind,
         accessToken = if (granted) uri.toString() else null,
     )
 }
@@ -73,7 +81,7 @@ fun resolveAndroidToken(
     return if (held) DocumentRef(token) else null
 }
 
-private fun displayNameOf(
+fun displayNameOf(
     resolver: ContentResolver,
     uri: Uri,
 ): String? =
@@ -89,4 +97,4 @@ internal fun isDocumentUri(uri: Uri): Boolean =
 
 private const val DATA = "drafts"
 private const val SESSIONS = "sessions"
-private const val FOUNTAIN = ".fountain"
+private const val SETTINGS = "settings"

@@ -65,5 +65,61 @@ enum class DocumentKind(
          */
         fun ofMimeType(mimeType: String): DocumentKind? =
             entries.firstOrNull { mimeType.substringBefore(';').trim().lowercase() in it.mimeTypes }
+
+        /**
+         * What the *contents* look like, for handovers that say nothing useful.
+         *
+         * 9.2: "Downloads and messaging apps frequently hand over `application/octet-stream`
+         * regardless of the real type. Include a permissive filter matched on extension, and sniff
+         * content on open."
+         *
+         * Only ever consulted when the name and the MIME type have both failed, and only ever
+         * returns an answer it is confident of. Fountain is the one worth detecting: a screenplay
+         * opened as Markdown loses every scene heading into a paragraph, while prose opened as a
+         * screenplay is merely odd. So Fountain needs real evidence and everything else that looks
+         * like text is Markdown, which is this application's primary format.
+         *
+         * Reads the opening of the document rather than all of it. A scene heading or a title page
+         * is at the top of a screenplay by definition, and a novel is not worth walking to decide
+         * something the first page already answers.
+         */
+        fun sniff(text: String): DocumentKind? {
+            val opening =
+                text
+                    .lineSequence()
+                    .take(LINES_SNIFFED)
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+
+            return when {
+                opening.none() -> null
+                opening.any { it.looksLikeScreenplay() } -> Fountain
+                else -> Markdown
+            }
+        }
+
+        /**
+         * A line only a screenplay has.
+         *
+         * A scene heading, which Fountain writes as `INT.`/`EXT.` or forces with a leading full
+         * stop; or a title-page key, which is the other thing at the top of a `.fountain` file.
+         *
+         * Deliberately narrow. A line of Markdown prose can start with almost anything, so a loose
+         * rule here would send novels to the screenplay parser -- and the cost of guessing wrong in
+         * that direction is a document whose every paragraph is a character cue.
+         */
+        private fun String.looksLikeScreenplay(): Boolean =
+            SCENE_PREFIXES.any { startsWith(it, ignoreCase = true) } ||
+                (startsWith(".") && length > 1 && !startsWith("..")) ||
+                TITLE_KEYS.any { startsWith(it, ignoreCase = true) }
+
+        /** Fountain's scene headings, which are the strongest signal a screenplay gives. */
+        private val SCENE_PREFIXES = listOf("INT.", "EXT.", "INT/EXT", "EXT/INT", "I/E.")
+
+        /** Title-page keys, which Fountain puts above everything else. */
+        private val TITLE_KEYS = listOf("Title:", "Credit:", "Author:", "Draft date:", "Contact:")
+
+        /** Far enough in to pass a title page and reach the first scene. */
+        private const val LINES_SNIFFED = 40
     }
 }
