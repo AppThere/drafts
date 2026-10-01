@@ -232,3 +232,31 @@ a human decision (`AGENTS.md` §3). Some may be right — a design system is mos
 belong in the spec; the rest belong back in the config.
 
 **Closes when:** decided, item by item.
+
+---
+
+## 6 — Only a vertical hinge moves the measure
+
+**Spec:** "Foldables: use Jetpack WindowManager's `FoldingFeature` to avoid rendering text across a
+hinge. On a book-posture fold, place the content column entirely on one side or split into two
+panes at the hinge — never let the fold bisect the measure."
+
+**Code:** the fold is read (`currentFold()` in `:platform-windows`, Jetpack WindowManager on
+Android, null everywhere else) and a separating **vertical** hinge moves the whole page — text,
+status dot and panels — onto the wider side of it. Three things are narrower than the sentence:
+
+- A **horizontal** hinge is ignored. It divides the window top from bottom, which does not bisect
+  the measure: a line of text crosses it at a point rather than along its length. The remedy that
+  would apply — confining a scrolling document to half the height of an already short window —
+  costs the reader more than the crease does.
+- The **first** folding feature is used. A window can report more than one, and a device with two
+  hinges exists; this handles the single-hinge case the spec describes.
+- Of the spec's two options, only the first. **Two panes at the hinge** needs a second thing to put
+  in the second pane, and the only one 6 offers is the outline, which does not exist (see above).
+
+**Verified** on the `pixel_fold` AVD: flat, the measure spans the inner display; half-opened, it
+sits entirely left of the hinge WindowManager reports at x=1104.
+
+**Closes when:** the outline lands, which makes two panes possible and is the better answer on a
+841dp display than half of one. The horizontal case closes if a flip-phone-shaped device turns up
+to test it on.
