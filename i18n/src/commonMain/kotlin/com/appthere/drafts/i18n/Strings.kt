@@ -165,6 +165,14 @@ object Strings {
 
     const val OPENING = "Opening\u2026"
 
+    /**
+     * A launch that carried nothing to open.
+     *
+     * Android only, and reachable: a share sheet can hand over an intent with no stream in it,
+     * and an empty editor would tell the reader nothing had gone wrong.
+     */
+    const val NO_DOCUMENT = "No document was given to open."
+
     /** A document that could not be opened, in words about the reader's situation (7.3). */
     const val COULD_NOT_READ =
         "This document could not be read. It may be somewhere Drafts cannot reach just now, such as " +

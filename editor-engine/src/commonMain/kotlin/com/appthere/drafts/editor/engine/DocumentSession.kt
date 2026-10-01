@@ -1,8 +1,10 @@
 package com.appthere.drafts.editor.engine
 
 import com.appthere.drafts.core.model.Block
+import com.appthere.drafts.core.model.Paragraph
 import com.appthere.drafts.core.model.SourceSpan
 import com.appthere.drafts.core.parse.markdown.MarkdownDocumentParser
+import kotlin.jvm.JvmName
 
 /**
  * What one edit cost, so the gate can be asserted rather than observed.
@@ -44,7 +46,7 @@ class DocumentSession(
     var text: String = initialText
         private set
 
-    var blocks: List<EditorBlock> = parser.parse(initialText).blocks.map { EditorBlock(ids.next(), it) }
+    var blocks: List<EditorBlock> = adopted(parser.parse(initialText).blocks)
         private set
 
     /**
@@ -83,7 +85,7 @@ class DocumentSession(
         val reconciled = reconcile(blocks.subList(window.first, window.last + 1), replacement0)
 
         text = updated
-        blocks = before + reconciled + after.map { EditorBlock(it.id, it.block.shiftedBy(delta)) }
+        blocks = adopted(before + reconciled + after.map { EditorBlock(it.id, it.block.shiftedBy(delta)) })
 
         return EditOutcome(
             reparsed = reparseSpan,
@@ -101,14 +103,6 @@ class DocumentSession(
      * that paragraph alone.
      */
     private fun dirtyWindow(range: SourceSpan): IntRange {
-        // An empty document has no window: nothing to throw away, everything to parse. Without this
-        // the arithmetic below lands on `0..0`, and the caller then asks for `subList(1, 0)`. Found
-        // by undoing a delete of the whole document, which is the ordinary way to reach this state.
-        //
-        // Spelled out rather than `IntRange.EMPTY`, which is `1..0` -- empty, but with a `first` of
-        // one, and the caller slices with `first`.
-        if (blocks.isEmpty()) return 0..-1
-
         val touched = blocks.indices.filter { index -> blocks[index].touches(range) }
 
         val first = (touched.minOrNull() ?: blocks.indices.lastOrNull() ?: 0) - 1
@@ -129,8 +123,6 @@ class DocumentSession(
         delta: Int,
         newLength: Int,
     ): SourceSpan {
-        if (blocks.isEmpty()) return SourceSpan.of(0, newLength)
-
         val start =
             blocks[window.first]
                 .block.source
@@ -163,6 +155,31 @@ class DocumentSession(
         rebuilt.mapIndexed { index, block ->
             EditorBlock(id = old.getOrNull(index)?.id ?: ids.next(), block = block)
         }
+
+    /**
+     * The blocks as the rest of the application sees them: never none.
+     *
+     * A document with no text parses to no blocks, and a document with no blocks has nothing to
+     * type into -- no field, no caret, no row to tap. `appthere-drafts.md` 7.4 asks for the
+     * opposite in as many words: a new document is "ready to type into", and "nothing stands
+     * between launching the app and writing". The same state is reached by deleting everything in
+     * a document that did have words, where being unable to start again is worse.
+     *
+     * So an empty document is one empty paragraph covering the empty span at the start. [text] is
+     * untouched by this -- it is still "" -- which is what keeps 8.2's digest and the serialiser
+     * looking at exactly the bytes that are really there.
+     *
+     * It keeps its identity through the first keystroke, because [reconcile] matches by position
+     * and this block is at position zero: the paragraph the parser then produces inherits its id,
+     * so the field the reader is typing into is not destroyed under them after the first character.
+     */
+    private fun adopted(parsed: List<Block>): List<EditorBlock> =
+        parsed
+            .ifEmpty { listOf(Paragraph(inlines = emptyList(), source = SourceSpan.of(0, 0))) }
+            .map { EditorBlock(ids.next(), it) }
+
+    @JvmName("adoptedBlocks")
+    private fun adopted(blocks: List<EditorBlock>): List<EditorBlock> = blocks.ifEmpty { adopted(emptyList<Block>()) }
 
     private fun EditorBlock.touches(range: SourceSpan): Boolean {
         val span = block.source ?: return false

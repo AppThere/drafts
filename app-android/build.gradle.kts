@@ -4,5 +4,17 @@ plugins {
 
 dependencies {
     implementation(project(":app-shared"))
+    implementation(project(":i18n"))
     implementation(libs.androidx.activity.compose)
+
+    testImplementation(libs.kotlin.test)
+    testImplementation(kotlin("test-junit"))
+    testImplementation(libs.kotlinx.coroutines.test)
+}
+
+// `ShortcutsTest` reads the manifest and `res/` as text, so they are inputs to it even though
+// nothing it asserts about them goes through the compiler.
+tasks.withType<Test>().configureEach {
+    inputs.file("src/main/AndroidManifest.xml").withPropertyName("manifest")
+    inputs.dir("src/main/res").withPropertyName("resources")
 }

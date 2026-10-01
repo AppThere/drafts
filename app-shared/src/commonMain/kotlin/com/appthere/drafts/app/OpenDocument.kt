@@ -183,6 +183,16 @@ fun openUntitled(
     val editor = EditorState(DocumentSession(text))
     record?.caret?.let { editor.placeAt(it) }
 
+    // 7.4: "ready to type into", and "Nothing stands between launching the app and writing."
+    //
+    // Only a document with no words at all. One that opens with prose in it is one the reader is
+    // coming back to, and 7.3 puts their caret back where they left it -- or leaves it nowhere,
+    // which is right: a caret blinking in a paragraph nobody asked to edit invites an accidental
+    // keystroke. A document with nothing in it has nothing else to be looking at.
+    if (editor.caret == null && editor.text.isEmpty()) {
+        editor.blocks.firstOrNull()?.let { editor.place(Caret(it.id, 0)) }
+    }
+
     return OpenDocument(
         store = store,
         editor = editor,

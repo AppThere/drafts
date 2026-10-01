@@ -7,8 +7,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
@@ -306,7 +309,22 @@ private fun DraftsWindow(
                     // chrome back (12).
                     //
                     // On everything that does not fold this is zero on both sides.
-                    Box(Modifier.fillMaxSize().padding(start = hinge.start, end = hinge.end)) {
+                    //
+                    // `safeDrawing` is the other thing the page has to keep clear of, and for the
+                    // same reason: an Android application targeting SDK 35 or later draws edge to
+                    // edge, so without this the status badge and the reader controls sit *behind*
+                    // the system status bar. Measured on a device: the top half of each was not
+                    // merely overlapped but untappable, because the system bar takes those touches.
+                    // It covers the keyboard too, which is what keeps the caret above it.
+                    //
+                    // On the page rather than the window, so the background still reaches the edges
+                    // of the glass: a document should not have a letterbox round it.
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .windowInsetsPadding(WindowInsets.safeDrawing)
+                            .padding(start = hinge.start, end = hinge.end),
+                    ) {
                         BlockEditor(state = editor, scroll = scroll)
 
                         // Whatever belongs to a document that came from a file: 8.4's badge, and 8.2's
@@ -443,5 +461,3 @@ internal val controlsInset = 16.dp
 
 /** Between the status badge and the kind beside it. */
 private val chromeGap = 12.dp
-
-private fun kindOf(id: String): DocumentKind = DocumentKind.entries.firstOrNull { it.id == id } ?: DocumentKind.Markdown

@@ -3,7 +3,17 @@
   appthere-drafts.md 11.1: user-facing strings live in resources, never in code. The custom
   detekt rule HardcodedUserFacingString enforces that; this file is where the strings it redirects
   people to actually go.
+
+  The two shortcut labels are also in `Strings` in :i18n, because the Linux and macOS launchers
+  reach them from code and Android's static shortcuts can only reach a resource. ShortcutsTest
+  asserts the two copies agree, so neither can be changed alone.
 -->
 <resources>
     <string name="app_name">Drafts</string>
+
+    <!-- 7.4's launcher entry points: "Static app shortcuts: New Markdown document, New Fountain screenplay". -->
+    <string name="new_markdown">New Markdown document</string>
+    <string name="new_fountain">New Fountain screenplay</string>
+    <string name="new_markdown_short">Markdown</string>
+    <string name="new_fountain_short">Screenplay</string>
 </resources>

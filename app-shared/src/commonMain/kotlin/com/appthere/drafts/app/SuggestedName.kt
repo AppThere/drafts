@@ -3,6 +3,9 @@ package com.appthere.drafts.app
 import com.appthere.drafts.core.model.Heading
 import com.appthere.drafts.core.model.plainText
 import com.appthere.drafts.editor.ui.EditorState
+import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.platform.files.DocumentState
+import com.appthere.drafts.platform.files.SessionRecord
 import com.appthere.drafts.platform.intents.DocumentKind
 
 /**
@@ -104,3 +107,34 @@ private const val FORBIDDEN = "/\\:*?\"<>|"
 private const val MAX_LENGTH = 80
 private val reserved =
     setOf("CON", "PRN", "AUX", "NUL") + (1..9).flatMap { listOf("COM$it", "LPT$it") }
+
+/**
+ * The name the save picker opens on, for whichever of the two reasons it was opened.
+ *
+ * 7.4, while the document has no file: "The suggested name comes from the first heading, or from a
+ * Fountain title page's `Title:`, and the extension from the kind."
+ *
+ * 8.2, when the document is conflicted and the reader chose "Save a copy...": not the name of the
+ * file they are keeping. Offered that, the dialog would open on the one version they chose to keep,
+ * one Return away from replacing it.
+ *
+ * Otherwise the file's own name, which is what *Save As* on a saved document means.
+ *
+ * Here rather than in each host because it is 7.4 and 8.2 rather than anything about a picker; what
+ * the hosts differ on is the picker, which is below this.
+ */
+fun OpenDocument.suggestedSaveName(record: SessionRecord): String =
+    when {
+        record.uri == null -> editor.suggestedFileName(kindOf(record.kind), Strings.UNTITLED)
+        lifecycle.state == DocumentState.Conflicted -> copyName(record.displayName, Strings.MY_VERSION)
+        else -> record.displayName
+    }
+
+/**
+ * The kind an id names, defaulting to Markdown.
+ *
+ * A default is right here and wrong in [DocumentKind.of], which deliberately returns null for a
+ * name it does not recognise: this is reading back an id this application wrote, so an unknown one
+ * is a settings file from a future version rather than a file whose type is in question.
+ */
+fun kindOf(id: String): DocumentKind = DocumentKind.entries.firstOrNull { it.id == id } ?: DocumentKind.Markdown

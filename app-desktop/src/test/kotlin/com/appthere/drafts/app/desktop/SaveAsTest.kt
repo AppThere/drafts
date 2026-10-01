@@ -1,5 +1,6 @@
 package com.appthere.drafts.app.desktop
 
+import com.appthere.drafts.app.SaveAs
 import com.appthere.drafts.app.SnapshotKeeper
 import com.appthere.drafts.app.openUntitled
 import com.appthere.drafts.platform.files.DocumentState
@@ -41,7 +42,7 @@ class SaveAsTest {
             val (document, record, keeper) = untitled()
             val target = directory.resolve("salt-road.md")
 
-            val outcome = SaveAs(sessions) {}.to(target.toString(), document, record, keeper)
+            val outcome = SaveAs(sessions) {}.to(destinationOf(target.toString(), record), document, record, keeper)
 
             assertIs<WriteOutcome.Written>(outcome)
             assertEquals(DRAFT, target.readText())
@@ -56,7 +57,7 @@ class SaveAsTest {
             val target = directory.resolve("salt-road.md")
             var shown: SessionRecord? = null
 
-            SaveAs(sessions) { shown = it }.to(target.toString(), document, record, keeper)
+            SaveAs(sessions) { shown = it }.to(destinationOf(target.toString(), record), document, record, keeper)
 
             assertEquals(record.documentId, shown?.documentId)
             assertEquals("salt-road.md", shown?.displayName)
@@ -70,7 +71,9 @@ class SaveAsTest {
             val (document, record, keeper) = untitled()
             var shown: SessionRecord? = null
 
-            SaveAs(sessions) { shown = it }.to(directory.resolve("scene.fountain").toString(), document, record, keeper)
+            val screenplay = destinationOf(directory.resolve("scene.fountain").toString(), record)
+
+            SaveAs(sessions) { shown = it }.to(screenplay, document, record, keeper)
 
             assertEquals("fountain", shown?.kind)
         }
@@ -86,7 +89,7 @@ class SaveAsTest {
 
             val outcome =
                 SaveAs(sessions) { shown = it }.to(
-                    notAFolder.resolve("draft.md").toString(),
+                    destinationOf(notAFolder.resolve("draft.md").toString(), record),
                     document,
                     record,
                     keeper,

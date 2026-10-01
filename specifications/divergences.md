@@ -260,3 +260,44 @@ sits entirely left of the hinge WindowManager reports at x=1104.
 **Closes when:** the outline lands, which makes two panes possible and is the better answer on a
 841dp display than half of one. The horizontal case closes if a flip-phone-shaped device turns up
 to test it on.
+
+---
+
+## 7.2 — One task per document, with one flag rather than two
+
+**Spec:** "Launch each document with `FLAG_ACTIVITY_NEW_DOCUMENT or FLAG_ACTIVITY_MULTIPLE_TASK`."
+
+**Code:** `FLAG_ACTIVITY_NEW_DOCUMENT` alone. `MULTIPLE_TASK` is what tells Android to make a *new*
+task even when one already exists for that data, so the two together open a second window for a
+document that already has one — which 9.4 forbids in as many words: "a file already open gets its
+existing window". With `documentLaunchMode="intoExisting"` in the manifest and one session id in
+each intent's data, the first flag alone gives exactly one task per document and brings an existing
+one forward.
+
+**Verified** on a device: four restored sessions came back as four tasks, and launching again while
+they were open added one new document rather than a fifth copy of an old one.
+
+**Closes when:** never, unless the spec sentence changes. This is the spec's two sentences
+disagreeing, and 9.4 is the one about what the reader sees.
+
+---
+
+## 7.3 — Android never marks a session closed
+
+**Spec:** a session is open until it is closed; 7.4 adds that "an untitled document that is still
+empty when closed is discarded — there is nothing in it to lose."
+
+**Code:** `SessionList.closed` exists and the desktop calls it when a window closes. Android calls
+it nowhere. Backing out of a document, or swiping its task away, leaves the session restorable, so
+the next launch brings it back.
+
+**Why it is not simply done:** closing is a write, `onDestroy` is not a coroutine, and the process
+may be gone before one could finish. Doing it properly means either a short-lived service or
+writing the marker from the snapshot keeper's own scope while the activity is finishing — a
+decision about process lifetime rather than a missing line.
+
+**What it costs meanwhile:** a reader who backs out of everything and relaunches gets it all back.
+That is 7.3's behaviour for sessions that were never closed, so it is consistent rather than wrong,
+but it is not what backing out of a document means to a reader.
+
+**Closes when:** the Android session lifecycle is done properly, with the empty-untitled discard.

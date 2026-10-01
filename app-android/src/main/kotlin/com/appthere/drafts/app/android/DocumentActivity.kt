@@ -13,24 +13,27 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import com.appthere.drafts.app.DocumentOpening
 import com.appthere.drafts.app.DraftsApp
+import com.appthere.drafts.app.KindChange
 import com.appthere.drafts.app.Notice
-import com.appthere.drafts.app.SettingsStore
+import com.appthere.drafts.app.SaveAs
 import com.appthere.drafts.app.SnapshotKeeper
+import com.appthere.drafts.app.kindOf
+import com.appthere.drafts.app.noticeFor
 import com.appthere.drafts.app.rememberSessionDocument
+import com.appthere.drafts.app.suggestedSaveName
 import com.appthere.drafts.design.ReaderSettings
-import com.appthere.drafts.platform.files.PathDocumentStore
+import com.appthere.drafts.i18n.Strings
 import com.appthere.drafts.platform.files.SafDocumentStore
+import com.appthere.drafts.platform.files.SessionIdentity
 import com.appthere.drafts.platform.files.SessionRecord
-import com.appthere.drafts.platform.files.SnapshotStore
 import com.appthere.drafts.platform.files.androidIdentity
-import com.appthere.drafts.platform.files.androidSessionRoot
-import com.appthere.drafts.platform.files.androidSettingsRoot
 import com.appthere.drafts.platform.files.displayNameOf
 import com.appthere.drafts.platform.intents.DocumentKind
-import com.appthere.drafts.platform.windows.SessionList
+import kotlinx.coroutines.launch
 
 /**
  * One document, in one task.
@@ -40,15 +43,21 @@ import com.appthere.drafts.platform.windows.SessionList
  * dragged into split-screen against another instance of the app -- which is what makes side-by-side
  * work on tablets, foldables, and ChromeOS."
  *
- * The per-document `taskAffinity` is set here rather than in the manifest, because a manifest value
- * is one string for every launch and the point is that each document gets its own. Recents shows
- * the document's name for the same reason: a column of identical entries is not a document switcher.
+ * It is reached two ways, and both end in the same session record:
+ *
+ * - From outside, as 9.2's VIEW, EDIT or SEND, carrying a `content://` URI. The grant is persisted
+ *   at that moment (7.3) and the document joins the session list.
+ * - From [LauncherActivity], carrying a session id this application already knows -- a document
+ *   being restored (7.3), or an untitled one just created (7.4), which has no URI to be named by.
+ *
+ * Recents shows the document's name rather than the application's: a column of identical entries is
+ * not a document switcher.
  */
 class DocumentActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         shown = intent
-        setContent { Document(shown?.let(::documentUri)) }
+        setContent { Document(shown) }
     }
 
     /**
@@ -68,8 +77,136 @@ class DocumentActivity : ComponentActivity() {
         shown = intent
     }
 
+    /** 7.4's "already running" question is asked of the process, so this task stops answering it. */
+    override fun onDestroy() {
+        super.onDestroy()
+        registered?.let(OpenDocuments::closed)
+    }
+
     /** The intent this task is about, which a later launch can replace. */
     private var shown: Intent? by mutableStateOf(null)
+
+    /** The document this task told [OpenDocuments] about, so it can take it back. */
+    private var registered: String? = null
+
+    @Composable
+    private fun Document(intent: Intent?) {
+        if (intent == null) {
+            Notice(message = Strings.NO_DOCUMENT)
+            return
+        }
+
+        val storage = remember { Storage(this) }
+
+        // The reader's own files go through the Storage Access Framework; everything of ours goes
+        // through `storage`. This one needs the Activity, because the grants are the Activity's.
+        val documents = remember { SafDocumentStore(this) }
+
+        // Mutable, not derived: *Save As* and 7.4's choice of kind both move the document, and what
+        // the chrome shows afterwards is the record they moved it to.
+        var record by remember(intent) { mutableStateOf<SessionRecord?>(null) }
+        var looked by remember(intent) { mutableStateOf(false) }
+
+        LaunchedEffect(intent) {
+            record = recordFor(intent, storage)
+            looked = true
+            record?.let {
+                OpenDocuments.opened(it.documentId)
+                registered = it.documentId
+            }
+        }
+
+        when (val open = record) {
+            null -> Notice(message = if (looked) Strings.NO_DOCUMENT else Strings.OPENING)
+            else -> Session(open, storage, documents) { moved -> record = moved }
+        }
+    }
+
+    /** One open session: its settings, its document, and the two things that can move it. */
+    @Composable
+    private fun Session(
+        open: SessionRecord,
+        storage: Storage,
+        documents: SafDocumentStore,
+        onMove: (SessionRecord) -> Unit,
+    ) {
+        // Recents shows one entry per document, named for the document.
+        LaunchedEffect(open.displayName) { describeTask(open.displayName) }
+
+        // 5.5's settings for this document's type, read before the document is drawn so the reader
+        // never sees the defaults flash up and be replaced by their own typography.
+        val saved by produceState<ReaderSettings?>(null, storage.settings, open.kind) {
+            value = storage.settings.settingsFor(open.kind) ?: ReaderSettings()
+        }
+
+        when (val opening = rememberSessionDocument(documents, storage.snapshots, open)) {
+            is DocumentOpening.Opened -> {
+                val keeper =
+                    remember(opening.document) {
+                        SnapshotKeeper(opening.document, storage.snapshots, open.identity())
+                    }
+                val saving = remember(storage) { SaveAs(storage.sessions) { onMove(it) } }
+                val kinds = remember(storage) { KindChange(storage.sessions, storage.settings) { onMove(it) } }
+                val choose = rememberSaveLocation()
+                val scope = rememberCoroutineScope()
+
+                saved?.let { initial ->
+                    DraftsApp(
+                        document = opening.document,
+                        initialSettings = initial,
+                        keeper = keeper,
+                        settingsStore = storage.settings,
+                        kind = open.kind,
+                        saveAs = {
+                            // 7.4 while untitled, 8.2's "Save a copy..." while conflicted, the
+                            // file's own name otherwise -- all decided in `:app-shared`, because
+                            // none of it is about Android.
+                            val where = SaveLocation(mimeFor(open.kind), opening.document.suggestedSaveName(open))
+
+                            choose(where)?.let { chosen ->
+                                saving.to(destinationFor(chosen, open), opening.document, open, keeper)
+                            }
+                        },
+                        // 7.4's kind, while there is no file whose extension already says.
+                        onKindChange =
+                            if (open.uri == null) {
+                                { chosen -> scope.launch { kinds.to(chosen, open, keeper) } }
+                            } else {
+                                null
+                            },
+                    )
+                }
+            }
+
+            DocumentOpening.Opening -> {
+                Notice(message = Strings.OPENING)
+            }
+
+            is DocumentOpening.Failed -> {
+                Notice(message = noticeFor(opening.reason), name = open.displayName)
+            }
+        }
+    }
+
+    /**
+     * The session this intent is about.
+     *
+     * A session id is one this application already recorded, so it is read back rather than built:
+     * an untitled document has no URI to derive an identity from, and a restored one must keep the
+     * id its snapshot is filed under.
+     */
+    private suspend fun recordFor(
+        intent: Intent,
+        storage: Storage,
+    ): SessionRecord? =
+        when (val session = sessionIdOf(intent)) {
+            null -> documentUri(intent)?.let { uri -> storage.opening(uri) }
+            else -> storage.snapshots.recordOf(session)
+        }
+
+    /** A document from outside: its grant persisted (7.3), and its kind decided, as it is let in. */
+    private suspend fun Storage.opening(uri: Uri): SessionRecord? =
+        androidIdentity(this@DocumentActivity, uri, kindOf(uri).id)?.let { sessions.opened(it) }
 
     /**
      * The document this launch is about, wherever the sender chose to put it.
@@ -93,58 +230,32 @@ class DocumentActivity : ComponentActivity() {
             intent.getParcelableExtra(Intent.EXTRA_STREAM)
         }
 
-    @Composable
-    private fun Document(uri: Uri?) {
-        if (uri == null) {
-            Notice(message = NO_DOCUMENT)
-            return
-        }
+    /**
+     * Where 7.4's first save has landed, in the terms the session list keeps.
+     *
+     * The name is the picker's, not the one that was suggested: the reader can type anything, and
+     * the Storage Access Framework may add an extension of its own. The kind follows that name
+     * (9.1), so saving an untitled document as `.fountain` makes it a screenplay.
+     *
+     * `androidIdentity` takes the persistable grant on the way past, which is what makes the
+     * document restorable on the next launch (7.3). If it cannot -- a provider that grants nothing
+     * persistable -- the save still happens and only the restore is lost, so the identity is built
+     * without a token rather than the save being refused.
+     */
+    private fun destinationFor(
+        uri: Uri,
+        record: SessionRecord,
+    ): SessionIdentity {
+        val name = displayNameOf(contentResolver, uri) ?: uri.lastPathSegment ?: record.displayName
+        val kind = DocumentKind.of(name)?.id ?: record.kind
 
-        val documents = remember { SafDocumentStore(this) }
-        val files = remember { PathDocumentStore() }
-        val snapshots = remember { SnapshotStore(files, androidSessionRoot(this)) }
-        val sessions = remember { SessionList(snapshots) }
-        val settings = remember { SettingsStore(files, androidSettingsRoot(this)) }
-
-        // 9.2: "Call `takePersistableUriPermission` immediately on receiving a content URI, or
-        // session restoration will fail silently on next launch." `androidIdentity` does it, and
-        // this is the first moment it can be done.
-        val record by produceState<SessionRecord?>(null, uri) {
-            val identity = androidIdentity(this@DocumentActivity, uri, kindOf(uri).id)
-            value = identity?.let { sessions.opened(it) }
-        }
-
-        val open = record
-        if (open == null) {
-            Notice(message = OPENING)
-            return
-        }
-
-        // Recents shows one entry per document, named for the document. Set once the name is known.
-        LaunchedEffect(open.displayName) { describeTask(open.displayName) }
-
-        when (val opening = rememberSessionDocument(documents, snapshots, open)) {
-            is DocumentOpening.Opened -> {
-                DraftsApp(
-                    document = opening.document,
-                    initialSettings = ReaderSettings(),
-                    keeper =
-                        remember(
-                            opening.document,
-                        ) { SnapshotKeeper(opening.document, snapshots, open.identity()) },
-                    settingsStore = settings,
-                    kind = open.kind,
-                )
-            }
-
-            DocumentOpening.Opening -> {
-                Notice(message = OPENING)
-            }
-
-            is DocumentOpening.Failed -> {
-                Notice(message = COULD_NOT_OPEN, name = open.displayName)
-            }
-        }
+        return androidIdentity(this, uri, kind)
+            ?: SessionIdentity(
+                documentId = record.documentId,
+                uri = uri.toString(),
+                displayName = name,
+                kind = kind,
+            )
     }
 
     /**
@@ -200,16 +311,21 @@ class DocumentActivity : ComponentActivity() {
     private companion object {
         /** Enough for a title page and the first scene, without pulling a novel over the wire. */
         const val SNIFF_BYTES = 8 * 1024
-
-        const val NO_DOCUMENT = "No document was given to open."
-        const val OPENING = "Opening…"
-        const val COULD_NOT_OPEN = "Could not open"
     }
 }
 
+/**
+ * The type `ACTION_CREATE_DOCUMENT` is asked to make.
+ *
+ * Fountain has none -- 9.1: "MIME | `text/markdown` (RFC 7763) | none registered" -- and the picker
+ * requires one, so a screenplay is created as plain text. Its extension is what says what it is,
+ * which is the same thing 9.2 already relies on when one arrives from elsewhere.
+ */
+private fun mimeFor(kind: String): String = kindOf(kind).mimeTypes.firstOrNull() ?: "text/plain"
+
 /** The 7.3 identity a record describes, for the keeper that writes its snapshots. */
 private fun SessionRecord.identity() =
-    com.appthere.drafts.platform.files.SessionIdentity(
+    SessionIdentity(
         documentId = documentId,
         uri = uri,
         displayName = displayName,

@@ -96,18 +96,31 @@
         </activity>
 
         <!--
-          The launcher entry, still on the sample document. 7.4's untitled document and the app
-          shortcuts per kind are the next part of this phase; this stays until they replace it so
-          the application remains launchable.
+          7.4's launcher entry, and the two app shortcuts beside it.
+
+          It shows nothing and finishes immediately: it decides what this launch opens and starts a
+          DocumentActivity task for each. The translucent theme is what keeps that invisible — with
+          an ordinary one the reader would see a blank window of this application appear and be
+          replaced, every launch.
+
+          excludeFromRecents, because it is not a document and 7.2 gives Recents to documents.
+          noHistory, so Back from a document goes where the reader came from rather than to a blank
+          screen this Activity left behind.
         -->
         <activity
-            android:name=".MainActivity"
+            android:name=".LauncherActivity"
+            android:excludeFromRecents="true"
             android:exported="true"
-            android:windowSoftInputMode="adjustResize">
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
     </application>
 </manifest>

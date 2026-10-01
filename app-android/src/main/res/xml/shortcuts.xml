@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  appthere-drafts.md 7.4: "Every platform's launcher offers both kinds directly, routed through the
+  same path as opening a file | Android | Static app shortcuts: New Markdown document, New Fountain
+  screenplay".
+
+  Static rather than dynamic, as 7.4 says: a dynamic shortcut has to be published by code that has
+  run at least once, so a reader who has never opened the application would not have them — which
+  is exactly the reader "Nothing stands between launching the app and writing" is written for.
+
+  The intent is the launcher's own, carrying the kind. It is not a separate entry point: it goes
+  through the same decision every launch goes through, which is what "routed through the same path"
+  asks for.
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:shortcutId="new-markdown"
+        android:shortcutLongLabel="@string/new_markdown"
+        android:shortcutShortLabel="@string/new_markdown_short">
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:targetClass="com.appthere.drafts.app.android.LauncherActivity"
+            android:targetPackage="com.appthere.drafts">
+            <extra
+                android:name="com.appthere.drafts.NEW_KIND"
+                android:value="markdown" />
+        </intent>
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:shortcutId="new-fountain"
+        android:shortcutLongLabel="@string/new_fountain"
+        android:shortcutShortLabel="@string/new_fountain_short">
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:targetClass="com.appthere.drafts.app.android.LauncherActivity"
+            android:targetPackage="com.appthere.drafts">
+            <extra
+                android:name="com.appthere.drafts.NEW_KIND"
+                android:value="fountain" />
+        </intent>
+    </shortcut>
+</shortcuts>

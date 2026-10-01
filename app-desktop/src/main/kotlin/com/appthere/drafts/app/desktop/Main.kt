@@ -40,13 +40,15 @@ import com.appthere.drafts.app.DraftsApp
 import com.appthere.drafts.app.KindChange
 import com.appthere.drafts.app.Notice
 import com.appthere.drafts.app.SampleDocument
+import com.appthere.drafts.app.SaveAs
 import com.appthere.drafts.app.SettingsStore
 import com.appthere.drafts.app.SnapshotKeeper
 import com.appthere.drafts.app.copyName
+import com.appthere.drafts.app.noticeFor
 import com.appthere.drafts.app.rememberOpenDocument
 import com.appthere.drafts.app.rememberSessionDocument
 import com.appthere.drafts.app.rememberUntitledDocument
-import com.appthere.drafts.app.suggestedFileName
+import com.appthere.drafts.app.suggestedSaveName
 import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.editor.ui.Shortcut
 import com.appthere.drafts.i18n.Strings
@@ -380,27 +382,10 @@ private fun FileDocument(
                     // Listed with the rest, though the window rather than the document answers it.
                     hostShortcuts = listOf(fullScreen),
                     saveAs = {
-                        // 7.4: the name comes from the first heading or the title page while the
-                        // document is untitled; once it has a file, Save As offers that file's name.
-                        val document = opening.document
-                        val suggested =
-                            when {
-                                record.uri == null -> {
-                                    document.editor.suggestedFileName(kindOf(record.kind), Strings.UNTITLED)
-                                }
-
-                                // 8.2's "Save a copy...": not the name of the version being kept.
-                                document.lifecycle.state == DocumentState.Conflicted -> {
-                                    copyName(record.displayName, Strings.MY_VERSION)
-                                }
-
-                                else -> {
-                                    record.displayName
-                                }
-                            }
+                        val suggested = opening.document.suggestedSaveName(record)
 
                         chooseSaveLocation(parent, Strings.SAVE_AS, suggested, near = record.accessToken)
-                            ?.let { path -> saving.to(path, opening.document, record, keeper) }
+                            ?.let { path -> saving.to(destinationOf(path, record), opening.document, record, keeper) }
                     },
                     // 7.4's kind, while there is no file whose extension already says.
                     onKindChange =
@@ -418,22 +403,10 @@ private fun FileDocument(
         }
 
         is DocumentOpening.Failed -> {
-            Notice(message = messageFor(opening.reason), name = record.displayName)
+            Notice(message = noticeFor(opening.reason), name = record.displayName)
         }
     }
 }
-
-/**
- * Why a document is not showing, in words about the reader's situation rather than the exception
- * (11.1). A file that is missing with a snapshot never gets here: it opens from the snapshot.
- */
-private fun messageFor(reason: DocumentOpening.Reason): String =
-    when (reason) {
-        DocumentOpening.Reason.Unreadable -> Strings.COULD_NOT_READ
-        DocumentOpening.Reason.Missing, DocumentOpening.Reason.NothingKept -> Strings.FILE_GONE_NOTHING_KEPT
-    }
-
-private fun kindOf(id: String): DocumentKind = DocumentKind.entries.firstOrNull { it.id == id } ?: DocumentKind.Markdown
 
 /**
  * The four places the desktop keeps things, made once and shared by every window: the reader's
