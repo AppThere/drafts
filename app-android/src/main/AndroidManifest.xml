@@ -34,8 +34,22 @@
           runtime; it cannot express "a task per document" at all. documentLaunchMode can, and
           does. What the document contributes per launch is its name, through TaskDescription.
         -->
+        <!--
+          configChanges, so that resizing a window does not restart the document.
+
+          Android recreates an Activity on a configuration change by default, and entering or
+          leaving split-screen is one, as is rotating the device. Measured on an emulator: type a
+          word, rotate, and the word is gone. What came back was 8.3's snapshot, which is written
+          three seconds after an edit, so every rotation cost whatever had been typed since the
+          last one and reset the caret and the undo history with it.
+
+          Compose resizes without being restarted, so handling these is the fix rather than a
+          workaround. It does not cover process death, and is not meant to: that is what 8.1's
+          snapshot and 8.3's recovery are for, and they work.
+        -->
         <activity
             android:name=".DocumentActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|density|uiMode|fontScale|layoutDirection"
             android:documentLaunchMode="intoExisting"
             android:exported="true"
             android:launchMode="standard"

@@ -102,7 +102,7 @@ class AndroidStorageTest {
         runTest {
             // The declaration is load-bearing: `SnapshotStore` refuses to be built on a store that
             // cannot rename, which is what stops 8.1's snapshots being put through SAF by accident.
-            val saf = SafDocumentStore(context.contentResolver)
+            val saf = SafDocumentStore(context)
 
             assertFalse(saf.writesAtomically)
             assertFalse(runCatching { SnapshotStore(saf, sessions) }.isSuccess)

@@ -100,7 +100,7 @@ class DocumentActivity : ComponentActivity() {
             return
         }
 
-        val documents = remember { SafDocumentStore(contentResolver) }
+        val documents = remember { SafDocumentStore(this) }
         val files = remember { PathDocumentStore() }
         val snapshots = remember { SnapshotStore(files, androidSessionRoot(this)) }
         val sessions = remember { SessionList(snapshots) }

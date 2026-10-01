@@ -1,7 +1,11 @@
 package com.appthere.drafts.platform.files
 
 import android.content.ContentResolver
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Binder
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import kotlinx.coroutines.CoroutineDispatcher
@@ -32,9 +36,11 @@ import java.io.IOException
  * that arrangement cannot be got wrong by accident.
  */
 class SafDocumentStore(
-    private val resolver: ContentResolver,
+    private val context: Context,
     private val io: CoroutineDispatcher = Dispatchers.IO,
 ) : DocumentStore {
+    private val resolver: ContentResolver get() = context.contentResolver
+
     /** See the class comment: SAF offers no replace-in-one-step, so 8.1 cannot be honoured here. */
     override val writesAtomically: Boolean = false
 
@@ -151,11 +157,26 @@ class SafDocumentStore(
     private fun bytesOf(ref: DocumentRef): ByteArray? =
         runCatching { resolver.openInputStream(Uri.parse(ref.token))?.use { it.readBytes() } }.getOrNull()
 
+    /**
+     * Whether this process may write to the document, asked of the system rather than inferred.
+     *
+     * The first version of this looked at `persistedUriPermissions` and whether the URI was a SAF
+     * document, and got the common case wrong: a document opened from a file manager arrives with a
+     * *transient* grant on the intent, which is neither of those things. Every such document showed
+     * as 8.4's `readOnly` -- a badge saying the reader could not save a file they could.
+     *
+     * `checkUriPermission` is the question actually being asked: may this process, right now, write
+     * through this URI. It covers the transient grant, the persisted one, and the case where a
+     * grant has since been revoked.
+     */
     private fun isWritable(ref: DocumentRef): Boolean =
         runCatching {
-            val uri = Uri.parse(ref.token)
-            resolver.persistedUriPermissions.any { it.uri == uri && it.isWritePermission } ||
-                DocumentsContract.isDocumentUri(null, uri)
+            context.checkUriPermission(
+                Uri.parse(ref.token),
+                Binder.getCallingPid(),
+                Binder.getCallingUid(),
+                Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+            ) == PackageManager.PERMISSION_GRANTED
         }.getOrDefault(false)
 
     /**
