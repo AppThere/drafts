@@ -60,7 +60,10 @@ include(":core-export-ooxml")
 include(":editor-engine")
 include(":editor-ui")
 
-// --- cross-cutting, still pure commonMain ---------------------------------------------------
+// --- cross-cutting -------------------------------------------------------------------------
+// These were pure commonMain until the platform started answering questions they ask: :a11y reads
+// the system's reduced-motion setting (10.2), and :i18n holds 11.1's strings, which are Compose
+// resources and so are read from a composition. All three are still below the editor.
 include(":design-system")
 include(":i18n")
 include(":a11y")

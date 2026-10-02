@@ -11,7 +11,14 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.discard
+import com.appthere.drafts.i18n.resources.document_state
+import com.appthere.drafts.i18n.resources.keep
+import com.appthere.drafts.i18n.resources.reload
+import com.appthere.drafts.i18n.resources.restored
+import com.appthere.drafts.i18n.resources.state_clean
+import com.appthere.drafts.i18n.resources.state_dirty
 import com.appthere.drafts.platform.files.CaretRecord
 import com.appthere.drafts.platform.files.Digest
 import com.appthere.drafts.platform.files.DocumentRef
@@ -79,7 +86,9 @@ class RecoveryTest {
         runSkikoComposeUiTest(size = SIZE) {
             open()
 
-            onNodeWithContentDescription("${Strings.DOCUMENT_STATE}, ${Strings.STATE_DIRTY}").assertExists()
+            onNodeWithContentDescription(
+                "${words(Res.string.document_state)}, ${words(Res.string.state_dirty)}",
+            ).assertExists()
         }
     }
 
@@ -90,7 +99,7 @@ class RecoveryTest {
         runSkikoComposeUiTest(size = SIZE) {
             open()
 
-            onNodeWithText(Strings.RESTORED, useUnmergedTree = true).assertExists()
+            onNodeWithText(words(Res.string.restored), useUnmergedTree = true).assertExists()
         }
     }
 
@@ -103,8 +112,10 @@ class RecoveryTest {
         runSkikoComposeUiTest(size = SIZE) {
             open()
 
-            onNodeWithText(Strings.RESTORED, useUnmergedTree = true).assertDoesNotExist()
-            onNodeWithContentDescription("${Strings.DOCUMENT_STATE}, ${Strings.STATE_CLEAN}").assertExists()
+            onNodeWithText(words(Res.string.restored), useUnmergedTree = true).assertDoesNotExist()
+            onNodeWithContentDescription(
+                "${words(Res.string.document_state)}, ${words(Res.string.state_clean)}",
+            ).assertExists()
         }
     }
 
@@ -116,7 +127,7 @@ class RecoveryTest {
             open()
 
             onNodeWithText(ORIGINAL_LINE).assertExists()
-            onNodeWithText(Strings.RESTORED, useUnmergedTree = true).assertDoesNotExist()
+            onNodeWithText(words(Res.string.restored), useUnmergedTree = true).assertDoesNotExist()
         }
     }
 
@@ -142,10 +153,10 @@ class RecoveryTest {
 
         runSkikoComposeUiTest(size = SIZE) {
             open()
-            onNodeWithContentDescription(Strings.KEEP).performClick()
+            onNodeWithContentDescription(words(Res.string.keep)).performClick()
             waitForIdle()
 
-            onNodeWithText(Strings.RESTORED, useUnmergedTree = true).assertDoesNotExist()
+            onNodeWithText(words(Res.string.restored), useUnmergedTree = true).assertDoesNotExist()
             onNodeWithText(UNSAVED_LINE).assertExists()
             assertEquals(ORIGINAL, file().readText())
         }
@@ -161,9 +172,9 @@ class RecoveryTest {
 
         runSkikoComposeUiTest(size = SIZE) {
             open()
-            onNodeWithContentDescription(Strings.DISCARD).performClick()
+            onNodeWithContentDescription(words(Res.string.discard)).performClick()
             waitUntil(timeoutMillis = TIMEOUT) {
-                onAllNodesWithContentDescription(Strings.DISCARD).fetchSemanticsNodes().isEmpty()
+                onAllNodesWithContentDescription(words(Res.string.discard)).fetchSemanticsNodes().isEmpty()
             }
 
             onNodeWithText(ORIGINAL_LINE).assertExists()
@@ -201,7 +212,7 @@ class RecoveryTest {
 
             save()
             waitUntil(timeoutMillis = TIMEOUT) {
-                onAllNodesWithContentDescription(Strings.RELOAD).fetchSemanticsNodes().isNotEmpty()
+                onAllNodesWithContentDescription(words(Res.string.reload)).fetchSemanticsNodes().isNotEmpty()
             }
 
             assertNull(runBlocking { snapshots.recordOf(ID)?.savedAt })
@@ -318,10 +329,10 @@ class RecoveryTest {
         }
         waitUntil(timeoutMillis = TIMEOUT) {
             onAllNodesWithContentDescription(
-                "${Strings.DOCUMENT_STATE}, ${Strings.STATE_DIRTY}",
+                "${words(Res.string.document_state)}, ${words(Res.string.state_dirty)}",
             ).fetchSemanticsNodes().isNotEmpty() ||
                 onAllNodesWithContentDescription(
-                    "${Strings.DOCUMENT_STATE}, ${Strings.STATE_CLEAN}",
+                    "${words(Res.string.document_state)}, ${words(Res.string.state_clean)}",
                 ).fetchSemanticsNodes().isNotEmpty()
         }
         return document

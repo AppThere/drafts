@@ -10,7 +10,7 @@ kotlin {
         commonMain.dependencies {
             // What a block is (the model) and what it is called (the strings), for 10.1's names.
             api(project(":core-model"))
-            implementation(project(":i18n"))
+            api(project(":i18n"))
 
             implementation(compose.runtime)
             // `LocalContext`, which is how the Android actual reaches the system settings.

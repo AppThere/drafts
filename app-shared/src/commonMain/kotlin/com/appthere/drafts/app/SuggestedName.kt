@@ -3,7 +3,6 @@ package com.appthere.drafts.app
 import com.appthere.drafts.core.model.Heading
 import com.appthere.drafts.core.model.plainText
 import com.appthere.drafts.editor.ui.EditorState
-import com.appthere.drafts.i18n.Strings
 import com.appthere.drafts.platform.files.DocumentState
 import com.appthere.drafts.platform.files.SessionRecord
 import com.appthere.drafts.platform.intents.DocumentKind
@@ -122,11 +121,20 @@ private val reserved =
  *
  * Here rather than in each host because it is 7.4 and 8.2 rather than anything about a picker; what
  * the hosts differ on is the picker, which is below this.
+ *
+ * [untitled] and [myVersion] are handed in rather than read here. 11.1's words come from resources,
+ * and a resource is read from a composition; this is called from a save, which is neither a
+ * composition nor a place that should have to know. The host resolves two words and passes them,
+ * which also leaves this function testable without a resource runtime.
  */
-fun OpenDocument.suggestedSaveName(record: SessionRecord): String =
+fun OpenDocument.suggestedSaveName(
+    record: SessionRecord,
+    untitled: String,
+    myVersion: String,
+): String =
     when {
-        record.uri == null -> editor.suggestedFileName(kindOf(record.kind), Strings.UNTITLED)
-        lifecycle.state == DocumentState.Conflicted -> copyName(record.displayName, Strings.MY_VERSION)
+        record.uri == null -> editor.suggestedFileName(kindOf(record.kind), untitled)
+        lifecycle.state == DocumentState.Conflicted -> copyName(record.displayName, myVersion)
         else -> record.displayName
     }
 

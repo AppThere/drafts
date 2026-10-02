@@ -9,7 +9,9 @@ import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.open_reader_controls
+import com.appthere.drafts.i18n.resources.reader_controls
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -85,14 +87,14 @@ class ResponsiveLayoutTest {
 
     /** The settings pane, found by the title assistive technology announces it with. */
     private fun SkikoComposeUiTest.panelBounds() =
-        onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, Strings.READER_CONTROLS))
+        onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, words(Res.string.reader_controls)))
             .getBoundsInRoot()
 
     private fun SkikoComposeUiTest.openControls() {
         setContent { DraftsApp(initialText = "A paragraph.\n") }
         waitForIdle()
 
-        onNodeWithContentDescription(Strings.OPEN_READER_CONTROLS).performClick()
+        onNodeWithContentDescription(words(Res.string.open_reader_controls)).performClick()
         waitForIdle()
     }
 

@@ -12,9 +12,10 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
 }
 
-// `ShortcutsTest` reads the manifest and `res/` as text, so they are inputs to it even though
-// nothing it asserts about them goes through the compiler.
+// `ShortcutsTest` reads the manifest, this module's `res/` and :i18n's Compose resources as text,
+// so all three are inputs to it even though nothing it asserts about them goes through the compiler.
 tasks.withType<Test>().configureEach {
     inputs.file("src/main/AndroidManifest.xml").withPropertyName("manifest")
     inputs.dir("src/main/res").withPropertyName("resources")
+    inputs.dir("../i18n/src/commonMain/composeResources").withPropertyName("strings")
 }

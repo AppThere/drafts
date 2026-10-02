@@ -14,7 +14,9 @@ import androidx.compose.ui.test.v2.runSkikoComposeUiTest
 import com.appthere.drafts.editor.engine.Caret
 import com.appthere.drafts.editor.engine.DocumentSession
 import com.appthere.drafts.editor.ui.EditorState
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.conflict
+import com.appthere.drafts.i18n.resources.save_copy
 import com.appthere.drafts.platform.files.DocumentRef
 import com.appthere.drafts.platform.files.DocumentSessionState
 import com.appthere.drafts.platform.files.DocumentState
@@ -39,7 +41,7 @@ class SaveCopyTest {
             setContent { DraftsApp(document = document, saveAs = { document.saveAs(COPY) }) }
             askToSave()
 
-            onNodeWithContentDescription(Strings.SAVE_COPY).performClick()
+            onNodeWithContentDescription(words(Res.string.save_copy)).performClick()
             waitUntil(timeoutMillis = TIMEOUT) { !asking() }
 
             assertEquals(MINE, runBlocking { store.read(COPY) }.text, "The reader's version is not in the copy")
@@ -55,7 +57,7 @@ class SaveCopyTest {
             setContent { DraftsApp(document = document, saveAs = { null }) }
             askToSave()
 
-            onNodeWithContentDescription(Strings.SAVE_COPY).performClick()
+            onNodeWithContentDescription(words(Res.string.save_copy)).performClick()
             waitForIdle()
 
             assertTrue(asking(), "Cancelling the copy answered the conflict")
@@ -67,7 +69,7 @@ class SaveCopyTest {
             setContent { DraftsApp(document = conflicted(FakeDocumentStore(REF, ORIGINAL))) }
             askToSave()
 
-            assertTrue(onAllNodesWithContentDescription(Strings.SAVE_COPY).fetchSemanticsNodes().isEmpty())
+            assertTrue(onAllNodesWithContentDescription(words(Res.string.save_copy)).fetchSemanticsNodes().isEmpty())
         }
 
     /** Ctrl+S, which 8.2 refuses, and waits for the question. */
@@ -82,7 +84,7 @@ class SaveCopyTest {
     }
 
     private fun SkikoComposeUiTest.asking(): Boolean =
-        onAllNodesWithContentDescription(Strings.CONFLICT).fetchSemanticsNodes().isNotEmpty()
+        onAllNodesWithContentDescription(words(Res.string.conflict)).fetchSemanticsNodes().isNotEmpty()
 
     /** A document with an edit of its own, whose file someone else has since changed. */
     private fun conflicted(store: FakeDocumentStore): OpenDocument {

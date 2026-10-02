@@ -165,22 +165,30 @@ report on what exists without it.
 
 ---
 
-## 11.1 — Strings are constants
+## 11.1 — Three things are still built by joining strings
 
-**Spec:** "User-facing strings live in resources."
+**Spec:** "No string concatenation; use positional parameters. Pluralisation via plural resources,
+not `if (n == 1)`."
 
-**Code:** `Strings` is a Kotlin object of constants, provisional since Phase 0. Several labels are
-still built by concatenation.
+The strings themselves have moved: `values/strings.xml` in `:i18n` holds all 102 of them, read with
+`stringResource` in a composition and `getString` outside one, and a translation is a sibling
+directory with no code change. What is left is three places that still join strings in code.
 
-Theme names no longer block this. Identifiers and labels used to be one string -- `Palette.name` was
-both what a reader saw and the key their choice was saved under -- so translating the application
-would have reset every saved theme. They are now separate: `Palette.id` and `Theme.id` are stable,
-lowercase and never shown, the words live in `Strings`, and settings written before the split still
-resolve. `MotionPreference`, `FocusMode` and `DocumentKind` were already separated this way.
+**The units in the reader controls.** "18sp", "0.75em", "1.60" are a number and a suffix stuck
+together. The suffix is user-facing and a language could want it elsewhere or spelled differently,
+so each wants a `%1$s` resource of its own.
 
-**Closes when:** the constants move to Compose Resources. That is mechanical now -- 170 call sites
-across `:a11y`, `:editor-ui` and `:app-shared`, each a constant becoming a resource lookup -- and
-nothing it touches can lose a reader's settings any more.
+**A key chord.** `Shortcut.keys()` joins "Ctrl", "Shift" and the key with a plus. Deliberate: a
+chord is a notation rather than a sentence, the number of parts varies, and the plus is the same
+notation everywhere. The names being joined *are* resources, which is the part that matters.
+
+**File names.** `suggestedFileName` builds `name.md` and `copyName` builds `chapter (my version).md`.
+A file name is not prose; only the words inside it come from resources, and they do.
+
+**Pluralisation** has nothing to fix yet: nothing in the application counts anything out loud. The
+first thing that does should reach for a plural resource rather than an `if`.
+
+**Closes when:** the units are resources. The other two are settled as they are.
 
 ---
 

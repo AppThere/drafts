@@ -12,7 +12,10 @@ import com.appthere.drafts.design.LocalWindowSize
 import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.design.WidthClass
 import com.appthere.drafts.editor.ui.Shortcut
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.keyboard_shortcuts
+import com.appthere.drafts.i18n.resources.licences
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The reader's panels, and the way in to them that needs no keyboard.
@@ -57,8 +60,8 @@ internal fun BoxScope.WindowPanels(
             modifier = panelPlacement(Alignment.TopEnd),
             onClose = refocused(panels::closeControls),
         ) {
-            PanelLink(Strings.KEYBOARD_SHORTCUTS, onClick = panels::openShortcuts)
-            PanelLink(Strings.LICENCES, onClick = panels::openLicences)
+            PanelLink(stringResource(Res.string.keyboard_shortcuts), onClick = panels::openShortcuts)
+            PanelLink(stringResource(Res.string.licences), onClick = panels::openLicences)
         }
     }
 

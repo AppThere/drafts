@@ -22,7 +22,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.Prose
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.cancel
+import com.appthere.drafts.i18n.resources.conflict
+import com.appthere.drafts.i18n.resources.reload
+import com.appthere.drafts.i18n.resources.save_copy
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * 8.2's refusal, shown to the reader.
@@ -53,6 +58,7 @@ fun ConflictDialog(
     onSaveCopy: (() -> Unit)? = null,
 ) {
     val palette = LocalPalette.current
+    val refusal = stringResource(Res.string.conflict)
 
     Column(
         modifier
@@ -60,11 +66,11 @@ fun ConflictDialog(
             .background(palette.background)
             .border(hairline, palette.accent, RoundedCornerShape(corner))
             .padding(panelPadding)
-            .semantics { contentDescription = Strings.CONFLICT },
+            .semantics { contentDescription = refusal },
         verticalArrangement = Arrangement.spacedBy(rowGap),
     ) {
         BasicText(
-            text = Strings.CONFLICT,
+            text = refusal,
             style = TextStyle(color = palette.ink, fontSize = messageSize, fontWeight = Prose.H5.weight),
         )
 
@@ -73,9 +79,9 @@ fun ConflictDialog(
             horizontalArrangement = Arrangement.spacedBy(buttonGap),
             verticalArrangement = Arrangement.spacedBy(buttonGap),
         ) {
-            onSaveCopy?.let { Choice(label = Strings.SAVE_COPY, onChoose = it) }
-            Choice(label = Strings.RELOAD, onChoose = onReload)
-            Choice(label = Strings.CANCEL, onChoose = onCancel)
+            onSaveCopy?.let { Choice(label = stringResource(Res.string.save_copy), onChoose = it) }
+            Choice(label = stringResource(Res.string.reload), onChoose = onReload)
+            Choice(label = stringResource(Res.string.cancel), onChoose = onCancel)
         }
     }
 }

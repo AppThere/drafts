@@ -13,7 +13,9 @@ import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
 import com.appthere.drafts.editor.engine.DocumentSession
 import com.appthere.drafts.editor.ui.EditorState
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.close
+import com.appthere.drafts.i18n.resources.could_not_save
 import com.appthere.drafts.platform.files.DocumentRef
 import com.appthere.drafts.platform.files.DocumentSessionState
 import com.appthere.drafts.platform.files.WriteOutcome
@@ -92,7 +94,7 @@ class SaveShortcutTest {
             press(Key.S)
             waitUntil(timeoutMillis = TIMEOUT) { saying() }
 
-            onNodeWithContentDescription(Strings.CLOSE).performClick()
+            onNodeWithContentDescription(words(Res.string.close)).performClick()
             waitUntil(timeoutMillis = TIMEOUT) { !saying() }
         }
 
@@ -110,7 +112,7 @@ class SaveShortcutTest {
     }
 
     private fun SkikoComposeUiTest.saying(): Boolean =
-        onAllNodesWithContentDescription(Strings.COULD_NOT_SAVE).fetchSemanticsNodes().isNotEmpty()
+        onAllNodesWithContentDescription(words(Res.string.could_not_save)).fetchSemanticsNodes().isNotEmpty()
 
     private fun opened(store: FakeDocumentStore): OpenDocument =
         runBlocking {

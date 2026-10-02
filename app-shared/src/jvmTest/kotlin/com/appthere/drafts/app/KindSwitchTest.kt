@@ -18,7 +18,10 @@ import androidx.compose.ui.test.v2.runSkikoComposeUiTest
 import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.editor.engine.DocumentSession
 import com.appthere.drafts.editor.ui.EditorState
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.kind
+import com.appthere.drafts.i18n.resources.kind_fountain
+import com.appthere.drafts.i18n.resources.kind_markdown
 import com.appthere.drafts.platform.files.DocumentRef
 import com.appthere.drafts.platform.files.DocumentSessionState
 import com.appthere.drafts.platform.intents.DocumentKind
@@ -95,7 +98,7 @@ class KindSwitchTest {
         val REF = DocumentRef("/documents/note.md")
         const val ORIGINAL = "As opened.\n"
         const val WIDER = 1.25f
-        val MARKDOWN = "${Strings.KIND}, ${Strings.KIND_MARKDOWN}"
-        val FOUNTAIN = "${Strings.KIND}, ${Strings.KIND_FOUNTAIN}"
+        val MARKDOWN = "${words(Res.string.kind)}, ${words(Res.string.kind_markdown)}"
+        val FOUNTAIN = "${words(Res.string.kind)}, ${words(Res.string.kind_fountain)}"
     }
 }

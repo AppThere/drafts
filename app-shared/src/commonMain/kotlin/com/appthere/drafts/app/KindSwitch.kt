@@ -21,8 +21,13 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.appthere.drafts.design.LocalPalette
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.kind
+import com.appthere.drafts.i18n.resources.kind_fountain
+import com.appthere.drafts.i18n.resources.kind_markdown
+import com.appthere.drafts.i18n.resources.said_after
 import com.appthere.drafts.platform.intents.DocumentKind
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * 7.4's kind, as a control, while a document is untitled: *Untitled · Markdown*.
@@ -63,6 +68,9 @@ private fun KindOption(
     val label = labelOf(kind)
     val shape = RoundedCornerShape(corner)
 
+    // Read here rather than inside `semantics`, which is not a composition.
+    val described = stringResource(Res.string.said_after, stringResource(Res.string.kind), label)
+
     BasicText(
         text = label,
         style = TextStyle(color = if (selected) palette.background else palette.ink, fontSize = labelSize),
@@ -73,14 +81,15 @@ private fun KindOption(
                 .border(hairline, palette.muted, shape)
                 .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onChoose)
                 .padding(optionPadding)
-                .semantics { contentDescription = "${Strings.KIND}, $label" },
+                .semantics { contentDescription = described },
     )
 }
 
+@Composable
 private fun labelOf(kind: DocumentKind): String =
     when (kind) {
-        DocumentKind.Markdown -> Strings.KIND_MARKDOWN
-        DocumentKind.Fountain -> Strings.KIND_FOUNTAIN
+        DocumentKind.Markdown -> stringResource(Res.string.kind_markdown)
+        DocumentKind.Fountain -> stringResource(Res.string.kind_fountain)
     }
 
 /** 10.2: "Touch targets >= 48dp." */

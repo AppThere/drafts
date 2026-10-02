@@ -14,7 +14,8 @@ import androidx.compose.ui.test.v2.runSkikoComposeUiTest
 import com.appthere.drafts.design.DraftsTheme
 import com.appthere.drafts.design.FontLicences
 import com.appthere.drafts.design.ReaderSettings
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.licences
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -71,7 +72,7 @@ class LicencesTest {
                     ReaderControls(
                         settings = ReaderSettings(),
                         onChange = {},
-                        links = { PanelLink(Strings.LICENCES, onClick = { opened = true }) },
+                        links = { PanelLink(words(Res.string.licences), onClick = { opened = true }) },
                     )
                 }
             }

@@ -1,6 +1,5 @@
 package com.appthere.drafts.app.android
 
-import com.appthere.drafts.i18n.Strings
 import com.appthere.drafts.platform.intents.DocumentKind
 import org.w3c.dom.Element
 import java.io.File
@@ -58,9 +57,12 @@ class ShortcutsTest {
 
     @Test
     fun `the labels say what the other platforms' launchers say`() {
-        // Linux's `.desktop` actions and macOS's Dock menu are built from these same two strings.
-        assertEquals(Strings.NEW_MARKDOWN, string("new_markdown"))
-        assertEquals(Strings.NEW_FOUNTAIN, string("new_fountain"))
+        // Linux's `.desktop` actions and macOS's Dock menu read these two words from 11.1's
+        // resources; Android's static shortcuts can only name an Android resource, so there are two
+        // copies of each by necessity. Compared as files rather than through the resource runtime,
+        // which an Android host test has no Context for.
+        assertEquals(words("new_markdown"), string("new_markdown"))
+        assertEquals(words("new_fountain"), string("new_fountain"))
     }
 
     @Test
@@ -85,8 +87,18 @@ class ShortcutsTest {
 
     private fun manifest(): Element = parse(File("src/main/AndroidManifest.xml"))
 
-    private fun string(name: String): String =
-        parse(File("src/main/res/values/strings.xml"))
+    /** A word from this module's own Android resources, which the shortcut XML names. */
+    private fun string(name: String): String = valueIn(File("src/main/res/values/strings.xml"), name)
+
+    /** The same word from 11.1's Compose resources, which the rest of the application reads. */
+    private fun words(name: String): String =
+        valueIn(File("../i18n/src/commonMain/composeResources/values/strings.xml"), name)
+
+    private fun valueIn(
+        file: File,
+        name: String,
+    ): String =
+        parse(file)
             .elements("string")
             .single { it.getAttribute("name") == name }
             .textContent

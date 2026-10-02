@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import com.appthere.drafts.a11y.BlockName
 import com.appthere.drafts.a11y.BlockNames
 import com.appthere.drafts.core.model.Block
 import com.appthere.drafts.core.model.BlockQuote
@@ -319,14 +320,17 @@ internal data class RowContent(
 )
 
 /**
- * 10.1's semantics for a block shown in preview: whether it is a heading, the prefix naming any
- * other kind -- "Block quote", "Code block, Kotlin" -- and the words that follow it. Built with the
- * rest of the row, so a block that merely moved keeps the same value and is not composed again.
+ * 10.1's semantics for a block shown in preview: whether it is a heading, the name of any other
+ * kind -- "Block quote", "Code block, Kotlin" -- and the words that follow it. Built with the rest
+ * of the row, so a block that merely moved keeps the same value and is not composed again.
+ *
+ * The prefix is a [BlockName] rather than its words: 11.1 puts the words in resources, which are
+ * read from a composition, and this is built outside one and cached across recompositions.
  */
 @Immutable
 internal data class Spoken(
     val heading: Boolean,
-    val prefix: String?,
+    val prefix: BlockName?,
     val text: String,
 )
 

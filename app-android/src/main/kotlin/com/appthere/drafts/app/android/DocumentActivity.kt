@@ -27,7 +27,13 @@ import com.appthere.drafts.app.noticeFor
 import com.appthere.drafts.app.rememberSessionDocument
 import com.appthere.drafts.app.suggestedSaveName
 import com.appthere.drafts.design.ReaderSettings
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.document_gone
+import com.appthere.drafts.i18n.resources.my_version
+import com.appthere.drafts.i18n.resources.no_document
+import com.appthere.drafts.i18n.resources.not_a_text_document
+import com.appthere.drafts.i18n.resources.opening
+import com.appthere.drafts.i18n.resources.untitled
 import com.appthere.drafts.platform.files.SafDocumentStore
 import com.appthere.drafts.platform.files.SessionIdentity
 import com.appthere.drafts.platform.files.SessionRecord
@@ -35,6 +41,8 @@ import com.appthere.drafts.platform.files.androidIdentity
 import com.appthere.drafts.platform.files.displayNameOf
 import com.appthere.drafts.platform.intents.DocumentKind
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * One document, in one task.
@@ -122,7 +130,7 @@ class DocumentActivity : ComponentActivity() {
     @Composable
     private fun Document(intent: Intent?) {
         if (intent == null) {
-            Notice(message = Strings.NO_DOCUMENT)
+            Notice(message = stringResource(Res.string.no_document))
             return
         }
 
@@ -147,7 +155,7 @@ class DocumentActivity : ComponentActivity() {
         }
 
         when (val open = record) {
-            null -> Notice(message = if (looked) nothingToShow(intent) else Strings.OPENING)
+            null -> Notice(message = if (looked) nothingToShow(intent) else stringResource(Res.string.opening))
             else -> Session(open, storage, documents) { moved -> record = moved }
         }
     }
@@ -198,7 +206,13 @@ class DocumentActivity : ComponentActivity() {
                             // 7.4 while untitled, 8.2's "Save a copy..." while conflicted, the
                             // file's own name otherwise -- all decided in `:app-shared`, because
                             // none of it is about Android.
-                            val where = SaveLocation(mimeFor(open.kind), opening.document.suggestedSaveName(open))
+                            val suggested =
+                                opening.document.suggestedSaveName(
+                                    open,
+                                    untitled = getString(Res.string.untitled),
+                                    myVersion = getString(Res.string.my_version),
+                                )
+                            val where = SaveLocation(mimeFor(open.kind), suggested)
 
                             choose(where)?.let { chosen ->
                                 saving.to(destinationFor(chosen, open), opening.document, open, keeper)
@@ -216,7 +230,7 @@ class DocumentActivity : ComponentActivity() {
             }
 
             DocumentOpening.Opening -> {
-                Notice(message = Strings.OPENING)
+                Notice(message = stringResource(Res.string.opening))
             }
 
             is DocumentOpening.Failed -> {
@@ -234,11 +248,12 @@ class DocumentActivity : ComponentActivity() {
      * could not be taken, which from the reader's side is the same sentence: it did not open. An
      * intent carrying no document at all is a share that brought nothing.
      */
+    @Composable
     private fun nothingToShow(intent: Intent): String =
         when {
-            sessionIdOf(intent) != null -> Strings.DOCUMENT_GONE
-            documentUri(intent) != null -> Strings.NOT_A_TEXT_DOCUMENT
-            else -> Strings.NO_DOCUMENT
+            sessionIdOf(intent) != null -> stringResource(Res.string.document_gone)
+            documentUri(intent) != null -> stringResource(Res.string.not_a_text_document)
+            else -> stringResource(Res.string.no_document)
         }
 
     /**

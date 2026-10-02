@@ -11,7 +11,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.file_gone
+import com.appthere.drafts.i18n.resources.save_as_choice
 import com.appthere.drafts.platform.files.DocumentRef
 import kotlin.test.Test
 
@@ -38,7 +40,7 @@ class FileGoneTest {
             setContent { DraftsApp(document = document, saveAs = { document.saveAs(ELSEWHERE) }) }
             waitUntil(timeoutMillis = TIMEOUT) { saying() }
 
-            onNodeWithContentDescription(Strings.SAVE_AS_CHOICE).performClick()
+            onNodeWithContentDescription(words(Res.string.save_as_choice)).performClick()
 
             waitUntil(timeoutMillis = TIMEOUT) { !saying() }
         }
@@ -84,7 +86,7 @@ class FileGoneTest {
     private fun vanished() = openVanished(FakeDocumentStore(ELSEWHERE, ""), GONE, "Kept words.\n")
 
     private fun SkikoComposeUiTest.saying(): Boolean =
-        onAllNodesWithContentDescription(Strings.FILE_GONE).fetchSemanticsNodes().isNotEmpty()
+        onAllNodesWithContentDescription(words(Res.string.file_gone)).fetchSemanticsNodes().isNotEmpty()
 
     private companion object {
         val SIZE = Size(1200f, 900f)

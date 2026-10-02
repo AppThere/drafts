@@ -4,10 +4,12 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.untitled
 import com.appthere.drafts.platform.files.SessionRecord
 import com.appthere.drafts.platform.intents.DocumentKind
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.getString
 
 /**
  * The launcher icon, and 7.4's two app shortcuts.
@@ -35,7 +37,7 @@ class LauncherActivity : ComponentActivity() {
                     sessions = storage.sessions,
                     requested = requested,
                     showing = showing,
-                    untitledName = Strings.UNTITLED,
+                    untitledName = getString(Res.string.untitled),
                     lastKind = storage.settings.kindForNew(),
                 )
 

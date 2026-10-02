@@ -51,7 +51,15 @@ import com.appthere.drafts.app.rememberUntitledDocument
 import com.appthere.drafts.app.suggestedSaveName
 import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.editor.ui.Shortcut
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.my_version
+import com.appthere.drafts.i18n.resources.new_fountain
+import com.appthere.drafts.i18n.resources.new_markdown
+import com.appthere.drafts.i18n.resources.opening
+import com.appthere.drafts.i18n.resources.save_as
+import com.appthere.drafts.i18n.resources.shortcut_full_screen
+import com.appthere.drafts.i18n.resources.untitled
+import com.appthere.drafts.i18n.resources.window_title
 import com.appthere.drafts.platform.files.Digest
 import com.appthere.drafts.platform.files.DocumentRef
 import com.appthere.drafts.platform.files.DocumentState
@@ -79,6 +87,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.stringResource
 import java.awt.Desktop
 import java.awt.Frame
 import java.awt.MenuItem
@@ -138,7 +148,6 @@ private fun becameTheRunningInstance(
         return false
     }
     installOpenFileHandler(requests)
-    installDockMenu(requests)
     return true
 }
 
@@ -167,14 +176,20 @@ private fun installOpenFileHandler(requests: Channel<LaunchRequest>) {
  * entry's actions instead, and Windows would have a jump list (`divergences.md`) -- so this is a
  * no-op there. Guarded like the open-file handler, for the same headless setups. Untested: there is
  * no Mac in this project's build environment.
+ *
+ * Suspends because its labels do: 11.1 puts them in resources, and a resource read outside a
+ * composition is a suspending one.
  */
-private fun installDockMenu(requests: Channel<LaunchRequest>) {
+private suspend fun installDockMenu(requests: Channel<LaunchRequest>) {
+    val markdown = getString(Res.string.new_markdown)
+    val fountain = getString(Res.string.new_fountain)
+
     runCatching {
         if (Taskbar.isTaskbarSupported() && Taskbar.getTaskbar().isSupported(Taskbar.Feature.MENU)) {
             Taskbar.getTaskbar().menu =
                 PopupMenu().apply {
-                    add(newDocumentItem(Strings.NEW_MARKDOWN, DocumentKind.Markdown, requests))
-                    add(newDocumentItem(Strings.NEW_FOUNTAIN, DocumentKind.Fountain, requests))
+                    add(newDocumentItem(markdown, DocumentKind.Markdown, requests))
+                    add(newDocumentItem(fountain, DocumentKind.Fountain, requests))
                 }
         }
     }
@@ -205,18 +220,23 @@ private fun ApplicationScope.DraftsApplication(
     var restored by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
+        // 7.4's Dock menu. Here rather than beside the open-file handler because its two labels are
+        // 11.1 resources and reading one suspends; nothing is waiting for the menu, and the Dock
+        // has it before anybody has reached for it.
+        installDockMenu(requests)
+
         // 8.3's pruning, before anything is restored: a session whose work reached a file more
         // than thirty days ago has no snapshot worth reopening.
         stores.snapshots.prune(epochMillis())
 
-        open += sessionsAtLaunch(sessions, request, Strings.UNTITLED, stores.settings.kindForNew())
+        open += sessionsAtLaunch(sessions, request, getString(Res.string.untitled), stores.settings.kindForNew())
         request?.let { stores.rememberKindOf(it) }
         restored = true
 
         // Requests handed over by later launches, and by macOS: a file in a window of its own (9.4),
         // or a new document (7.4).
         for (next in requests) {
-            open.serve(next, sessions, Strings.UNTITLED, stores.settings.kindForNew())
+            open.serve(next, sessions, getString(Res.string.untitled), stores.settings.kindForNew())
             stores.rememberKindOf(next)
         }
     }
@@ -248,7 +268,7 @@ private fun ApplicationScope.DraftsApplication(
     // application -- rather than conjuring another untitled document, which 7.4 asks for only at
     // launch.
     if (!restored) {
-        Window(onCloseRequest = ::exitApplication, visible = false, title = Strings.WINDOW_TITLE) {}
+        Window(onCloseRequest = ::exitApplication, visible = false, title = stringResource(Res.string.window_title)) {}
     }
 }
 
@@ -382,9 +402,14 @@ private fun FileDocument(
                     // Listed with the rest, though the window rather than the document answers it.
                     hostShortcuts = listOf(fullScreen),
                     saveAs = {
-                        val suggested = opening.document.suggestedSaveName(record)
+                        val suggested =
+                            opening.document.suggestedSaveName(
+                                record,
+                                untitled = getString(Res.string.untitled),
+                                myVersion = getString(Res.string.my_version),
+                            )
 
-                        chooseSaveLocation(parent, Strings.SAVE_AS, suggested, near = record.accessToken)
+                        chooseSaveLocation(parent, getString(Res.string.save_as), suggested, near = record.accessToken)
                             ?.let { path -> saving.to(destinationOf(path, record), opening.document, record, keeper) }
                     },
                     // 7.4's kind, while there is no file whose extension already says.
@@ -399,7 +424,7 @@ private fun FileDocument(
         }
 
         DocumentOpening.Opening -> {
-            Notice(message = Strings.OPENING)
+            Notice(message = stringResource(Res.string.opening))
         }
 
         is DocumentOpening.Failed -> {
@@ -443,7 +468,7 @@ private class Stores(
  * chord is the one key in the application that needs Ctrl and ⌘ at once, which [Shortcut] does not
  * describe; the list says it in words instead.
  */
-private val fullScreen = Shortcut(Strings.SHORTCUT_FULL_SCREEN, Key.F11, "F11")
+private val fullScreen = Shortcut(Res.string.shortcut_full_screen, Key.F11, "F11")
 
 private fun togglesFullScreen(event: KeyEvent): Boolean =
     fullScreen.matches(event) ||

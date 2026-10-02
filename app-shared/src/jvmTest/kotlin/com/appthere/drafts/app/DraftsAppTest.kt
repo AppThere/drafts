@@ -13,7 +13,10 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
 import com.appthere.drafts.design.FontLicences
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.close
+import com.appthere.drafts.i18n.resources.licences
+import com.appthere.drafts.i18n.resources.open_reader_controls
 import kotlin.test.Test
 
 /**
@@ -63,7 +66,7 @@ class DraftsAppTest {
             // reached on Android at all.
             setContent { DraftsApp(initialText = "A paragraph.\n") }
 
-            onNodeWithContentDescription(Strings.OPEN_READER_CONTROLS).performClick()
+            onNodeWithContentDescription(words(Res.string.open_reader_controls)).performClick()
 
             onNodeWithContentDescription(LARGER).assertIsDisplayed()
         }
@@ -72,12 +75,12 @@ class DraftsAppTest {
     fun `the reader controls close without a keyboard`() =
         runSkikoComposeUiTest(size = Size(1200f, 900f)) {
             setContent { DraftsApp(initialText = "A paragraph.\n") }
-            onNodeWithContentDescription(Strings.OPEN_READER_CONTROLS).performClick()
+            onNodeWithContentDescription(words(Res.string.open_reader_controls)).performClick()
 
-            onNodeWithContentDescription(Strings.CLOSE).performClick()
+            onNodeWithContentDescription(words(Res.string.close)).performClick()
 
             onNodeWithContentDescription(LARGER).assertDoesNotExist()
-            onNodeWithContentDescription(Strings.OPEN_READER_CONTROLS).assertIsDisplayed()
+            onNodeWithContentDescription(words(Res.string.open_reader_controls)).assertIsDisplayed()
         }
 
     @Test
@@ -87,8 +90,8 @@ class DraftsAppTest {
             // gone with it, there would be nowhere for the next keystroke to start from, and the
             // reader's shortcuts would silently stop until they clicked the document.
             setContent { DraftsApp(initialText = "A paragraph.\n") }
-            onNodeWithContentDescription(Strings.OPEN_READER_CONTROLS).performClick()
-            onNodeWithContentDescription(Strings.CLOSE).performClick()
+            onNodeWithContentDescription(words(Res.string.open_reader_controls)).performClick()
+            onNodeWithContentDescription(words(Res.string.close)).performClick()
 
             onRoot().performKeyInput {
                 keyDown(Key.CtrlLeft)
@@ -103,7 +106,7 @@ class DraftsAppTest {
     fun `escape closes the reader controls`() =
         runSkikoComposeUiTest(size = Size(1200f, 900f)) {
             setContent { DraftsApp(initialText = "A paragraph.\n") }
-            onNodeWithContentDescription(Strings.OPEN_READER_CONTROLS).performClick()
+            onNodeWithContentDescription(words(Res.string.open_reader_controls)).performClick()
 
             onRoot().performKeyInput { pressKey(Key.Escape) }
 
@@ -116,8 +119,8 @@ class DraftsAppTest {
             // One Escape, one panel. The licences open from the controls; closing both at once
             // would send the reader back further than they asked to go.
             setContent { DraftsApp(initialText = "A paragraph.\n") }
-            onNodeWithContentDescription(Strings.OPEN_READER_CONTROLS).performClick()
-            onNodeWithContentDescription(Strings.LICENCES).performScrollTo().performClick()
+            onNodeWithContentDescription(words(Res.string.open_reader_controls)).performClick()
+            onNodeWithContentDescription(words(Res.string.licences)).performScrollTo().performClick()
             onNodeWithText(FontLicences.all.first().family).assertExists()
 
             onRoot().performKeyInput { pressKey(Key.Escape) }

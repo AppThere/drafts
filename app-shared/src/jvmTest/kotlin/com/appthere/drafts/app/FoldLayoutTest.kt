@@ -13,7 +13,9 @@ import androidx.compose.ui.test.v2.runSkikoComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.appthere.drafts.design.Fold
 import com.appthere.drafts.design.FoldAxis
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.open_reader_controls
+import com.appthere.drafts.i18n.resources.reader_controls
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -96,11 +98,11 @@ class FoldLayoutTest {
         // unfolded device would get -- and the sheet still stops at the hinge.
         runSkikoComposeUiTest(size = INNER_DISPLAY) {
             openWith(BOOK_POSTURE)
-            onNodeWithContentDescription(Strings.OPEN_READER_CONTROLS).performClick()
+            onNodeWithContentDescription(words(Res.string.open_reader_controls)).performClick()
             waitForIdle()
 
             val panel =
-                onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, Strings.READER_CONTROLS))
+                onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, words(Res.string.reader_controls)))
                     .getBoundsInRoot()
 
             assertTrue(

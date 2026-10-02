@@ -13,7 +13,8 @@ import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
 import com.appthere.drafts.editor.engine.DocumentSession
 import com.appthere.drafts.editor.ui.EditorState
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.settings_not_saved
 import com.appthere.drafts.platform.files.DocumentRef
 import com.appthere.drafts.platform.files.DocumentSessionState
 import kotlinx.coroutines.runBlocking
@@ -92,7 +93,7 @@ class SettingsNotKeptTest {
     }
 
     private fun SkikoComposeUiTest.saying(): Boolean =
-        onAllNodesWithText(Strings.SETTINGS_NOT_SAVED).fetchSemanticsNodes().isNotEmpty()
+        onAllNodesWithText(words(Res.string.settings_not_saved)).fetchSemanticsNodes().isNotEmpty()
 
     private companion object {
         val SIZE = Size(1200f, 900f)

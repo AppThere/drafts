@@ -30,7 +30,9 @@ import com.appthere.drafts.design.FontLicence
 import com.appthere.drafts.design.FontLicences
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.Prose
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.licences
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The in-app licences screen `appthere-drafts.md` 5.1 requires.
@@ -62,7 +64,7 @@ fun Licences(
             .padding(panelPadding),
         verticalArrangement = Arrangement.spacedBy(rowGap),
     ) {
-        PanelHeader(title = Strings.LICENCES, onClose = onClose)
+        PanelHeader(title = stringResource(Res.string.licences), onClose = onClose)
 
         Column(
             Modifier.verticalScroll(rememberScrollState()),

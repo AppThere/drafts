@@ -4,7 +4,16 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.text.AnnotatedString
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.key_backspace
+import com.appthere.drafts.i18n.resources.key_delete
+import com.appthere.drafts.i18n.resources.shortcut_copy
+import com.appthere.drafts.i18n.resources.shortcut_cut
+import com.appthere.drafts.i18n.resources.shortcut_delete_selection
+import com.appthere.drafts.i18n.resources.shortcut_paste
+import com.appthere.drafts.i18n.resources.shortcut_redo
+import com.appthere.drafts.i18n.resources.shortcut_select_all
+import com.appthere.drafts.i18n.resources.shortcut_undo
 
 /**
  * The editor's own shortcuts, which act on the document rather than on a field.
@@ -15,15 +24,17 @@ import com.appthere.drafts.i18n.Strings
  * field does.
  */
 object EditorShortcuts {
-    val SelectAll = Shortcut(Strings.SHORTCUT_SELECT_ALL, Key.A, "A", primary = true)
-    val Copy = Shortcut(Strings.SHORTCUT_COPY, Key.C, "C", primary = true)
-    val Cut = Shortcut(Strings.SHORTCUT_CUT, Key.X, "X", primary = true)
-    val Paste = Shortcut(Strings.SHORTCUT_PASTE, Key.V, "V", primary = true)
-    val Undo = Shortcut(Strings.SHORTCUT_UNDO, Key.Z, "Z", primary = true)
-    val Redo = Shortcut(Strings.SHORTCUT_REDO, Key.Z, "Z", primary = true, shift = true)
-    val RedoAlso = Shortcut(Strings.SHORTCUT_REDO, Key.Y, "Y", primary = true)
-    val DeleteBackward = Shortcut(Strings.SHORTCUT_DELETE_SELECTION, Key.Backspace, Strings.KEY_BACKSPACE)
-    val DeleteForward = Shortcut(Strings.SHORTCUT_DELETE_SELECTION, Key.Delete, Strings.KEY_DELETE)
+    val SelectAll = Shortcut(Res.string.shortcut_select_all, Key.A, "A", primary = true)
+    val Copy = Shortcut(Res.string.shortcut_copy, Key.C, "C", primary = true)
+    val Cut = Shortcut(Res.string.shortcut_cut, Key.X, "X", primary = true)
+    val Paste = Shortcut(Res.string.shortcut_paste, Key.V, "V", primary = true)
+    val Undo = Shortcut(Res.string.shortcut_undo, Key.Z, "Z", primary = true)
+    val Redo = Shortcut(Res.string.shortcut_redo, Key.Z, "Z", primary = true, shift = true)
+    val RedoAlso = Shortcut(Res.string.shortcut_redo, Key.Y, "Y", primary = true)
+    val DeleteBackward =
+        Shortcut(Res.string.shortcut_delete_selection, Key.Backspace, KeyLabel.Named(Res.string.key_backspace))
+    val DeleteForward =
+        Shortcut(Res.string.shortcut_delete_selection, Key.Delete, KeyLabel.Named(Res.string.key_delete))
 
     /** In the order the list shows them. */
     val all: List<Shortcut> = listOf(SelectAll, Copy, Cut, Paste, Undo, Redo, RedoAlso, DeleteBackward, DeleteForward)

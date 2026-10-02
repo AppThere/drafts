@@ -20,8 +20,18 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.appthere.drafts.design.LocalPalette
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.document_state
+import com.appthere.drafts.i18n.resources.said_after
+import com.appthere.drafts.i18n.resources.save_now
+import com.appthere.drafts.i18n.resources.state_clean
+import com.appthere.drafts.i18n.resources.state_conflicted
+import com.appthere.drafts.i18n.resources.state_dirty
+import com.appthere.drafts.i18n.resources.state_orphaned
+import com.appthere.drafts.i18n.resources.state_read_only
+import com.appthere.drafts.i18n.resources.state_untitled
 import com.appthere.drafts.platform.files.DocumentState
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * 8.4's state, in the window chrome.
@@ -48,6 +58,9 @@ fun DocumentStateBadge(
     val label = labelOf(state)
     val tint = if (needsAttention(state)) palette.accent else palette.muted
 
+    // Read here rather than inside `semantics`, which is not a composition.
+    val described = stringResource(Res.string.said_after, stringResource(Res.string.document_state), label)
+
     // Saving is a keyboard shortcut and a phone has no keyboard, so on a touch device there was no
     // way to save at all. The indicator becomes the way: 12 says it "is the only persistent
     // chrome", so a second button beside it would be the wrong answer to that -- and the thing
@@ -67,7 +80,7 @@ fun DocumentStateBadge(
                 } else {
                     // The label is what a screen reader offers instead of "double-tap to
                     // activate", which says what the gesture is and not what it does.
-                    Modifier.clickable(onClickLabel = Strings.SAVE_NOW, onClick = save)
+                    Modifier.clickable(onClickLabel = stringResource(Res.string.save_now), onClick = save)
                 },
             )
             // One announcement for the whole badge, not one for the dot and another for the label.
@@ -77,7 +90,7 @@ fun DocumentStateBadge(
             // It does not clear the click above it: `clearAndSetSemantics` clears what is inside
             // it, and `clickable` is outside. Checked by removing the action and watching a screen
             // reader still activate it, rather than assumed either way.
-            .clearAndSetSemantics { contentDescription = "${Strings.DOCUMENT_STATE}, $label" },
+            .clearAndSetSemantics { contentDescription = described },
         horizontalArrangement = Arrangement.spacedBy(dotGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -117,14 +130,15 @@ private fun Dot(
  * Exhaustive `when` on purpose: a sixth state added to 8.4 should stop compiling here rather than
  * quietly display as whatever the `else` branch said.
  */
+@Composable
 private fun labelOf(state: DocumentState): String =
     when (state) {
-        DocumentState.Untitled -> Strings.STATE_UNTITLED
-        DocumentState.Clean -> Strings.STATE_CLEAN
-        DocumentState.Dirty -> Strings.STATE_DIRTY
-        DocumentState.Conflicted -> Strings.STATE_CONFLICTED
-        DocumentState.Orphaned -> Strings.STATE_ORPHANED
-        DocumentState.ReadOnly -> Strings.STATE_READ_ONLY
+        DocumentState.Untitled -> stringResource(Res.string.state_untitled)
+        DocumentState.Clean -> stringResource(Res.string.state_clean)
+        DocumentState.Dirty -> stringResource(Res.string.state_dirty)
+        DocumentState.Conflicted -> stringResource(Res.string.state_conflicted)
+        DocumentState.Orphaned -> stringResource(Res.string.state_orphaned)
+        DocumentState.ReadOnly -> stringResource(Res.string.state_read_only)
     }
 
 /**

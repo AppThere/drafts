@@ -24,7 +24,12 @@ import com.appthere.drafts.design.Palettes
 import com.appthere.drafts.design.Prose
 import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.design.Theme
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.licences
+import com.appthere.drafts.i18n.resources.theme_dark
+import com.appthere.drafts.i18n.resources.theme_high_contrast
+import com.appthere.drafts.i18n.resources.theme_sepia
+import com.appthere.drafts.i18n.resources.theme_system
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -93,7 +98,7 @@ class ReaderControlsTest {
             var settings by mutableStateOf(ReaderSettings())
             setContent { DraftsTheme(settings) { ReaderControls(settings, onChange = { settings = it }) } }
 
-            onNodeWithContentDescription("Theme, ${Strings.THEME_DARK}").performClick()
+            onNodeWithContentDescription("Theme, ${words(Res.string.theme_dark)}").performClick()
 
             assertEquals(Theme.Fixed(Palettes.Dark), settings.theme)
         }
@@ -106,7 +111,7 @@ class ReaderControlsTest {
             var settings by mutableStateOf(ReaderSettings())
             setContent { DraftsTheme(settings) { ReaderControls(settings, onChange = { settings = it }) } }
 
-            onNodeWithContentDescription("Theme, ${Strings.THEME_SYSTEM}").performClick()
+            onNodeWithContentDescription("Theme, ${words(Res.string.theme_system)}").performClick()
 
             assertEquals(Theme.System, settings.theme)
         }
@@ -131,7 +136,12 @@ class ReaderControlsTest {
             setContent { DraftsTheme(settings) { ReaderControls(settings, onChange = {}) } }
 
             val targets =
-                listOf("Text size, increase", "Text size, decrease", "Theme, ${Strings.THEME_SEPIA}", "Motion, Full")
+                listOf(
+                    "Text size, increase",
+                    "Text size, decrease",
+                    "Theme, ${words(Res.string.theme_sepia)}",
+                    "Motion, Full",
+                )
 
             targets.forEach { description ->
                 onNodeWithContentDescription(description)
@@ -179,7 +189,11 @@ class ReaderControlsTest {
             val settings = ReaderSettings()
             setContent {
                 DraftsTheme(settings) {
-                    ReaderControls(settings, onChange = {}, links = { PanelLink(Strings.LICENCES, onClick = {}) })
+                    ReaderControls(
+                        settings,
+                        onChange = {},
+                        links = { PanelLink(words(Res.string.licences), onClick = {}) },
+                    )
                 }
             }
 
@@ -189,7 +203,7 @@ class ReaderControlsTest {
                 "Letter spacing, increase",
                 "Line length, increase",
                 "Body weight, increase",
-                "Theme, ${Strings.THEME_HIGH_CONTRAST}",
+                "Theme, ${words(Res.string.theme_high_contrast)}",
                 "Motion, Reduced",
                 "Licences",
             ).forEach { control ->
@@ -214,11 +228,15 @@ class ReaderControlsTest {
             val settings = ReaderSettings()
             setContent {
                 DraftsTheme(settings) {
-                    ReaderControls(settings, onChange = {}, links = { PanelLink(Strings.LICENCES, onClick = {}) })
+                    ReaderControls(
+                        settings,
+                        onChange = {},
+                        links = { PanelLink(words(Res.string.licences), onClick = {}) },
+                    )
                 }
             }
 
-            listOf("Theme, ${Strings.THEME_HIGH_CONTRAST}", "Text size, increase", "Motion, Reduced")
+            listOf("Theme, ${words(Res.string.theme_high_contrast)}", "Text size, increase", "Motion, Reduced")
                 .forEach { control ->
                     val bounds = onNodeWithContentDescription(control).getBoundsInRoot()
 
@@ -236,7 +254,11 @@ class ReaderControlsTest {
             val settings = ReaderSettings()
             setContent {
                 DraftsTheme(settings) {
-                    ReaderControls(settings, onChange = {}, links = { PanelLink(Strings.LICENCES, onClick = {}) })
+                    ReaderControls(
+                        settings,
+                        onChange = {},
+                        links = { PanelLink(words(Res.string.licences), onClick = {}) },
+                    )
                 }
             }
 

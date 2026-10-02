@@ -67,9 +67,16 @@ class ShortcutTest {
 
     @Test
     fun `the keys are named the way the list shows them`() {
-        assertEquals("Ctrl+Z", undo.keys)
-        assertEquals("Ctrl+Shift+Z", redo.keys)
-        assertEquals("Backspace", delete.keys)
+        // Through a composition, because 11.1 put the key names in resources and a resource is read
+        // from one. What is asserted is still the notation: the modifiers in order, joined by a
+        // plus, ending in the key.
+        runSkikoComposeUiTest(size = Size(SIDE, SIDE)) {
+            val named = mutableListOf<String>()
+            setContent { named += listOf(undo.keys(), redo.keys(), delete.keys()) }
+            waitForIdle()
+
+            assertEquals(listOf("Ctrl+Z", "Ctrl+Shift+Z", "Backspace"), named.take(3))
+        }
     }
 
     /** Which of the undo, redo and delete shortcuts the keys pressed in [keys] matched. */

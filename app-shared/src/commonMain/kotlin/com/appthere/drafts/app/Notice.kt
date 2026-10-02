@@ -11,7 +11,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import com.appthere.drafts.design.LocalPalette
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.could_not_read
+import com.appthere.drafts.i18n.resources.file_gone_nothing_kept
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * A message on its own in the window, for when there is no document to show.
@@ -51,8 +54,12 @@ private val noticeGap = 8.dp
  *
  * A file that is missing with a snapshot never gets here: it opens from the snapshot (7.3).
  */
+@Composable
 fun noticeFor(reason: DocumentOpening.Reason): String =
     when (reason) {
-        DocumentOpening.Reason.Unreadable -> Strings.COULD_NOT_READ
-        DocumentOpening.Reason.Missing, DocumentOpening.Reason.NothingKept -> Strings.FILE_GONE_NOTHING_KEPT
+        DocumentOpening.Reason.Unreadable -> stringResource(Res.string.could_not_read)
+
+        DocumentOpening.Reason.Missing,
+        DocumentOpening.Reason.NothingKept,
+        -> stringResource(Res.string.file_gone_nothing_kept)
     }

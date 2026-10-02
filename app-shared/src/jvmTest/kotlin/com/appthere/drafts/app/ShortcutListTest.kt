@@ -13,8 +13,15 @@ import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
 import androidx.compose.ui.test.withKeyDown
 import com.appthere.drafts.editor.ui.EditorShortcuts
+import com.appthere.drafts.editor.ui.KeyLabel
 import com.appthere.drafts.editor.ui.Shortcut
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.key_ctrl
+import com.appthere.drafts.i18n.resources.key_shift
+import com.appthere.drafts.i18n.resources.keyboard_shortcuts
+import com.appthere.drafts.i18n.resources.open_reader_controls
+import com.appthere.drafts.i18n.resources.said_after
+import com.appthere.drafts.i18n.resources.shortcut_full_screen
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -43,9 +50,9 @@ class ShortcutListTest {
             // A tablet with a keyboard case is the reader this list is for, and they may well
             // reach for the screen before they reach for a chord they do not know yet.
             setContent { DraftsApp(initialText = "A paragraph.\n") }
-            onNodeWithContentDescription(Strings.OPEN_READER_CONTROLS).performClick()
+            onNodeWithContentDescription(words(Res.string.open_reader_controls)).performClick()
 
-            onNodeWithContentDescription(Strings.KEYBOARD_SHORTCUTS).performScrollTo().performClick()
+            onNodeWithContentDescription(words(Res.string.keyboard_shortcuts)).performScrollTo().performClick()
 
             assertListed(WindowShortcuts.Save)
         }
@@ -53,7 +60,7 @@ class ShortcutListTest {
     @Test
     fun `a shortcut the host answers is listed with the rest`() =
         runSkikoComposeUiTest(size = Size(WIDTH, HEIGHT)) {
-            val hosted = Shortcut("Do the host's thing", Key.F12, "F12")
+            val hosted = Shortcut(Res.string.shortcut_full_screen, Key.F12, "F12")
             setContent { ShortcutList(onClose = {}, hostShortcuts = listOf(hosted)) }
 
             assertListed(hosted)
@@ -63,8 +70,8 @@ class ShortcutListTest {
     fun `escape closes the list and leaves the controls it was opened from`() =
         runSkikoComposeUiTest(size = Size(WIDTH, HEIGHT)) {
             setContent { DraftsApp(initialText = "A paragraph.\n") }
-            onNodeWithContentDescription(Strings.OPEN_READER_CONTROLS).performClick()
-            onNodeWithContentDescription(Strings.KEYBOARD_SHORTCUTS).performScrollTo().performClick()
+            onNodeWithContentDescription(words(Res.string.open_reader_controls)).performClick()
+            onNodeWithContentDescription(words(Res.string.keyboard_shortcuts)).performScrollTo().performClick()
 
             onRoot().performKeyInput { pressKey(Key.Escape) }
 
@@ -100,7 +107,20 @@ class ShortcutListTest {
         onNodeWithContentDescription(label(shortcut)).performScrollTo()
     }
 
-    private fun label(shortcut: Shortcut) = "${shortcut.keys}, ${shortcut.action}"
+    /** The row's description, built the way `ShortcutList` builds it. */
+    private fun label(shortcut: Shortcut): String {
+        val keys =
+            listOfNotNull(
+                words(Res.string.key_ctrl).takeIf { shortcut.primary },
+                words(Res.string.key_shift).takeIf { shortcut.shift },
+                when (val of = shortcut.label) {
+                    is KeyLabel.Letter -> of.of
+                    is KeyLabel.Named -> words(of.word)
+                },
+            ).joinToString("+")
+
+        return words(Res.string.said_after).replace("%1\$s", keys).replace("%2\$s", words(shortcut.action))
+    }
 
     private companion object {
         const val WIDTH = 1200f

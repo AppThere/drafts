@@ -5,8 +5,15 @@ import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
+import com.appthere.drafts.editor.ui.KeyLabel
 import com.appthere.drafts.editor.ui.Shortcut
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.key_escape
+import com.appthere.drafts.i18n.resources.shortcut_close
+import com.appthere.drafts.i18n.resources.shortcut_list
+import com.appthere.drafts.i18n.resources.shortcut_reader_controls
+import com.appthere.drafts.i18n.resources.shortcut_save
+import com.appthere.drafts.i18n.resources.shortcut_save_as
 
 // Every key a document window answers, in one place.
 //
@@ -43,19 +50,19 @@ internal fun rouses(event: KeyEvent): Boolean =
  */
 internal object WindowShortcuts {
     /** 8.2's explicit save, on the shortcut every editor uses for it. */
-    val Save = Shortcut(Strings.SHORTCUT_SAVE, Key.S, "S", primary = true)
+    val Save = Shortcut(Res.string.shortcut_save, Key.S, "S", primary = true)
 
     /** 7.4's *Save As*, on the shortcut every editor uses for it. */
-    val SaveAs = Shortcut(Strings.SHORTCUT_SAVE_AS, Key.S, "S", primary = true, shift = true)
+    val SaveAs = Shortcut(Res.string.shortcut_save_as, Key.S, "S", primary = true, shift = true)
 
     /** 5.5's settings, on the shortcut every editor uses for them. */
-    val ReaderControls = Shortcut(Strings.SHORTCUT_READER_CONTROLS, Key.Comma, ",", primary = true)
+    val ReaderControls = Shortcut(Res.string.shortcut_reader_controls, Key.Comma, ",", primary = true)
 
     /** This list -- the key most applications that have one use for it. */
-    val KeyboardShortcuts = Shortcut(Strings.SHORTCUT_LIST, Key.Slash, "/", primary = true)
+    val KeyboardShortcuts = Shortcut(Res.string.shortcut_list, Key.Slash, "/", primary = true)
 
     /** Escape, which cancels whatever is being asked and closes whatever is open. */
-    val Dismiss = Shortcut(Strings.SHORTCUT_CLOSE, Key.Escape, Strings.KEY_ESCAPE)
+    val Dismiss = Shortcut(Res.string.shortcut_close, Key.Escape, KeyLabel.Named(Res.string.key_escape))
 
     /** In the order the list shows them. */
     val all: List<Shortcut> = listOf(Save, SaveAs, ReaderControls, KeyboardShortcuts, Dismiss)

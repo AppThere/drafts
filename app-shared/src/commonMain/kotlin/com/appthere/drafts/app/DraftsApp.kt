@@ -54,7 +54,6 @@ import com.appthere.drafts.editor.ui.BlockEditor
 import com.appthere.drafts.editor.ui.EditorState
 import com.appthere.drafts.editor.ui.Shortcut
 import com.appthere.drafts.editor.ui.handleShortcut
-import com.appthere.drafts.i18n.Strings
 import com.appthere.drafts.platform.files.WriteOutcome
 import com.appthere.drafts.platform.intents.DocumentKind
 import com.appthere.drafts.platform.windows.currentFold

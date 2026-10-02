@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Every user-facing string in the application, per appthere-drafts.md 11.1: "Compose Multiplatform
+  Resources (org.jetbrains.compose.resources) with stringResource and per-locale directories. No
+  string concatenation; use positional parameters."
+
+  This directory is the English original. A translation is a sibling directory — values-fr, and so
+  on — holding the same names with different words; nothing in the code changes to add one.
+
+  Two rules the comments below are mostly about. The words are written from the reader's side
+  rather than the implementation's: "Changed on disk" is what happened, "conflicted" is a state
+  name. And an identifier is never one of these: a theme is saved under Palette.id, which is stable
+  and never shown, so translating this file cannot reset anybody's settings.
+
+  The custom detekt rule drafts>HardcodedUserFacingString is what keeps literals out of composables
+  and sends people here.
+
+  Apostrophes are escaped as \' — the Android resource syntax Compose Resources parses.
+-->
+<resources>
+    <string name="window_title">Drafts</string>
+
+    <!--
+      Two things said one after the other, for assistive technology: "Document, Saved"; "Text size,
+      increase"; "Block quote, " and then the quote.
+
+      A resource rather than a comma in the code. 11.1: "No string concatenation; use positional
+      parameters." Gluing two translated fragments together assumes every language joins them the
+      same way and in the same order, and this is the one string in the file whose whole content is
+      that assumption — so it is the one a translator most needs to be able to change.
+    -->
+    <string name="said_after">%1$s, %2$s</string>
+
+    <!--
+      7.4: the name a new document has until its first save gives it one.
+    -->
+    <string name="untitled">Untitled</string>
+
+    <!--
+      10.1's names for blocks, as a screen reader announces them. Named for what a writer calls
+      them, not for the Markdown construct: "Section break", not "thematic break".
+    -->
+    <string name="block_paragraph">Paragraph</string>
+    <string name="block_heading_level">Heading level %1$s</string>
+    <string name="block_quote">Block quote</string>
+    <string name="block_code">Code block</string>
+    <string name="block_code_in">Code block, %1$s</string>
+    <string name="block_bulleted_list">Bulleted list</string>
+    <string name="block_numbered_list">Numbered list</string>
+    <string name="block_definition_list">Definition list</string>
+    <string name="block_table">Table</string>
+    <string name="block_section_break">Section break</string>
+    <string name="block_figure">Figure</string>
+    <string name="block_raw">HTML</string>
+    <string name="block_link_reference">Link reference</string>
+    <!--
+      A structural change, said as a sentence. The kind is the sentence; this is the full stop,
+      which is a separate string because not every language ends a sentence with one.
+    -->
+    <string name="announced">%1$s.</string>
+
+    <string name="blocks_joined">Joined with the block above.</string>
+
+    <!--
+      10.2's shortcut map: the keys' names, and what each shortcut does, said as the reader would
+      say it. Ctrl stands for ⌘ as well on a Mac, and the list says so once rather than every time.
+    -->
+    <string name="key_ctrl">Ctrl</string>
+    <string name="key_shift">Shift</string>
+    <string name="key_escape">Esc</string>
+    <string name="key_backspace">Backspace</string>
+    <string name="key_delete">Delete</string>
+    <string name="shortcut_select_all">Select everything</string>
+    <string name="shortcut_copy">Copy</string>
+    <string name="shortcut_cut">Cut</string>
+    <string name="shortcut_paste">Paste</string>
+    <string name="shortcut_undo">Undo</string>
+    <string name="shortcut_redo">Redo</string>
+    <string name="shortcut_delete_selection">Delete what is selected</string>
+    <string name="shortcut_save">Save</string>
+    <string name="shortcut_save_as">Save As, or save a copy somewhere else</string>
+    <string name="shortcut_reader_controls">Show or hide the reader controls</string>
+    <string name="shortcut_list">Show or hide this list</string>
+    <string name="shortcut_close">Close what is open</string>
+    <string name="shortcut_full_screen">Enter or leave full screen (on a Mac, also Ctrl+⌘+F)</string>
+    <string name="keyboard_shortcuts">Keyboard shortcuts</string>
+    <string name="shortcuts_writing">Writing</string>
+    <string name="shortcuts_document">The document and the window</string>
+    <string name="shortcuts_on_a_mac">On a Mac, ⌘ works wherever Ctrl is shown.</string>
+
+    <!--
+      7.4's choice of kind for an untitled document, named as a writer would name them.
+    -->
+    <string name="kind">Kind</string>
+    <string name="kind_markdown">Markdown</string>
+    <string name="kind_fountain">Fountain</string>
+
+    <!--
+      7.4's launcher entry points, where a platform shows them from inside the application.
+    -->
+    <string name="new_markdown">New Markdown document</string>
+    <string name="new_fountain">New Fountain screenplay</string>
+
+    <!--
+      7.4's *Save As*: the dialog's title, and the words when a save does not happen.
+    -->
+    <string name="save_as">Save As</string>
+    <string name="could_not_save">This document could not be saved. Your words are safe in this window, and will be here next time too.</string>
+
+    <!--
+      The reader controls of `appthere-drafts.md` 5.5. Named for what they do to the reading
+      experience rather than for the property they set: "Text size", not "Base sp".
+    -->
+    <string name="reader_controls">Reader</string>
+    <string name="open_reader_controls">Reader controls</string>
+    <string name="theme">Theme</string>
+
+    <!--
+      The theme names a reader sees, which are not the keys their choice is saved under.
+
+      11.1 will translate everything in this object. A theme's identifier must survive that, so it
+      lives on `Palette.id` and never comes through here — these are the words, and words change
+      language.
+    -->
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_sepia">Sepia</string>
+    <string name="theme_high_contrast">High contrast</string>
+    <string name="theme_system">Follow the system</string>
+    <string name="text_size">Text size</string>
+    <string name="line_height">Line height</string>
+    <string name="letter_spacing">Letter spacing</string>
+    <string name="measure">Line length</string>
+    <string name="paragraph_spacing">Paragraph spacing</string>
+    <string name="body_weight">Body weight</string>
+    <string name="motion">Motion</string>
+    <string name="motion_full">Full</string>
+    <string name="motion_reduced">Reduced</string>
+
+    <!--
+      10.2: following the operating system is the default, and has to be sayable.
+    -->
+    <string name="motion_system">Follow the system</string>
+
+    <!--
+      A settings file that could not be written: what it means for the reader, not the disk.
+    -->
+    <string name="settings_not_saved">These settings could not be kept. They apply until this window closes, and will need choosing again next time.</string>
+
+    <!--
+      12's two reading options, named for what they do rather than for what they are called.
+
+      "Typewriter scrolling" is the term of art and means nothing to someone meeting it for the
+      first time, so the choice is spelled out: the page moves, or it stays.
+    -->
+    <string name="typewriter">While typing</string>
+    <string name="typewriter_on">Keep the line centred</string>
+    <string name="typewriter_off">Leave the page still</string>
+
+    <string name="focus">Focus</string>
+    <string name="focus_off">Whole document</string>
+    <string name="focus_block">Current paragraph</string>
+
+    <!--
+      The stepper buttons: a glyph to look at, and a word for anything that reads the screen
+      aloud. "Text size, increase" says what will happen; "Text size, +" says a punctuation mark.
+    -->
+    <string name="less">−</string>
+    <string name="more">+</string>
+    <string name="decrease">decrease</string>
+    <string name="increase">increase</string>
+
+    <!--
+      5.1: the fonts ship under the SIL Open Font License, which requires the licence to travel
+      with them. "Licences" rather than "About": what this screen is for is the obligation.
+    -->
+    <string name="licences">Licences</string>
+    <string name="close">Close</string>
+
+    <!--
+      What pressing the status indicator does, for a reader who has no keyboard to press Ctrl+S
+      with. Spoken by assistive technology as the indicator's action rather than shown beside it.
+    -->
+    <string name="save_now">Save</string>
+
+    <!--
+      The five states of `appthere-drafts.md` 8.4, as the "short label" it asks for.
+
+      Written from the reader's side. `conflicted` is a state name; "Changed on disk" is what
+      happened. The one with no words is `clean` — there is nothing to tell someone about a
+      document that matches its file.
+    -->
+    <string name="document_state">Document</string>
+    <string name="state_untitled">Not saved yet</string>
+    <string name="state_clean">Saved</string>
+    <string name="state_dirty">Unsaved</string>
+    <string name="state_conflicted">Changed on disk</string>
+    <string name="state_orphaned">File missing</string>
+    <string name="state_read_only">Read-only</string>
+
+    <string name="opening">Opening…</string>
+
+    <!--
+      A launch that carried nothing to open.
+
+      Android only, and reachable: a share sheet can hand over an intent with no stream in it,
+      and an empty editor would tell the reader nothing had gone wrong.
+    -->
+    <string name="no_document">No document was given to open.</string>
+
+    <!--
+      A document this application once had and no longer does.
+
+      Android keeps a card in Recents for a task whose activity has finished, so one can
+      outlive the document it belonged to — an untitled document that was still empty when it
+      was closed is discarded (7.4), and its card is not. Tapping it should say what happened
+      rather than claim nothing was asked for.
+    -->
+    <string name="document_gone">That document is no longer here. It was empty when it was closed.</string>
+
+    <!--
+      A handover that is not a text document.
+
+      9.2 requires the Android filters to accept `application/octet-stream`, or a mail
+      attachment never arrives. The same filter offers Drafts for every unknown binary on the
+      device, and a reader who picks it should be told why nothing opened rather than shown a
+      screenful of replacement characters.
+    -->
+    <string name="not_a_text_document">This does not look like a text document, so Drafts has not opened it.</string>
+
+    <!--
+      A document that could not be opened, in words about the reader's situation (7.3).
+    -->
+    <string name="could_not_read">This document could not be read. It may be somewhere Drafts cannot reach just now, such as a drive that is not connected.</string>
+    <string name="file_gone_nothing_kept">This document\'s file is no longer there, and no copy of its words was kept here.</string>
+
+    <!--
+      7.3's banner for a document whose file vanished, and the answer it offers.
+    -->
+    <string name="file_gone">The file this document was saved in is no longer there. Its words are safe here. Choose a place to save them again.</string>
+    <string name="save_as_choice">Save As…</string>
+
+    <!--
+      8.3's banner, in its own words.
+
+      "*Unsaved changes from your last session have been restored.* [ Compare ] [ Discard ]"
+
+      `Compare` is not offered: it needs a diff view, which does not exist, and the same omission
+      is already recorded for 8.2's "Show differences". `KEEP` is not in the spec and is here
+      because the banner has to be dismissible — an unobtrusive banner that cannot be got rid of
+      stops being unobtrusive by the second document.
+    -->
+    <string name="restored">Unsaved changes from your last session have been restored.</string>
+    <string name="discard">Discard</string>
+    <string name="keep">Keep</string>
+
+    <!--
+      8.2's refusal, in its own words.
+
+      "*This file has changed on disk since you opened it.* [ Save a copy... ] [ Reload and lose my
+      changes ] [ Show differences ] [ Cancel ]"
+
+      Two of those four are missing here on purpose. "Save a copy" needs a platform save dialog and
+      "Show differences" needs a diff view; neither exists yet, and a button that does nothing is
+      worse than one that is not offered. The two that are here are the two that work, and the
+      refusal itself — the part that protects the file — does not depend on any of them.
+
+      `RELOAD` keeps the spec's full phrasing rather than shortening to "Reload". What is being
+      lost is the whole point of the sentence, and a reader clicking a button labelled "Reload"
+      would not have been told.
+    -->
+    <string name="conflict">This file has changed on disk since you opened it.</string>
+    <string name="save_copy">Save a copy…</string>
+    <string name="reload">Reload and lose my changes</string>
+
+    <!--
+      What "Save a copy" calls the copy, so the dialog does not open on the file being kept.
+    -->
+    <string name="my_version">my version</string>
+    <string name="cancel">Cancel</string>
+</resources>

@@ -22,7 +22,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.appthere.drafts.design.LocalPalette
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.close
+import com.appthere.drafts.i18n.resources.could_not_save
+import com.appthere.drafts.i18n.resources.discard
+import com.appthere.drafts.i18n.resources.file_gone
+import com.appthere.drafts.i18n.resources.keep
+import com.appthere.drafts.i18n.resources.restored
+import com.appthere.drafts.i18n.resources.save_as_choice
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * A message at the foot of the window, with the reader's possible answers beside it.
@@ -86,8 +94,8 @@ fun RestoredBanner(
     modifier: Modifier = Modifier,
 ) {
     Banner(
-        message = Strings.RESTORED,
-        choices = listOf(Strings.KEEP to onKeep, Strings.DISCARD to onDiscard),
+        message = stringResource(Res.string.restored),
+        choices = listOf(stringResource(Res.string.keep) to onKeep, stringResource(Res.string.discard) to onDiscard),
         modifier = modifier,
     )
 }
@@ -106,8 +114,8 @@ fun FileGoneBanner(
     modifier: Modifier = Modifier,
 ) {
     Banner(
-        message = Strings.FILE_GONE,
-        choices = listOf(Strings.SAVE_AS_CHOICE to onSaveAs),
+        message = stringResource(Res.string.file_gone),
+        choices = listOf(stringResource(Res.string.save_as_choice) to onSaveAs),
         modifier = modifier,
         announce = true,
     )
@@ -126,8 +134,8 @@ fun SaveFailedBanner(
     modifier: Modifier = Modifier,
 ) {
     Banner(
-        message = Strings.COULD_NOT_SAVE,
-        choices = listOf(Strings.CLOSE to onDismiss),
+        message = stringResource(Res.string.could_not_save),
+        choices = listOf(stringResource(Res.string.close) to onDismiss),
         modifier = modifier,
         announce = true,
     )

@@ -25,7 +25,13 @@ import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.Prose
 import com.appthere.drafts.editor.ui.EditorShortcuts
 import com.appthere.drafts.editor.ui.Shortcut
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.keyboard_shortcuts
+import com.appthere.drafts.i18n.resources.said_after
+import com.appthere.drafts.i18n.resources.shortcuts_document
+import com.appthere.drafts.i18n.resources.shortcuts_on_a_mac
+import com.appthere.drafts.i18n.resources.shortcuts_writing
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Every keyboard shortcut, listed: 10.2's "document the full shortcut map".
@@ -58,12 +64,15 @@ internal fun ShortcutList(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(rowGap),
     ) {
-        PanelHeader(title = Strings.KEYBOARD_SHORTCUTS, onClose = onClose)
+        PanelHeader(title = stringResource(Res.string.keyboard_shortcuts), onClose = onClose)
 
-        BasicText(Strings.SHORTCUTS_ON_A_MAC, style = TextStyle(color = palette.muted, fontSize = labelSize))
+        BasicText(
+            stringResource(Res.string.shortcuts_on_a_mac),
+            style = TextStyle(color = palette.muted, fontSize = labelSize),
+        )
 
-        ShortcutSection(Strings.SHORTCUTS_WRITING, EditorShortcuts.all)
-        ShortcutSection(Strings.SHORTCUTS_DOCUMENT, WindowShortcuts.all + hostShortcuts)
+        ShortcutSection(stringResource(Res.string.shortcuts_writing), EditorShortcuts.all)
+        ShortcutSection(stringResource(Res.string.shortcuts_document), WindowShortcuts.all + hostShortcuts)
     }
 }
 
@@ -81,19 +90,23 @@ private fun ShortcutSection(
             modifier = Modifier.semantics { heading() },
         )
         shortcuts.forEach { shortcut ->
+            val keys = shortcut.keys()
+            val action = stringResource(shortcut.action)
+            val described = stringResource(Res.string.said_after, keys, action)
+
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .clearAndSetSemantics { contentDescription = "${shortcut.keys}, ${shortcut.action}" },
+                    .clearAndSetSemantics { contentDescription = described },
                 horizontalArrangement = Arrangement.spacedBy(rowGap),
             ) {
                 BasicText(
-                    text = shortcut.keys,
+                    text = keys,
                     style = TextStyle(color = palette.ink, fontSize = labelSize),
                     modifier = Modifier.widthIn(min = keysWidth),
                 )
                 BasicText(
-                    text = shortcut.action,
+                    text = action,
                     style = TextStyle(color = palette.muted, fontSize = labelSize),
                     modifier = Modifier.weight(1f),
                 )

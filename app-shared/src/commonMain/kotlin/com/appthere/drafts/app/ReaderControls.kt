@@ -41,7 +41,37 @@ import com.appthere.drafts.design.Palettes
 import com.appthere.drafts.design.Prose
 import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.design.Theme
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.body_weight
+import com.appthere.drafts.i18n.resources.decrease
+import com.appthere.drafts.i18n.resources.focus
+import com.appthere.drafts.i18n.resources.focus_block
+import com.appthere.drafts.i18n.resources.focus_off
+import com.appthere.drafts.i18n.resources.increase
+import com.appthere.drafts.i18n.resources.less
+import com.appthere.drafts.i18n.resources.letter_spacing
+import com.appthere.drafts.i18n.resources.line_height
+import com.appthere.drafts.i18n.resources.measure
+import com.appthere.drafts.i18n.resources.more
+import com.appthere.drafts.i18n.resources.motion
+import com.appthere.drafts.i18n.resources.motion_full
+import com.appthere.drafts.i18n.resources.motion_reduced
+import com.appthere.drafts.i18n.resources.motion_system
+import com.appthere.drafts.i18n.resources.paragraph_spacing
+import com.appthere.drafts.i18n.resources.reader_controls
+import com.appthere.drafts.i18n.resources.said_after
+import com.appthere.drafts.i18n.resources.settings_not_saved
+import com.appthere.drafts.i18n.resources.text_size
+import com.appthere.drafts.i18n.resources.theme
+import com.appthere.drafts.i18n.resources.theme_dark
+import com.appthere.drafts.i18n.resources.theme_high_contrast
+import com.appthere.drafts.i18n.resources.theme_light
+import com.appthere.drafts.i18n.resources.theme_sepia
+import com.appthere.drafts.i18n.resources.theme_system
+import com.appthere.drafts.i18n.resources.typewriter
+import com.appthere.drafts.i18n.resources.typewriter_off
+import com.appthere.drafts.i18n.resources.typewriter_on
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
 /**
@@ -71,6 +101,9 @@ fun ReaderControls(
     val palette = LocalPalette.current
     val metrics = panelMetrics()
 
+    // Read here rather than inside `semantics`, which is not a composition.
+    val title = stringResource(Res.string.reader_controls)
+
     Column(
         modifier
             // A ceiling, not a width. 6 makes Compact windows -- under 600dp -- a first-class case,
@@ -83,7 +116,7 @@ fun ReaderControls(
             // A pane, and named as one. Assistive technology announces a pane by its title when it
             // appears, which is what tells a screen reader that the settings have opened rather
             // than that focus has moved somewhere unexplained.
-            .semantics { paneTitle = Strings.READER_CONTROLS }
+            .semantics { paneTitle = title }
             .widthIn(max = metrics.panel)
             .fillMaxWidth()
             .background(palette.background)
@@ -96,9 +129,9 @@ fun ReaderControls(
         verticalArrangement = Arrangement.spacedBy(rowGap),
     ) {
         if (onClose != null) {
-            PanelHeader(title = Strings.READER_CONTROLS, onClose = onClose)
+            PanelHeader(title = stringResource(Res.string.reader_controls), onClose = onClose)
         } else {
-            BasicText(Strings.READER_CONTROLS, style = heading(palette))
+            BasicText(stringResource(Res.string.reader_controls), style = heading(palette))
         }
 
         // A failed write of the settings file. Said here, where the reader is changing them, and
@@ -107,7 +140,7 @@ fun ReaderControls(
         // hears it without being interrupted mid-announcement of the control just pressed.
         if (unsaved) {
             BasicText(
-                text = Strings.SETTINGS_NOT_SAVED,
+                text = stringResource(Res.string.settings_not_saved),
                 style = body(palette),
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
@@ -143,35 +176,35 @@ private fun TypeSteppers(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(rowGap)) {
         Stepper(
-            label = Strings.TEXT_SIZE,
+            label = stringResource(Res.string.text_size),
             value = "${settings.base.value.roundToInt()}sp",
             onLess = { onChange(settings.copy(base = (settings.base.value - 1).sp).clamped()) },
             onMore = { onChange(settings.copy(base = (settings.base.value + 1).sp).clamped()) },
         )
 
         Stepper(
-            label = Strings.LINE_HEIGHT,
+            label = stringResource(Res.string.line_height),
             value = format(settings.lineHeight),
             onLess = { onChange(settings.copy(lineHeight = settings.lineHeight - LINE_HEIGHT_STEP).clamped()) },
             onMore = { onChange(settings.copy(lineHeight = settings.lineHeight + LINE_HEIGHT_STEP).clamped()) },
         )
 
         Stepper(
-            label = Strings.LETTER_SPACING,
+            label = stringResource(Res.string.letter_spacing),
             value = "${format(settings.letterSpacing)}em",
             onLess = { onChange(settings.copy(letterSpacing = settings.letterSpacing - SPACING_STEP).clamped()) },
             onMore = { onChange(settings.copy(letterSpacing = settings.letterSpacing + SPACING_STEP).clamped()) },
         )
 
         Stepper(
-            label = Strings.MEASURE,
+            label = stringResource(Res.string.measure),
             value = "${settings.characters.roundToInt()}",
             onLess = { onChange(settings.copy(characters = settings.characters - MEASURE_STEP).clamped()) },
             onMore = { onChange(settings.copy(characters = settings.characters + MEASURE_STEP).clamped()) },
         )
 
         Stepper(
-            label = Strings.PARAGRAPH_SPACING,
+            label = stringResource(Res.string.paragraph_spacing),
             value = "${format(settings.paragraphSpacing)}em",
             onLess = {
                 onChange(
@@ -186,7 +219,7 @@ private fun TypeSteppers(
         )
 
         Stepper(
-            label = Strings.BODY_WEIGHT,
+            label = stringResource(Res.string.body_weight),
             value = "${settings.bodyWeight}",
             onLess = { onChange(settings.copy(bodyWeight = settings.bodyWeight - WEIGHT_STEP).clamped()) },
             onMore = { onChange(settings.copy(bodyWeight = settings.bodyWeight + WEIGHT_STEP).clamped()) },
@@ -201,10 +234,10 @@ private fun ThemeChoice(
     onChange: (ReaderSettings) -> Unit,
 ) {
     Choice(
-        label = Strings.THEME,
-        options = Theme.all.map(::labelOf),
-        selected = labelOf(settings.theme),
-        onSelect = { label -> themeLabelled(label)?.let { onChange(settings.copy(theme = it)) } },
+        label = stringResource(Res.string.theme),
+        options = Theme.all.map { Option(it, labelOf(it)) },
+        selected = settings.theme,
+        onSelect = { theme -> onChange(settings.copy(theme = theme)) },
     )
 }
 
@@ -221,12 +254,14 @@ private fun TypewriterChoice(
     onChange: (ReaderSettings) -> Unit,
 ) {
     Choice(
-        label = Strings.TYPEWRITER,
-        options = listOf(Strings.TYPEWRITER_OFF, Strings.TYPEWRITER_ON),
-        selected = if (settings.typewriterScrolling) Strings.TYPEWRITER_ON else Strings.TYPEWRITER_OFF,
-        onSelect = { choice ->
-            onChange(settings.copy(typewriterScrolling = choice == Strings.TYPEWRITER_ON))
-        },
+        label = stringResource(Res.string.typewriter),
+        options =
+            listOf(
+                Option(false, stringResource(Res.string.typewriter_off)),
+                Option(true, stringResource(Res.string.typewriter_on)),
+            ),
+        selected = settings.typewriterScrolling,
+        onSelect = { moves -> onChange(settings.copy(typewriterScrolling = moves)) },
     )
 }
 
@@ -237,12 +272,14 @@ private fun FocusChoice(
     onChange: (ReaderSettings) -> Unit,
 ) {
     Choice(
-        label = Strings.FOCUS,
-        options = listOf(Strings.FOCUS_OFF, Strings.FOCUS_BLOCK),
-        selected = if (settings.focusMode == FocusMode.Off) Strings.FOCUS_OFF else Strings.FOCUS_BLOCK,
-        onSelect = { choice ->
-            onChange(settings.copy(focusMode = if (choice == Strings.FOCUS_BLOCK) FocusMode.Block else FocusMode.Off))
-        },
+        label = stringResource(Res.string.focus),
+        options =
+            listOf(
+                Option(FocusMode.Off, stringResource(Res.string.focus_off)),
+                Option(FocusMode.Block, stringResource(Res.string.focus_block)),
+            ),
+        selected = settings.focusMode,
+        onSelect = { mode -> onChange(settings.copy(focusMode = mode)) },
     )
 }
 
@@ -253,10 +290,10 @@ private fun MotionChoice(
     onChange: (ReaderSettings) -> Unit,
 ) {
     Choice(
-        label = Strings.MOTION,
-        options = listOf(Strings.MOTION_SYSTEM, Strings.MOTION_FULL, Strings.MOTION_REDUCED),
-        selected = labelOf(settings.motion),
-        onSelect = { choice -> onChange(settings.copy(motion = preferenceOf(choice))) },
+        label = stringResource(Res.string.motion),
+        options = motionOrder.map { Option(it, labelOf(it)) },
+        selected = settings.motion,
+        onSelect = { preference -> onChange(settings.copy(motion = preference)) },
     )
 }
 
@@ -274,6 +311,9 @@ private fun Stepper(
     onMore: () -> Unit,
 ) {
     val palette = LocalPalette.current
+    val said = stringResource(Res.string.said_after, label, value)
+    val fewer = stringResource(Res.string.said_after, label, stringResource(Res.string.decrease))
+    val more = stringResource(Res.string.said_after, label, stringResource(Res.string.increase))
 
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         BasicText(
@@ -282,26 +322,40 @@ private fun Stepper(
             modifier =
                 Modifier
                     .width(panelMetrics().label)
-                    .semantics { contentDescription = "$label, $value" },
+                    .semantics { contentDescription = said },
         )
-        Button(Strings.LESS, "$label, ${Strings.DECREASE}", onLess)
+        Button(stringResource(Res.string.less), fewer, onLess)
         BasicText(
             text = value,
             style = body(palette).copy(textAlign = TextAlign.Center),
             modifier = Modifier.width(panelMetrics().value),
         )
-        Button(Strings.MORE, "$label, ${Strings.INCREASE}", onMore)
+        Button(stringResource(Res.string.more), more, onMore)
     }
 }
+
+/**
+ * One of a set of options, as the reader sees it and as the application means it.
+ *
+ * The two are separate because 11.1 translates the first and must not touch the second. This used
+ * to be one string: the control offered words, and the handler matched on the words to decide what
+ * had been chosen -- so the first translation would have made every option unrecognisable, silently
+ * and only in the other language.
+ */
+@Immutable
+private data class Option<T>(
+    val value: T,
+    val label: String,
+)
 
 /** A row of mutually exclusive options, each one a target in its own right, wrapping if it must. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Choice(
+private fun <T> Choice(
     label: String,
-    options: List<String>,
-    selected: String,
-    onSelect: (String) -> Unit,
+    options: List<Option<T>>,
+    selected: T,
+    onSelect: (T) -> Unit,
 ) {
     val palette = LocalPalette.current
 
@@ -320,9 +374,11 @@ private fun Choice(
             verticalArrangement = Arrangement.spacedBy(optionGap),
         ) {
             options.forEach { option ->
-                val chosen = option == selected
+                val chosen = option.value == selected
+                val described = stringResource(Res.string.said_after, label, option.label)
+
                 BasicText(
-                    text = option,
+                    text = option.label,
                     style = body(palette).copy(color = if (chosen) palette.background else palette.ink),
                     modifier =
                         Modifier
@@ -331,9 +387,9 @@ private fun Choice(
                                 if (chosen) palette.accent else palette.background,
                                 RoundedCornerShape(corner),
                             ).border(hairline, palette.muted, RoundedCornerShape(corner))
-                            .clickable { onSelect(option) }
+                            .clickable { onSelect(option.value) }
                             .padding(horizontal = optionPadding, vertical = optionPadding)
-                            .semantics { contentDescription = "$label, $option" },
+                            .semantics { contentDescription = described },
                 )
             }
         }
@@ -432,20 +488,17 @@ private const val HUNDRED = 100
  * "Follow the system" is offered first because it is the default, and because 10.2's promise is
  * that a reader who has already told their operating system does not have to tell this as well.
  */
+@Composable
 private fun labelOf(preference: MotionPreference): String =
     when (preference) {
-        MotionPreference.Full -> Strings.MOTION_FULL
-        MotionPreference.Reduced -> Strings.MOTION_REDUCED
-        MotionPreference.System -> Strings.MOTION_SYSTEM
+        MotionPreference.Full -> stringResource(Res.string.motion_full)
+        MotionPreference.Reduced -> stringResource(Res.string.motion_reduced)
+        MotionPreference.System -> stringResource(Res.string.motion_system)
     }
 
-/** And back. An unrecognised label follows the system, which is the default. */
-private fun preferenceOf(label: String): MotionPreference =
-    when (label) {
-        Strings.MOTION_FULL -> MotionPreference.Full
-        Strings.MOTION_REDUCED -> MotionPreference.Reduced
-        else -> MotionPreference.System
-    }
+/** Follow-the-system first: it is the default, and 10.2's promise that asking once is enough. */
+private val motionOrder =
+    listOf(MotionPreference.System, MotionPreference.Full, MotionPreference.Reduced)
 
 /**
  * A theme as the reader sees it.
@@ -454,14 +507,12 @@ private fun preferenceOf(label: String): MotionPreference =
  * 11.1's translation; this is the word, and words change language. Keeping them the same string
  * would mean a reader who switched the application to French lost the theme they had chosen.
  */
+@Composable
 private fun labelOf(theme: Theme): String =
     when (theme.id) {
-        Palettes.Light.id -> Strings.THEME_LIGHT
-        Palettes.Dark.id -> Strings.THEME_DARK
-        Palettes.Sepia.id -> Strings.THEME_SEPIA
-        Palettes.HighContrast.id -> Strings.THEME_HIGH_CONTRAST
-        else -> Strings.THEME_SYSTEM
+        Palettes.Light.id -> stringResource(Res.string.theme_light)
+        Palettes.Dark.id -> stringResource(Res.string.theme_dark)
+        Palettes.Sepia.id -> stringResource(Res.string.theme_sepia)
+        Palettes.HighContrast.id -> stringResource(Res.string.theme_high_contrast)
+        else -> stringResource(Res.string.theme_system)
     }
-
-/** And back, for the control that offers the words. */
-private fun themeLabelled(label: String): Theme? = Theme.all.firstOrNull { labelOf(it) == label }

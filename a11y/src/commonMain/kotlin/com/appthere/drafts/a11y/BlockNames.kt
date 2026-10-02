@@ -1,5 +1,7 @@
 package com.appthere.drafts.a11y
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import com.appthere.drafts.core.model.Block
 import com.appthere.drafts.core.model.BlockQuote
 import com.appthere.drafts.core.model.CodeBlock
@@ -12,7 +14,49 @@ import com.appthere.drafts.core.model.Paragraph
 import com.appthere.drafts.core.model.RawPassthrough
 import com.appthere.drafts.core.model.Table
 import com.appthere.drafts.core.model.ThematicBreak
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.block_bulleted_list
+import com.appthere.drafts.i18n.resources.block_code
+import com.appthere.drafts.i18n.resources.block_code_in
+import com.appthere.drafts.i18n.resources.block_definition_list
+import com.appthere.drafts.i18n.resources.block_figure
+import com.appthere.drafts.i18n.resources.block_heading_level
+import com.appthere.drafts.i18n.resources.block_link_reference
+import com.appthere.drafts.i18n.resources.block_numbered_list
+import com.appthere.drafts.i18n.resources.block_paragraph
+import com.appthere.drafts.i18n.resources.block_quote
+import com.appthere.drafts.i18n.resources.block_raw
+import com.appthere.drafts.i18n.resources.block_section_break
+import com.appthere.drafts.i18n.resources.block_table
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
+
+/**
+ * What a kind of block is called, before anyone has looked up the words.
+ *
+ * A name rather than a string, because the words come from 11.1's resources and resources are read
+ * from a composition. The editor decides a block's name once, where it caches everything else about
+ * the row; the words are looked up where the row is drawn. Between those two points this is what
+ * travels, and it compares by value -- so a block that has not changed kind is still equal to
+ * itself after a reparse.
+ */
+@Immutable
+sealed interface BlockName {
+    /** A kind with one word for it. */
+    data class Named(
+        val word: StringResource,
+    ) : BlockName
+
+    /** "Heading level 2": the level is part of what a screen reader says, and it is a number. */
+    data class HeadingAt(
+        val level: Int,
+    ) : BlockName
+
+    /** "Code block, Kotlin": the fence's language, capitalised the way it is spoken. */
+    data class CodeIn(
+        val language: String,
+    ) : BlockName
+}
 
 /**
  * What each kind of block is called to someone who cannot see it (`appthere-drafts.md` 10.1).
@@ -23,20 +67,54 @@ import com.appthere.drafts.i18n.Strings
  * wherever it is announced.
  */
 object BlockNames {
-    /** The block's kind, as a screen reader should name it: "Block quote", "Heading level 2". */
-    fun kindOf(block: Block): String =
+    /** The block's kind, as a screen reader should name it. */
+    fun kindOf(block: Block): BlockName =
         when (block) {
-            is Paragraph -> Strings.BLOCK_PARAGRAPH
-            is Heading -> "${Strings.BLOCK_HEADING_LEVEL} ${block.level}"
-            is BlockQuote -> Strings.BLOCK_QUOTE
-            is CodeBlock -> codeBlock(block.language)
-            is ListBlock -> if (block.ordered) Strings.BLOCK_NUMBERED_LIST else Strings.BLOCK_BULLETED_LIST
-            is DefinitionList -> Strings.BLOCK_DEFINITION_LIST
-            is Table -> Strings.BLOCK_TABLE
-            is ThematicBreak -> Strings.BLOCK_SECTION_BREAK
-            is Figure -> Strings.BLOCK_FIGURE
-            is RawPassthrough -> Strings.BLOCK_RAW
-            is LinkReferenceDefinition -> Strings.BLOCK_LINK_REFERENCE
+            is Paragraph -> {
+                BlockName.Named(Res.string.block_paragraph)
+            }
+
+            is Heading -> {
+                BlockName.HeadingAt(block.level)
+            }
+
+            is BlockQuote -> {
+                BlockName.Named(Res.string.block_quote)
+            }
+
+            is CodeBlock -> {
+                codeBlock(block.language)
+            }
+
+            is ListBlock -> {
+                BlockName.Named(
+                    if (block.ordered) Res.string.block_numbered_list else Res.string.block_bulleted_list,
+                )
+            }
+
+            is DefinitionList -> {
+                BlockName.Named(Res.string.block_definition_list)
+            }
+
+            is Table -> {
+                BlockName.Named(Res.string.block_table)
+            }
+
+            is ThematicBreak -> {
+                BlockName.Named(Res.string.block_section_break)
+            }
+
+            is Figure -> {
+                BlockName.Named(Res.string.block_figure)
+            }
+
+            is RawPassthrough -> {
+                BlockName.Named(Res.string.block_raw)
+            }
+
+            is LinkReferenceDefinition -> {
+                BlockName.Named(Res.string.block_link_reference)
+            }
         }
 
     /**
@@ -46,7 +124,7 @@ object BlockNames {
      * before most of the document. A heading says what it is through its role instead -- `heading()`
      * is what lets a screen reader jump between them -- and a prefix as well would say it twice.
      */
-    fun prefixOf(block: Block): String? =
+    fun prefixOf(block: Block): BlockName? =
         when (block) {
             is Paragraph, is Heading -> null
             else -> kindOf(block)
@@ -60,16 +138,25 @@ object BlockNames {
      * Only a change of kind. Typing inside a paragraph changes the block and not what it is, and
      * announcing every keystroke's block would be exactly the chattiness 10.1 warns against.
      */
-    fun announcement(
+    fun changed(
         before: Block,
         after: Block,
-    ): String? = kindOf(after).takeIf { it != kindOf(before) }?.let { "$it." }
+    ): BlockName? = kindOf(after).takeIf { it != kindOf(before) }
 
-    /** "Code block, Kotlin": a fence's language as a name, capitalised the way it is spoken. */
-    private fun codeBlock(language: String?): String =
+    /** A fence's language, or nothing to say about one that has none. */
+    private fun codeBlock(language: String?): BlockName =
         language
             ?.trim()
             ?.takeIf { it.isNotEmpty() }
-            ?.let { "${Strings.BLOCK_CODE}, ${it.replaceFirstChar(Char::uppercaseChar)}" }
-            ?: Strings.BLOCK_CODE
+            ?.let { BlockName.CodeIn(it.replaceFirstChar(Char::uppercaseChar)) }
+            ?: BlockName.Named(Res.string.block_code)
 }
+
+/** The words for a [BlockName], read from 11.1's resources. */
+@Composable
+fun BlockName.spoken(): String =
+    when (this) {
+        is BlockName.Named -> stringResource(word)
+        is BlockName.HeadingAt -> stringResource(Res.string.block_heading_level, level.toString())
+        is BlockName.CodeIn -> stringResource(Res.string.block_code_in, language)
+    }

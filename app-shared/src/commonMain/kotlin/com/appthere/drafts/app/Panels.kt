@@ -26,7 +26,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.Prose
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.close
+import com.appthere.drafts.i18n.resources.open_reader_controls
+import com.appthere.drafts.i18n.resources.reader_controls
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The panels that open over a document -- the reader controls, the licences and the keyboard
@@ -154,7 +158,11 @@ internal fun PanelHeader(
             style = TextStyle(color = palette.ink, fontSize = headingSize, fontWeight = Prose.H4.weight),
             modifier = Modifier.weight(1f),
         )
-        PanelButton(text = Strings.CLOSE, description = Strings.CLOSE, onClick = onClose)
+        PanelButton(
+            text = stringResource(Res.string.close),
+            description = stringResource(Res.string.close),
+            onClick = onClose,
+        )
     }
 }
 
@@ -172,8 +180,8 @@ internal fun ReaderControlsButton(
     modifier: Modifier = Modifier,
 ) {
     PanelButton(
-        text = Strings.READER_CONTROLS,
-        description = Strings.OPEN_READER_CONTROLS,
+        text = stringResource(Res.string.reader_controls),
+        description = stringResource(Res.string.open_reader_controls),
         onClick = onClick,
         enabled = enabled,
         modifier = modifier,

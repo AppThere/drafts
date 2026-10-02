@@ -8,7 +8,13 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
 import com.appthere.drafts.design.DraftsTheme
 import com.appthere.drafts.design.ReaderSettings
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.document_state
+import com.appthere.drafts.i18n.resources.state_clean
+import com.appthere.drafts.i18n.resources.state_conflicted
+import com.appthere.drafts.i18n.resources.state_dirty
+import com.appthere.drafts.i18n.resources.state_orphaned
+import com.appthere.drafts.i18n.resources.state_read_only
 import com.appthere.drafts.platform.files.DocumentState
 import kotlin.test.Test
 
@@ -23,10 +29,10 @@ import kotlin.test.Test
 class DocumentStateBadgeTest {
     @Test
     fun `each state that needs a word shows one`() {
-        assertShows(DocumentState.Dirty, Strings.STATE_DIRTY)
-        assertShows(DocumentState.Conflicted, Strings.STATE_CONFLICTED)
-        assertShows(DocumentState.Orphaned, Strings.STATE_ORPHANED)
-        assertShows(DocumentState.ReadOnly, Strings.STATE_READ_ONLY)
+        assertShows(DocumentState.Dirty, words(Res.string.state_dirty))
+        assertShows(DocumentState.Conflicted, words(Res.string.state_conflicted))
+        assertShows(DocumentState.Orphaned, words(Res.string.state_orphaned))
+        assertShows(DocumentState.ReadOnly, words(Res.string.state_read_only))
     }
 
     @Test
@@ -37,7 +43,7 @@ class DocumentStateBadgeTest {
             // Unmerged, because the badge collapses to a single description for assistive
             // technology -- so *every* state has no visible text in the merged tree, and this
             // assertion would hold for all five without proving anything about any of them.
-            onNodeWithText(Strings.STATE_CLEAN, useUnmergedTree = true).assertDoesNotExist()
+            onNodeWithText(words(Res.string.state_clean), useUnmergedTree = true).assertDoesNotExist()
         }
     }
 
@@ -49,7 +55,9 @@ class DocumentStateBadgeTest {
         runSkikoComposeUiTest(size = SIZE) {
             setContent { Badge(DocumentState.Clean) }
 
-            onNodeWithContentDescription("${Strings.DOCUMENT_STATE}, ${Strings.STATE_CLEAN}").assertExists()
+            onNodeWithContentDescription(
+                "${words(Res.string.document_state)}, ${words(Res.string.state_clean)}",
+            ).assertExists()
         }
     }
 
@@ -60,7 +68,9 @@ class DocumentStateBadgeTest {
         runSkikoComposeUiTest(size = SIZE) {
             setContent { Badge(DocumentState.Dirty) }
 
-            onNodeWithContentDescription("${Strings.DOCUMENT_STATE}, ${Strings.STATE_DIRTY}").assertExists()
+            onNodeWithContentDescription(
+                "${words(Res.string.document_state)}, ${words(Res.string.state_dirty)}",
+            ).assertExists()
         }
     }
 

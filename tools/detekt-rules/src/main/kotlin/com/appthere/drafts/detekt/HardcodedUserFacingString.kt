@@ -27,9 +27,14 @@ import org.jetbrains.kotlin.psi.psiUtil.getStrictParentOfType
  * user-visible text, not at every literal, because test tags, log keys and format specifiers are
  * all legitimately literal.
  *
- * Interpolated templates are allowed through because a template that reads a resource and
- * substitutes a value -- `"$count words"` built from a resource -- is the correct pattern, and the
- * literal parts of it are the resource's problem, not this rule's.
+ * Interpolated templates are allowed through, because this rule cannot see what is being
+ * interpolated and a template whose parts are all resources looks the same as one that is not.
+ *
+ * That is a tolerance rather than an endorsement. 11.1 says "No string concatenation; use
+ * positional parameters", so the pattern to reach for is `stringResource(Res.string.x, value)`
+ * against a resource that reads `%1${'$'}s` -- `said_after` in `values/strings.xml` is the example
+ * worth copying. A template that glues two translated fragments together assumes every language
+ * joins them the same way and in the same order; nothing here will tell you otherwise.
  */
 class HardcodedUserFacingString(
     config: Config = Config.empty,

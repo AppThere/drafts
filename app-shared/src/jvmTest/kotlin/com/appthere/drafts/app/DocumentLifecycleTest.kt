@@ -22,7 +22,15 @@ import androidx.compose.ui.unit.dp
 import com.appthere.drafts.editor.engine.Caret
 import com.appthere.drafts.editor.engine.DocumentSession
 import com.appthere.drafts.editor.ui.EditorState
-import com.appthere.drafts.i18n.Strings
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.cancel
+import com.appthere.drafts.i18n.resources.conflict
+import com.appthere.drafts.i18n.resources.document_state
+import com.appthere.drafts.i18n.resources.reload
+import com.appthere.drafts.i18n.resources.state_clean
+import com.appthere.drafts.i18n.resources.state_conflicted
+import com.appthere.drafts.i18n.resources.state_dirty
+import com.appthere.drafts.i18n.resources.state_orphaned
 import com.appthere.drafts.platform.files.DocumentRef
 import com.appthere.drafts.platform.files.DocumentSessionState
 import com.appthere.drafts.platform.files.PathDocumentStore
@@ -63,7 +71,7 @@ class DocumentLifecycleTest {
             setContent { DraftsApp(document = document) }
             waitForIdle()
 
-            onNodeWithContentDescription(badge(Strings.STATE_CLEAN)).assertExists()
+            onNodeWithContentDescription(badge(words(Res.string.state_clean))).assertExists()
         }
     }
 
@@ -74,7 +82,7 @@ class DocumentLifecycleTest {
             setContent { DraftsApp(document = document) }
             type(document, "Mine. ")
 
-            onNodeWithContentDescription(badge(Strings.STATE_DIRTY)).assertExists()
+            onNodeWithContentDescription(badge(words(Res.string.state_dirty))).assertExists()
         }
     }
 
@@ -90,7 +98,7 @@ class DocumentLifecycleTest {
             // `savedRevision` is only set when the coroutine resumes afterwards, so the file can
             // be written while the badge still says `Unsaved` -- which passed on this machine and
             // failed on CI, where the resume is slower.
-            waitUntil(timeoutMillis = TIMEOUT) { showing(badge(Strings.STATE_CLEAN)) }
+            waitUntil(timeoutMillis = TIMEOUT) { showing(badge(words(Res.string.state_clean))) }
 
             assertEquals("Mine. $ORIGINAL", file().readText())
         }
@@ -108,7 +116,7 @@ class DocumentLifecycleTest {
             save()
             waitUntil(timeoutMillis = TIMEOUT) { conflicted() }
 
-            onNodeWithContentDescription(badge(Strings.STATE_CONFLICTED)).assertExists()
+            onNodeWithContentDescription(badge(words(Res.string.state_conflicted))).assertExists()
         }
     }
 
@@ -139,10 +147,12 @@ class DocumentLifecycleTest {
 
             save()
             waitUntil(timeoutMillis = TIMEOUT) {
-                onAllNodesWithContentDescription(badge(Strings.STATE_ORPHANED)).fetchSemanticsNodes().isNotEmpty()
+                onAllNodesWithContentDescription(
+                    badge(words(Res.string.state_orphaned)),
+                ).fetchSemanticsNodes().isNotEmpty()
             }
 
-            onNodeWithContentDescription(badge(Strings.STATE_ORPHANED)).assertExists()
+            onNodeWithContentDescription(badge(words(Res.string.state_orphaned))).assertExists()
         }
     }
 
@@ -163,7 +173,7 @@ class DocumentLifecycleTest {
                 onAllNodesWithText(FIRST_LINE).fetchSemanticsNodes().isNotEmpty()
             }
 
-            onNodeWithContentDescription(badge(Strings.STATE_CLEAN)).assertExists()
+            onNodeWithContentDescription(badge(words(Res.string.state_clean))).assertExists()
         }
     }
 
@@ -179,9 +189,9 @@ class DocumentLifecycleTest {
             save()
             waitUntil(timeoutMillis = TIMEOUT) { asking() }
 
-            onNodeWithText(Strings.CONFLICT, useUnmergedTree = true).assertExists()
-            onNodeWithContentDescription(Strings.RELOAD).assertExists()
-            onNodeWithContentDescription(Strings.CANCEL).assertExists()
+            onNodeWithText(words(Res.string.conflict), useUnmergedTree = true).assertExists()
+            onNodeWithContentDescription(words(Res.string.reload)).assertExists()
+            onNodeWithContentDescription(words(Res.string.cancel)).assertExists()
         }
     }
 
@@ -198,9 +208,9 @@ class DocumentLifecycleTest {
             // Waiting for the badge rather than the file, so the save has demonstrably finished
             // before anything asserts a dialog is absent. Waiting for the bytes alone would let
             // this pass while the outcome was still on its way back.
-            waitUntil(timeoutMillis = TIMEOUT) { showing(badge(Strings.STATE_CLEAN)) }
+            waitUntil(timeoutMillis = TIMEOUT) { showing(badge(words(Res.string.state_clean))) }
 
-            onNodeWithText(Strings.CONFLICT, useUnmergedTree = true).assertDoesNotExist()
+            onNodeWithText(words(Res.string.conflict), useUnmergedTree = true).assertDoesNotExist()
         }
     }
 
@@ -216,11 +226,11 @@ class DocumentLifecycleTest {
             save()
             waitUntil(timeoutMillis = TIMEOUT) { asking() }
 
-            onNodeWithContentDescription(Strings.CANCEL).performClick()
+            onNodeWithContentDescription(words(Res.string.cancel)).performClick()
             waitForIdle()
 
-            onNodeWithText(Strings.CONFLICT, useUnmergedTree = true).assertDoesNotExist()
-            onNodeWithContentDescription(badge(Strings.STATE_CONFLICTED)).assertExists()
+            onNodeWithText(words(Res.string.conflict), useUnmergedTree = true).assertDoesNotExist()
+            onNodeWithContentDescription(badge(words(Res.string.state_conflicted))).assertExists()
             assertEquals(THEIRS, file().readText())
             assertEquals("Mine. $ORIGINAL", document.editor.text)
         }
@@ -238,12 +248,12 @@ class DocumentLifecycleTest {
             file().writeText(THEIRS)
             save()
             waitUntil(timeoutMillis = TIMEOUT) { asking() }
-            onNodeWithContentDescription(Strings.CANCEL).performClick()
+            onNodeWithContentDescription(words(Res.string.cancel)).performClick()
             waitForIdle()
 
             type(document, "More. ")
 
-            onNodeWithText(Strings.CONFLICT, useUnmergedTree = true).assertDoesNotExist()
+            onNodeWithText(words(Res.string.conflict), useUnmergedTree = true).assertDoesNotExist()
         }
     }
 
@@ -258,11 +268,11 @@ class DocumentLifecycleTest {
             save()
             waitUntil(timeoutMillis = TIMEOUT) { asking() }
 
-            onNodeWithContentDescription(Strings.RELOAD).performClick()
+            onNodeWithContentDescription(words(Res.string.reload)).performClick()
             waitUntil(timeoutMillis = TIMEOUT) { document.editor.text == THEIRS }
 
-            onNodeWithText(Strings.CONFLICT, useUnmergedTree = true).assertDoesNotExist()
-            onNodeWithContentDescription(badge(Strings.STATE_CLEAN)).assertExists()
+            onNodeWithText(words(Res.string.conflict), useUnmergedTree = true).assertDoesNotExist()
+            onNodeWithContentDescription(badge(words(Res.string.state_clean))).assertExists()
             onNodeWithText(THEIR_LINE).assertExists()
         }
     }
@@ -283,7 +293,7 @@ class DocumentLifecycleTest {
             onRoot().performKeyInput { pressKey(Key.Escape) }
             waitForIdle()
 
-            onNodeWithText(Strings.CONFLICT, useUnmergedTree = true).assertDoesNotExist()
+            onNodeWithText(words(Res.string.conflict), useUnmergedTree = true).assertDoesNotExist()
             assertEquals(THEIRS, file().readText(), "Escape wrote something")
         }
     }
@@ -298,8 +308,8 @@ class DocumentLifecycleTest {
             setContent { DraftsApp(document = document) }
             type(document, "Mine. ")
 
-            onNodeWithContentDescription(badge(Strings.STATE_DIRTY)).performClick()
-            waitUntil(timeoutMillis = TIMEOUT) { showing(badge(Strings.STATE_CLEAN)) }
+            onNodeWithContentDescription(badge(words(Res.string.state_dirty))).performClick()
+            waitUntil(timeoutMillis = TIMEOUT) { showing(badge(words(Res.string.state_clean))) }
 
             assertEquals("Mine. $ORIGINAL", file().readText())
         }
@@ -316,9 +326,9 @@ class DocumentLifecycleTest {
             setContent { DraftsApp(document = document) }
             type(document, "Mine. ")
 
-            onNodeWithContentDescription(badge(Strings.STATE_DIRTY))
+            onNodeWithContentDescription(badge(words(Res.string.state_dirty)))
                 .performSemanticsAction(SemanticsActions.OnClick)
-            waitUntil(timeoutMillis = TIMEOUT) { showing(badge(Strings.STATE_CLEAN)) }
+            waitUntil(timeoutMillis = TIMEOUT) { showing(badge(words(Res.string.state_clean))) }
 
             assertEquals("Mine. $ORIGINAL", file().readText())
         }
@@ -333,7 +343,7 @@ class DocumentLifecycleTest {
             setContent { DraftsApp(document = document) }
             waitForIdle()
 
-            onNodeWithContentDescription(badge(Strings.STATE_CLEAN)).assertHasNoClickAction()
+            onNodeWithContentDescription(badge(words(Res.string.state_clean))).assertHasNoClickAction()
         }
     }
 
@@ -346,7 +356,7 @@ class DocumentLifecycleTest {
             setContent { DraftsApp(document = document) }
             type(document, "Mine. ")
 
-            val bounds = onNodeWithContentDescription(badge(Strings.STATE_DIRTY)).getBoundsInRoot()
+            val bounds = onNodeWithContentDescription(badge(words(Res.string.state_dirty))).getBoundsInRoot()
             val width = bounds.right - bounds.left
             val height = bounds.bottom - bounds.top
 
@@ -407,14 +417,14 @@ class DocumentLifecycleTest {
 
     /** True once 8.2's dialog is on screen. */
     private fun SkikoComposeUiTest.asking(): Boolean =
-        onAllNodesWithContentDescription(Strings.RELOAD).fetchSemanticsNodes().isNotEmpty()
+        onAllNodesWithContentDescription(words(Res.string.reload)).fetchSemanticsNodes().isNotEmpty()
 
     private fun SkikoComposeUiTest.conflicted(): Boolean =
-        onAllNodesWithContentDescription(badge(Strings.STATE_CONFLICTED)).fetchSemanticsNodes().isNotEmpty()
+        onAllNodesWithContentDescription(badge(words(Res.string.state_conflicted))).fetchSemanticsNodes().isNotEmpty()
 
     private fun file(): Path = directory.resolve("note.md")
 
-    private fun badge(label: String) = "${Strings.DOCUMENT_STATE}, $label"
+    private fun badge(label: String) = "${words(Res.string.document_state)}, $label"
 
     private companion object {
         val SIZE = Size(1200f, 900f)
