@@ -19,6 +19,31 @@ comparison possible.
 
 Each prints its own measurements. The numbers below are copied from those runs.
 
+### On a device
+
+The three above run on this machine's JVM. From Phase 6 there is a second measurement, on Android,
+because the gate has always said "slowest target device" and the desktop is not one. It uses the
+platform's own frame accounting rather than a test harness, so what it reports is what the reader
+sees: whole frames, missed or not.
+
+Put the same 10,000-word fixture on the device and open it from a file manager — the fixture is
+`GateFixture.tenThousandWords()`, 62,724 code units — then, with the caret in a paragraph near the
+top:
+
+```
+WARM=$(python3 -c "print('abcdefghij'*6)")      # 60 keystrokes of warm-up
+BURST=$(python3 -c "print('abcdefghij'*12)")    # 120 measured, as the JVM gate uses
+
+adb shell input text "$WARM"
+adb shell dumpsys gfxinfo com.appthere.drafts reset
+adb shell input text "$BURST"
+adb shell dumpsys gfxinfo com.appthere.drafts | grep -E "Total frames|Janky|percentile"
+```
+
+Repeat it in a three-line document. That pairing is the measurement: the absolute figures belong to
+the device's refresh rate and its GPU, and the *difference* between a long document and a short one
+belongs to this application.
+
 ## What the numbers mean
 
 The frame budget is 8,333 microseconds — one frame at 120Hz, which is the target in
@@ -109,3 +134,59 @@ with and without it at the old sample size: 8,304 against 8,187 microseconds, a 
 noise.
 
 Engine and scroll figures are unchanged.
+
+### Phase 6 — 2026-10-02
+
+Fixture: 62,724 code units, 512 blocks, 10,000+ words. Same machine, quiet (no emulator running).
+
+| Measurement | Value | Budget | Margin |
+|---|---|---|---|
+| Reparse window per keystroke | 216 code units (0.3% of document) | bounded | — |
+| Blocks rebuilt per keystroke | 3 | — | — |
+| Engine time per edit (median) | 520 us | 8,333 us | 94% spare |
+| Typing latency, attributable (median) | 6,385 us | 8,333 us | **23% spare** |
+| Scroll per screen, attributable (median of four runs) | 4,520 us | 8,333 us | 46% spare |
+
+Reparse, blocks rebuilt and engine time are unchanged from Phase 5. Typing is 300 microseconds
+above Phase 5's 6,083, which is inside the 600-microsecond spread that measurement has.
+
+**The scroll figure needs a correction, not an investigation.** Phase 6 reads 4,270 / 4,520 / 4,612
+/ 4,936 across four runs, against 2,916 recorded for Phase 5 — a 55% jump with nothing to attribute
+it to: `:editor-ui` has no source change at all since Phase 5 (`git diff 989ecbf..HEAD -- editor-ui`
+is empty), and `ScrollLatencyTest` exercises `BlockEditor` directly rather than through anything
+Phase 6 touched. Phase 4 and Phase 5 both record *exactly* 2,916, which for a wall-clock median
+across two separate runs is not plausible: the Phase 5 entry was carried over, under the heading
+"Engine and scroll figures are unchanged", rather than re-measured. So the comparison to make is
+Phase 6 against Phase 4's machine state, which is not recoverable. From here the four-run spread is
+recorded so there is something a later phase can actually be compared against.
+
+### Phase 6 — on an Android device, 2026-10-02
+
+The first time any of this has been measured on Android. Device: the `pixel_fold` emulator
+(android-36, x86_64, 2208x1840 at 420dpi), which is **not** the slowest supported device — it is
+the fastest thing available here, with a software GPU and a 60Hz display. The acceptance criterion
+asks for a real phone and is not met by this.
+
+What a 60Hz display means for these numbers: 16ms is one frame and the floor. The 120Hz budget the
+JVM gates assert against is invisible underneath it.
+
+| Measurement | 10,000-word document | Three-line document |
+|---|---|---|
+| Frames rendered during the burst | 64 | 39 |
+| Janky frames | 20.3% | 23.1% |
+| 50th percentile frame | 20 ms | 16 ms |
+| 90th percentile frame | 32 ms | 16 ms |
+| 99th percentile frame | 32 ms | 16 ms |
+
+The short document never misses a frame: every percentile is 16ms, the refresh period. The long one
+is at one frame on the median and two at the 90th. So on this hardware a 10,000-word document costs
+about one extra 60Hz frame in the worst tenth of keystrokes, and nothing on the median.
+
+The janky percentage is the same for both and therefore says nothing about document length; it is
+the emulator's own rendering, confirmed by its GPU percentiles, which report 4,950ms at the 95th
+for both documents and are plainly an artefact.
+
+**What this does and does not establish.** It establishes that the architecture's O(viewport) claim
+survives contact with Android: a document 200 times longer than the other costs one extra frame at
+the 90th percentile, not 200 times anything. It does not establish that §10.3's budget is met on the
+slowest supported device, because no such device has run it.

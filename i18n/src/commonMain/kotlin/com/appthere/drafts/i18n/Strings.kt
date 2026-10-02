@@ -183,6 +183,17 @@ object Strings {
      */
     const val DOCUMENT_GONE = "That document is no longer here. It was empty when it was closed."
 
+    /**
+     * A handover that is not a text document.
+     *
+     * 9.2 requires the Android filters to accept `application/octet-stream`, or a mail
+     * attachment never arrives. The same filter offers Drafts for every unknown binary on the
+     * device, and a reader who picks it should be told why nothing opened rather than shown a
+     * screenful of replacement characters.
+     */
+    const val NOT_A_TEXT_DOCUMENT =
+        "This does not look like a text document, so Drafts has not opened it."
+
     /** A document that could not be opened, in words about the reader's situation (7.3). */
     const val COULD_NOT_READ =
         "This document could not be read. It may be somewhere Drafts cannot reach just now, such as " +

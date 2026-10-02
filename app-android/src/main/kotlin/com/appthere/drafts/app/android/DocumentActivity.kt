@@ -228,12 +228,18 @@ class DocumentActivity : ComponentActivity() {
     /**
      * Why there is nothing to show, in the reader's terms rather than the intent's.
      *
-     * An intent naming one of our own sessions and finding none is a document that has been
-     * discarded (7.4) and whose card in Recents outlived it. An intent naming nothing at all is a
-     * share that carried no document, which is a different thing and not the reader's doing either.
+     * One of our own sessions that is not there is a document that has been discarded (7.4) and
+     * whose card in Recents outlived it. A document URI that produced nothing is a handover 9.2's
+     * permissive filters let in and `looksLikeText` turned away -- or, rarely, one whose grant
+     * could not be taken, which from the reader's side is the same sentence: it did not open. An
+     * intent carrying no document at all is a share that brought nothing.
      */
     private fun nothingToShow(intent: Intent): String =
-        if (sessionIdOf(intent) != null) Strings.DOCUMENT_GONE else Strings.NO_DOCUMENT
+        when {
+            sessionIdOf(intent) != null -> Strings.DOCUMENT_GONE
+            documentUri(intent) != null -> Strings.NOT_A_TEXT_DOCUMENT
+            else -> Strings.NO_DOCUMENT
+        }
 
     /**
      * The session this intent is about.
@@ -252,8 +258,11 @@ class DocumentActivity : ComponentActivity() {
         }
 
     /** A document from outside: its grant persisted (7.3), and its kind decided, as it is let in. */
-    private suspend fun Storage.opening(uri: Uri): SessionRecord? =
-        androidIdentity(this@DocumentActivity, uri, kindOf(uri).id)?.let { sessions.opened(it) }
+    private suspend fun Storage.opening(uri: Uri): SessionRecord? {
+        val kind = kindOf(uri) ?: return null
+
+        return androidIdentity(this@DocumentActivity, uri, kind.id)?.let { sessions.opened(it) }
+    }
 
     /**
      * The document this launch is about, wherever the sender chose to put it.
@@ -340,19 +349,40 @@ class DocumentActivity : ComponentActivity() {
      * "sniff content on open", for the downloads and messaging apps that "frequently hand over
      * `application/octet-stream` regardless of the real type".
      */
-    private fun kindOf(uri: Uri): DocumentKind {
+    private fun kindOf(uri: Uri): DocumentKind? {
+        // The name first, and decisively: it is what the reader chose, it is the only reliable
+        // signal Fountain has, and a document they named `.md` is one they mean to edit whatever
+        // its bytes look like.
         val named = displayNameOf(contentResolver, uri)?.let(DocumentKind::of)
-        val typed = contentResolver.getType(uri)?.let(DocumentKind::ofMimeType)
 
-        return named ?: typed ?: sniffed(uri) ?: DocumentKind.Markdown
+        // Lazily, so a name that settles it does not also cost a read. Once read, read once: both
+        // of the questions below ask the same bytes a different thing.
+        val opening by lazy { opening(uri) }
+
+        return when {
+            named != null -> {
+                named
+            }
+
+            // 9.2's filters accept `application/octet-stream`, so this is where a photo or an
+            // archive pointed at Drafts is turned away -- before a session exists for it, and
+            // before the reader is shown a screenful of replacement characters saying nothing.
+            opening?.let { !DocumentKind.looksLikeText(it) } == true -> {
+                null
+            }
+
+            else -> {
+                contentResolver.getType(uri)?.let(DocumentKind::ofMimeType)
+                    ?: opening?.let { DocumentKind.sniff(it.decodeToString()) }
+                    ?: DocumentKind.Markdown
+            }
+        }
     }
 
-    /** Reads only as much as [DocumentKind.sniff] looks at. */
-    private fun sniffed(uri: Uri): DocumentKind? =
+    /** The opening of the document, which is as much as either question needs. */
+    private fun opening(uri: Uri): ByteArray? =
         runCatching {
-            contentResolver.openInputStream(uri)?.use { stream ->
-                DocumentKind.sniff(stream.readNBytes(SNIFF_BYTES).decodeToString())
-            }
+            contentResolver.openInputStream(uri)?.use { stream -> stream.readNBytes(SNIFF_BYTES) }
         }.getOrNull()
 
     private companion object {

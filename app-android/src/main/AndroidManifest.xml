@@ -56,7 +56,23 @@
             android:resizeableActivity="true"
             android:windowSoftInputMode="adjustResize">
 
-            <!-- 9.1's registered type, and the unregistered spelling several editors send. -->
+            <!--
+              9.1's registered type, the unregistered spelling several editors send, and the two
+              types a handover uses when it is not saying what the file really is.
+
+              text/plain is what Drive and most mail clients call a document they cannot name, and
+              what Fountain always arrives as: 9.1 says Fountain has no registered MIME type at all.
+
+              application/octet-stream is 9.2's first trap stated plainly: "Downloads and messaging
+              apps frequently hand over application/octet-stream regardless of the real type." The
+              extension filter below catches those whose URI carries a name; a mail attachment's
+              does not, so without this one a .md attachment reaches nothing. Measured on a device:
+              before this filter existed, a Gmail-shaped and a Drive-shaped handover both resolved
+              to no activity at all.
+
+              The cost is that every unknown binary on the device can now be pointed at Drafts.
+              DocumentKind.looksLikeText is what says no to those, before anything is opened.
+            -->
             <intent-filter android:priority="1">
                 <action android:name="android.intent.action.VIEW" />
                 <action android:name="android.intent.action.EDIT" />
@@ -66,6 +82,8 @@
                 <data android:scheme="file" />
                 <data android:mimeType="text/markdown" />
                 <data android:mimeType="text/x-markdown" />
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="application/octet-stream" />
             </intent-filter>
 
             <!--
@@ -86,12 +104,17 @@
                 <data android:pathPattern=".*\\.spmd" />
             </intent-filter>
 
-            <!-- 9.2's share sheet. The document arrives as EXTRA_STREAM rather than as data. -->
+            <!--
+              9.2's share sheet. The document arrives as EXTRA_STREAM rather than as data, and a
+              messaging app sharing an attachment names its type as vaguely as it sent it.
+            -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
                 <data android:mimeType="text/markdown" />
+                <data android:mimeType="text/x-markdown" />
+                <data android:mimeType="application/octet-stream" />
             </intent-filter>
         </activity>
 

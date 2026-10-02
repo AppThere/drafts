@@ -67,6 +67,38 @@ enum class DocumentKind(
             entries.firstOrNull { mimeType.substringBefore(';').trim().lowercase() in it.mimeTypes }
 
         /**
+         * Whether a handover is a text document at all.
+         *
+         * 9.2 requires this application to accept `application/octet-stream`, because "Downloads and
+         * messaging apps frequently hand over `application/octet-stream` regardless of the real
+         * type" -- and a mail client's attachment URI carries no extension to narrow it with. The
+         * price of that filter is that every unknown binary on the device can now be pointed at
+         * Drafts, so something has to say no.
+         *
+         * Two signals, in order of certainty. A NUL byte settles it: no UTF-8 text document
+         * contains one, and almost every binary format does. Otherwise the opening is decoded and
+         * the replacement characters counted -- a file of arbitrary bytes produces them in
+         * quantity, and a text file produces none.
+         *
+         * [opening] is the first few kilobytes, not the whole file, so the last character may be cut
+         * in half. A four-byte sequence split across the end decodes to at most three replacements,
+         * which is why that many are forgiven and a fourth is not.
+         *
+         * An empty file is text. There is nothing in it to be anything else, and 7.4's untitled
+         * document is empty too.
+         *
+         * UTF-16 is refused, because it is full of NUL bytes. That is a real limitation rather than
+         * an oversight: nothing else in this application reads UTF-16 either, so accepting the
+         * handover would only move the failure later, to a document of mojibake.
+         */
+        fun looksLikeText(opening: ByteArray): Boolean =
+            when {
+                opening.isEmpty() -> true
+                opening.any { it == NUL } -> false
+                else -> opening.decodeToString().count { it == REPLACEMENT } <= SPLIT_CHARACTER
+            }
+
+        /**
          * What the *contents* look like, for handovers that say nothing useful.
          *
          * 9.2: "Downloads and messaging apps frequently hand over `application/octet-stream`
@@ -121,5 +153,12 @@ enum class DocumentKind(
 
         /** Far enough in to pass a title page and reach the first scene. */
         private const val LINES_SNIFFED = 40
+
+        private const val NUL: Byte = 0
+
+        private const val REPLACEMENT = '\uFFFD'
+
+        /** The most replacement characters one character cut in half at the end of a read can make. */
+        private const val SPLIT_CHARACTER = 3
     }
 }
