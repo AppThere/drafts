@@ -8,6 +8,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -77,10 +78,31 @@ class DocumentActivity : ComponentActivity() {
         shown = intent
     }
 
+    /**
+     * The reader closed this document: Back out of it, or swiped its task away.
+     *
+     * `onStop` rather than `onDestroy`, because the work is asked for here and carried out
+     * afterwards (see [closingScope]), and this is the last moment at which the process is
+     * certainly not a cached one. `isFinishing` is what separates closing the document from merely
+     * leaving it on screen; `isChangingConfigurations` catches the configuration changes the
+     * manifest does not already absorb, where the Activity is destroyed and immediately rebuilt.
+     */
+    override fun onStop() {
+        super.onStop()
+        if (isFinishing && !isChangingConfigurations) close()
+    }
+
     /** 7.4's "already running" question is asked of the process, so this task stops answering it. */
     override fun onDestroy() {
         super.onDestroy()
         registered?.let(OpenDocuments::closed)
+    }
+
+    /** Runs the closing work once, then forgets it, so a second lifecycle callback does nothing. */
+    private fun close() {
+        val work = closing ?: return
+        closing = null
+        closingScope.launch { work() }
     }
 
     /** The intent this task is about, which a later launch can replace. */
@@ -88,6 +110,14 @@ class DocumentActivity : ComponentActivity() {
 
     /** The document this task told [OpenDocuments] about, so it can take it back. */
     private var registered: String? = null
+
+    /**
+     * What to do when this document is closed, as the composition that knows how hands it over.
+     *
+     * The keeper and the session list both live inside the composition, and the moment they are
+     * needed is a lifecycle callback outside it. The desktop has the same seam and the same name.
+     */
+    private var closing: (suspend () -> Unit)? = null
 
     @Composable
     private fun Document(intent: Intent?) {
@@ -117,7 +147,7 @@ class DocumentActivity : ComponentActivity() {
         }
 
         when (val open = record) {
-            null -> Notice(message = if (looked) Strings.NO_DOCUMENT else Strings.OPENING)
+            null -> Notice(message = if (looked) nothingToShow(intent) else Strings.OPENING)
             else -> Session(open, storage, documents) { moved -> record = moved }
         }
     }
@@ -149,6 +179,13 @@ class DocumentActivity : ComponentActivity() {
                 val kinds = remember(storage) { KindChange(storage.sessions, storage.settings) { onMove(it) } }
                 val choose = rememberSaveLocation()
                 val scope = rememberCoroutineScope()
+
+                // Handed over rather than called: 8.1's closing snapshot happens after the window
+                // has gone, and the composition is the only thing that knows what to snapshot.
+                DisposableEffect(keeper, open.documentId) {
+                    closing = { closeDocument(storage.sessions, keeper, open.documentId) }
+                    onDispose { closing = null }
+                }
 
                 saved?.let { initial ->
                     DraftsApp(
@@ -189,6 +226,16 @@ class DocumentActivity : ComponentActivity() {
     }
 
     /**
+     * Why there is nothing to show, in the reader's terms rather than the intent's.
+     *
+     * An intent naming one of our own sessions and finding none is a document that has been
+     * discarded (7.4) and whose card in Recents outlived it. An intent naming nothing at all is a
+     * share that carried no document, which is a different thing and not the reader's doing either.
+     */
+    private fun nothingToShow(intent: Intent): String =
+        if (sessionIdOf(intent) != null) Strings.DOCUMENT_GONE else Strings.NO_DOCUMENT
+
+    /**
      * The session this intent is about.
      *
      * A session id is one this application already recorded, so it is read back rather than built:
@@ -201,7 +248,7 @@ class DocumentActivity : ComponentActivity() {
     ): SessionRecord? =
         when (val session = sessionIdOf(intent)) {
             null -> documentUri(intent)?.let { uri -> storage.opening(uri) }
-            else -> storage.snapshots.recordOf(session)
+            else -> reopened(storage.sessions, storage.snapshots, session)
         }
 
     /** A document from outside: its grant persisted (7.3), and its kind decided, as it is let in. */
@@ -322,13 +369,3 @@ class DocumentActivity : ComponentActivity() {
  * which is the same thing 9.2 already relies on when one arrives from elsewhere.
  */
 private fun mimeFor(kind: String): String = kindOf(kind).mimeTypes.firstOrNull() ?: "text/plain"
-
-/** The 7.3 identity a record describes, for the keeper that writes its snapshots. */
-private fun SessionRecord.identity() =
-    SessionIdentity(
-        documentId = documentId,
-        uri = uri,
-        displayName = displayName,
-        kind = kind,
-        accessToken = accessToken,
-    )

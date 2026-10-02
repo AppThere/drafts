@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import com.appthere.drafts.platform.files.SessionIdentity
 import com.appthere.drafts.platform.files.SessionRecord
+import com.appthere.drafts.platform.files.SnapshotStore
 import com.appthere.drafts.platform.intents.DocumentKind
 import com.appthere.drafts.platform.windows.SessionList
 
@@ -67,3 +68,32 @@ internal fun sessionUri(documentId: String): Uri = Uri.parse("$SESSION_SCHEME://
 internal fun sessionIdOf(intent: Intent): String? = intent.data?.takeIf { it.scheme == SESSION_SCHEME }?.lastPathSegment
 
 private const val SESSION_SCHEME = "drafts-session"
+
+/**
+ * The session [documentId] names, marked open again.
+ *
+ * Reached two ways. The launcher has usually just recorded the document as open, and doing it twice
+ * costs nothing: 7.3's record is kept and only `closedAt` is cleared. The other way is a reader
+ * tapping the document's own card in Recents -- Android keeps a card for a task whose activity has
+ * finished, so a document closed earlier can be reopened from one. Reading the record without
+ * clearing the mark would leave that document on screen and still closed, and the next launch would
+ * not restore it.
+ *
+ * Null when there is no such session: a card for a document that was discarded (7.4), or one whose
+ * record cannot be read.
+ */
+internal suspend fun reopened(
+    sessions: SessionList,
+    snapshots: SnapshotStore,
+    documentId: String,
+): SessionRecord? = snapshots.recordOf(documentId)?.let { sessions.opened(it.identity()) }
+
+/** The 7.3 identity a record describes, for the keeper that writes its snapshots. */
+internal fun SessionRecord.identity() =
+    SessionIdentity(
+        documentId = documentId,
+        uri = uri,
+        displayName = displayName,
+        kind = kind,
+        accessToken = accessToken,
+    )

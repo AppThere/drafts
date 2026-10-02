@@ -173,6 +173,16 @@ object Strings {
      */
     const val NO_DOCUMENT = "No document was given to open."
 
+    /**
+     * A document this application once had and no longer does.
+     *
+     * Android keeps a card in Recents for a task whose activity has finished, so one can
+     * outlive the document it belonged to -- an untitled document that was still empty when it
+     * was closed is discarded (7.4), and its card is not. Tapping it should say what happened
+     * rather than claim nothing was asked for.
+     */
+    const val DOCUMENT_GONE = "That document is no longer here. It was empty when it was closed."
+
     /** A document that could not be opened, in words about the reader's situation (7.3). */
     const val COULD_NOT_READ =
         "This document could not be read. It may be somewhere Drafts cannot reach just now, such as " +

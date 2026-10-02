@@ -282,22 +282,22 @@ disagreeing, and 9.4 is the one about what the reader sees.
 
 ---
 
-## 7.3 — Android never marks a session closed
+## 7.3 — On Android a closing document outlives the Activity that closed it
 
-**Spec:** a session is open until it is closed; 7.4 adds that "an untitled document that is still
-empty when closed is discarded — there is nothing in it to lose."
+**Spec:** a session is open until it is closed, and 8.1 snapshots on "window close, before
+teardown".
 
-**Code:** `SessionList.closed` exists and the desktop calls it when a window closes. Android calls
-it nowhere. Backing out of a document, or swiping its task away, leaves the session restorable, so
-the next launch brings it back.
+**Code:** both happen, from `onStop` when the Activity is finishing — but they are *started* there
+and finish afterwards, in a process-scoped coroutine. They cannot be done in the callback itself:
+`lifecycleScope` is cancelled at DESTROYED, which is immediately after, and `runBlocking` parks the
+main thread and is banned by `engineering-conventions.md` 4.1.
 
-**Why it is not simply done:** closing is a write, `onDestroy` is not a coroutine, and the process
-may be gone before one could finish. Doing it properly means either a short-lived service or
-writing the marker from the snapshot keeper's own scope while the activity is finishing — a
-decision about process lifetime rather than a missing line.
+**What that costs:** a process killed in the window between the Activity going and the write
+landing loses the closing snapshot and leaves the session open, so the document reopens next launch
+holding whatever the last idle snapshot had. An Android process is not killed the instant its last
+Activity goes — it becomes a cached process — and the write is a few kilobytes to app-private
+storage, so the window is milliseconds. It is the same exposure 8.1's other four triggers exist to
+cover, which is what makes it tolerable.
 
-**What it costs meanwhile:** a reader who backs out of everything and relaunches gets it all back.
-That is 7.3's behaviour for sessions that were never closed, so it is consistent rather than wrong,
-but it is not what backing out of a document means to a reader.
-
-**Closes when:** the Android session lifecycle is done properly, with the empty-untitled discard.
+**Closes when:** there is a reason to think it has been hit. A `Service` or `WorkManager` would
+close it and would cost more than the case is worth until then.
