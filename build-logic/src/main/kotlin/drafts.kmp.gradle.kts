@@ -1,3 +1,4 @@
+import com.android.build.api.dsl.Lint
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 
@@ -13,6 +14,23 @@ plugins {
     id("org.jetbrains.kotlin.multiplatform")
     id("com.android.kotlin.multiplatform.library")
     id("drafts.quality")
+}
+
+// Lint, for NewApi; see the `lint` block under `androidLibrary` for why. The KMP library plugin
+// creates no lint tasks for androidMain on its own -- `com.android.lint` is what adds them.
+//
+// Only where there is source to read. In a module with none yet -- the :core-export-* placeholders
+// -- lint reports "No .class files were found" as an error rather than as nothing to check. The
+// plugin comes on with the module's first source file.
+if (fileTree("src") { include("**/*.kt") }.any()) {
+    apply(plugin = "com.android.lint")
+
+    // `com.android.lint` also lints the JVM target, with lint's full default check set. NewApi has
+    // no meaning there, so this keeps that half as narrow as the Android half.
+    configure<Lint> {
+        checkOnly += "NewApi"
+        abortOnError = true
+    }
 }
 
 private val versions = extensions.getByType<VersionCatalogsExtension>().named("libs")
@@ -66,6 +84,22 @@ configure<KotlinMultiplatformExtension> {
         // about, need a real device.
         withDeviceTest {
             instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        }
+
+        // NewApi: the one gate that reads jvmAndroidMain against Android's API levels. That source
+        // set compiles against the desktop JDK, so a Java API Android lacks passes every JVM test
+        // and fails only on a device -- `Path.of` crashed the app on launch on API 33.
+        //
+        // Verified 2026-10-03 by putting `Path.of` back in :platform-files and watching
+        // `lintAndroidMain` fail. It does *not* catch a Kotlin call to `Stream.toList()` (Java 16,
+        // API 34), which shipped in the same file; lint resolves that call differently from the
+        // compiler. Not a complete gate, then -- but the only one there is.
+        //
+        // NewApi only, for now. Turning on the rest of lint is a separate decision with its own
+        // findings to work through.
+        lint {
+            checkOnly += "NewApi"
+            abortOnError = true
         }
     }
 

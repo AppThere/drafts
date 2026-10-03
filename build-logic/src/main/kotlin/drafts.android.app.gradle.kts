@@ -45,4 +45,15 @@ configure<ApplicationExtension> {
             isMinifyEnabled = false
         }
     }
+
+    // NewApi, for this module's own code. The library modules lint themselves (drafts.kmp):
+    // `checkDependencies` from here does not reach a KMP library's sources -- verified 2026-10-03,
+    // it passed with `Path.of` put back in :platform-files.
+    //
+    // NewApi only, for now. Turning on the rest of lint is a separate decision with its own
+    // findings to work through.
+    lint {
+        checkOnly += "NewApi"
+        abortOnError = true
+    }
 }
