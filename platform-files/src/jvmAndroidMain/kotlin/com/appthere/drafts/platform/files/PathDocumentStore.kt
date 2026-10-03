@@ -10,8 +10,10 @@ import java.nio.file.AccessDeniedException
 import java.nio.file.Files
 import java.nio.file.NoSuchFileException
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
+import java.util.stream.Collectors
 
 /**
  * A [DocumentStore] over a filesystem path: a [DocumentRef]'s token is an absolute path.
@@ -84,8 +86,9 @@ class PathDocumentStore(
     override suspend fun children(ref: DocumentRef): List<DocumentRef> =
         withContext(io) {
             runCatching {
+                // Not `Stream.toList()`: that is Java 16, and Android only has it from API 34.
                 Files.list(ref.path()).use { entries ->
-                    entries.map { DocumentRef(it.toString()) }.toList()
+                    entries.map { DocumentRef(it.toString()) }.collect(Collectors.toList())
                 }
             }.getOrDefault(emptyList())
         }
@@ -228,7 +231,8 @@ class PathDocumentStore(
     private companion object {
         const val TEMPORARY_SUFFIX = ".tmp"
 
-        fun DocumentRef.path(): Path = Path.of(token)
+        // Not `Path.of`: Android only has it from API 34, and this file also runs on Android.
+        fun DocumentRef.path(): Path = Paths.get(token)
 
         /**
          * Sorts an I/O failure into 8.4's terms.
