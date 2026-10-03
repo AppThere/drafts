@@ -25,6 +25,7 @@ import com.appthere.drafts.core.model.Strikethrough
 import com.appthere.drafts.core.model.Table
 import com.appthere.drafts.core.model.Text
 import com.appthere.drafts.core.model.ThematicBreak
+import com.appthere.drafts.core.model.Underline
 
 /**
  * Builds the **preview** rendering of a block: formatted, with markup characters hidden.
@@ -189,6 +190,10 @@ private fun PreviewBuilder.appendInline(inline: Inline) {
 
         is Strikethrough -> styled(struck) { appendInlines(inline.children) }
 
+        // Fountain's `_x_`, which underlines rather than italicises. The same decoration a link
+        // gets, because that is what underline is -- the two are told apart by colour elsewhere.
+        is Underline -> styled(underlined) { appendInlines(inline.children) }
+
         is CodeSpan -> styled(monospace) { append(inline.text, inline.source) }
 
         is Link -> styled(linked) { appendInlines(inline.children) }
@@ -213,6 +218,7 @@ private fun Emphasis.style(): SpanStyle =
 private val struck = SpanStyle(textDecoration = TextDecoration.LineThrough)
 private val monospace = SpanStyle(fontFamily = FontFamily.Monospace)
 private val linked = SpanStyle(textDecoration = TextDecoration.Underline)
+private val underlined = SpanStyle(textDecoration = TextDecoration.Underline)
 private val quoted = SpanStyle(fontStyle = FontStyle.Italic)
 
 /** Decoration the preview supplies, and markup it shows without giving it the weight of text. */

@@ -10,6 +10,7 @@ import com.appthere.drafts.core.model.LinkForm
 import com.appthere.drafts.core.model.RawInline
 import com.appthere.drafts.core.model.Strikethrough
 import com.appthere.drafts.core.model.Text
+import com.appthere.drafts.core.model.Underline
 
 /**
  * Writes [Inline] content back to Markdown.
@@ -36,8 +37,19 @@ internal class InlineWriter {
             is Image -> image(inline)
             is LineBreak -> if (inline.hard) HARD_BREAK else "\n"
             is RawInline -> inline.text
+            is Underline -> underline(inline)
             else -> ""
         }
+
+    /**
+     * Underline, which Markdown has no syntax for.
+     *
+     * It comes from Fountain, where `_x_` is underline rather than italic, and reaches this writer
+     * only if a screenplay is being written out as Markdown. `markdown-dialect.md` passes raw HTML
+     * through untouched, so `<u>` is the one spelling that survives a round trip through a Markdown
+     * renderer with its meaning intact. Fountain's own serialiser writes the underscores back.
+     */
+    private fun underline(inline: Underline): String = "<u>${write(inline.children)}</u>"
 
     /**
      * Puts back the backslashes the lowering took out.

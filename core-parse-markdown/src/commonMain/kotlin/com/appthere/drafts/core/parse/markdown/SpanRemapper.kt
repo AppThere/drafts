@@ -24,6 +24,7 @@ import com.appthere.drafts.core.model.Strikethrough
 import com.appthere.drafts.core.model.Table
 import com.appthere.drafts.core.model.Text
 import com.appthere.drafts.core.model.ThematicBreak
+import com.appthere.drafts.core.model.Underline
 
 /**
  * Rewrites the spans of a nested parse so they point into the containing document.
@@ -110,13 +111,24 @@ internal object SpanRemapper {
     private fun Inline.remapped(body: MappedText): Inline =
         when (this) {
             is Text -> copy(source = source.map(body))
+
             is CodeSpan -> copy(source = source.map(body))
+
             is LineBreak -> copy(source = source.map(body))
+
             is FootnoteRef -> copy(source = source.map(body))
+
             is RawInline -> copy(source = source.map(body))
+
             is Image -> copy(source = source.map(body))
+
             is Emphasis -> copy(children = children.remapped(body), source = source.map(body))
+
+            // Markdown never produces one; the exhaustive `when` is what says so out loud.
+            is Underline -> copy(children = children.remapped(body), source = source.map(body))
+
             is Strikethrough -> copy(children = children.remapped(body), source = source.map(body))
+
             is Link -> copy(children = children.remapped(body), source = source.map(body))
         }
 

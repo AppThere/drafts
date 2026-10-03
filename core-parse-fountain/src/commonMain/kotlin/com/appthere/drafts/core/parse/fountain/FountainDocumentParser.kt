@@ -48,7 +48,7 @@ class FountainDocumentParser(
         // nothing between them is lost.
         boneyards.forEach { boneyard ->
             blocks += bodyIn(source, at, boneyard.start.value) { metadata = it }
-            blocks += Paragraph(listOf(textOf(source, boneyard)), BlockRole.NOTE, source = boneyard)
+            blocks += Paragraph(listOf(verbatim(source, boneyard)), BlockRole.NOTE, source = boneyard)
             at = boneyard.endExclusive.value
         }
 
@@ -80,7 +80,7 @@ class FountainDocumentParser(
         chunks.forEach { chunk ->
             if (first && from == 0 && TitlePage.opens(chunk)) {
                 titled(TitlePage.metadataOf(chunk))
-                blocks += Paragraph(listOf(textOf(source, chunk.source)), BlockRole.BODY, source = chunk.source)
+                blocks += Paragraph(inlinesIn(source, chunk.source), BlockRole.BODY, source = chunk.source)
             } else {
                 val emitted = blocksOf(source, chunk, previous)
                 blocks += emitted
@@ -154,9 +154,7 @@ class FountainDocumentParser(
                     Heading(
                         level = forced.depth.coerceIn(1, MAX_HEADING_LEVEL),
                         inlines =
-                            listOf(
-                                textOf(source, SourceSpan.of(first.start + forced.markerLength, first.endExclusive)),
-                            ),
+                            inlinesIn(source, SourceSpan.of(first.start + forced.markerLength, first.endExclusive)),
                         style = HeadingStyle.ATX,
                         role = BlockRole.SECTION,
                         source = chunk.source,
@@ -200,7 +198,7 @@ class FountainDocumentParser(
         val words = SourceSpan.of(line.start + marker, line.start + (numbered?.second ?: line.text.length))
 
         return Paragraph(
-            inlines = listOf(textOf(source, words)),
+            inlines = inlinesIn(source, words),
             role = BlockRole.SCENE_HEADING,
             attrs = numbered?.let { Attributes(keyValues = mapOf(SCENE_NUMBER to it.first)) } ?: Attributes.EMPTY,
             source = chunk.source,
@@ -242,7 +240,7 @@ class FountainDocumentParser(
         val blocks =
             mutableListOf<Block>(
                 Paragraph(
-                    inlines = listOf(textOf(source, SourceSpan.of(name.start + marker, name.start + nameEnd))),
+                    inlines = inlinesIn(source, SourceSpan.of(name.start + marker, name.start + nameEnd)),
                     role = BlockRole.CHARACTER,
                     attrs = if (dual) Attributes(classes = listOf(DUAL_CLASS)) else Attributes.EMPTY,
                     source = name.span,

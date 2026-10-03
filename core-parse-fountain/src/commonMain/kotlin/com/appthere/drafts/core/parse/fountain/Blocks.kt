@@ -30,7 +30,7 @@ internal fun paragraph(
     marker: Int = 0,
 ): Block =
     Paragraph(
-        inlines = listOf(textOf(source, SourceSpan.of(span.start.value + marker, span.endExclusive.value))),
+        inlines = inlinesIn(source, SourceSpan.of(span.start.value + marker, span.endExclusive.value)),
         role = role,
         source = span,
     )
@@ -41,7 +41,7 @@ internal fun spoken(
     span: SourceSpan,
     role: BlockRole,
     marks: Attributes,
-): Block = Paragraph(inlines = listOf(textOf(source, span)), role = role, attrs = marks, source = span)
+): Block = Paragraph(inlines = inlinesIn(source, span), role = role, attrs = marks, source = span)
 
 /** One lyric line, less its tilde: "Each line is its own lyric element; the `~` is not rendered." */
 internal fun lyric(
@@ -49,8 +49,13 @@ internal fun lyric(
     line: Line,
 ): Block = paragraph(source, line.span, BlockRole.LYRIC, forcingOf(line.text)?.markerLength ?: 0)
 
-/** The text of [span], as the one inline a block has until there is an inline pass. */
-internal fun textOf(
+/**
+ * The text of [span], unparsed.
+ *
+ * For the two blocks the inline pass must not touch: a boneyard, where "emphasis does not apply",
+ * and anything else whose characters are to be shown exactly as typed.
+ */
+internal fun verbatim(
     source: String,
     span: SourceSpan,
 ): Text = Text(source.substring(span.start.value, span.endExclusive.value), span)

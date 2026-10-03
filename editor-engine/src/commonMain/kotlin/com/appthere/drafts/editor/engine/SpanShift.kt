@@ -24,6 +24,7 @@ import com.appthere.drafts.core.model.Strikethrough
 import com.appthere.drafts.core.model.Table
 import com.appthere.drafts.core.model.Text
 import com.appthere.drafts.core.model.ThematicBreak
+import com.appthere.drafts.core.model.Underline
 
 /**
  * Moves every span in a block by a fixed number of code units.
@@ -110,6 +111,7 @@ private fun Inline.shift(by: Int): Inline =
         is RawInline -> copy(source = source.shift(by))
         is Image -> copy(source = source.shift(by))
         is Emphasis -> copy(children = children.shift(by), source = source.shift(by))
+        is Underline -> copy(children = children.shift(by), source = source.shift(by))
         is Strikethrough -> copy(children = children.shift(by), source = source.shift(by))
         is Link -> copy(children = children.shift(by), source = source.shift(by))
     }

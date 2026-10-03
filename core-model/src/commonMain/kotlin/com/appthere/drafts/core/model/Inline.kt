@@ -40,6 +40,23 @@ data class Emphasis(
     override val source: SourceSpan? = null,
 ) : Inline
 
+/**
+ * `_underlined_` in Fountain.
+ *
+ * Not [Emphasis] with an underscore delimiter, though that is how the same five characters read in
+ * Markdown. `fountain.md`'s emphasis table is explicit that `_text_` is *underline* where `*text*`
+ * is italic, and the two are different things to a reader and to every export format. Collapsing
+ * them would mean an exporter walking this IR had to know which parser produced it before it could
+ * decide what a span meant, which is exactly what one IR for both formats is meant to avoid.
+ *
+ * Markdown never produces one: `markdown-dialect.md` has no underline, and CommonMark's `_x_` is
+ * emphasis. So this costs the Markdown side nothing but a branch it never takes.
+ */
+data class Underline(
+    override val children: List<Inline>,
+    override val source: SourceSpan? = null,
+) : Inline
+
 /** Which character the author used to mark emphasis. Both are valid CommonMark; neither is canonical. */
 enum class EmphasisDelimiter(
     val char: Char,
@@ -181,6 +198,19 @@ enum class Origin {
 
     /** Raw HTML, which CommonMark permits and this dialect passes through untouched. */
     RAW_HTML,
+
+    /**
+     * Fountain's `[[ ... ]]`, which is "not rendered" and may appear inside any element.
+     *
+     * Passthrough rather than a block of its own, because a note is inline: it can sit in the
+     * middle of an action line, and lifting it out would cut the line in half. Opaque, so the
+     * emphasis pass does not run inside it -- `fountain.md`: "Emphasis does not apply inside
+     * Boneyard or Notes."
+     */
+    FOUNTAIN_NOTE,
+
+    /** Fountain's block comment, where one is opened in the middle of a line rather than on its own. */
+    FOUNTAIN_BONEYARD,
 }
 
 /**

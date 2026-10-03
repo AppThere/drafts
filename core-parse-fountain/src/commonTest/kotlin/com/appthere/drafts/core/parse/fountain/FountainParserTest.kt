@@ -2,7 +2,9 @@ package com.appthere.drafts.core.parse.fountain
 
 import com.appthere.drafts.core.model.Block
 import com.appthere.drafts.core.model.BlockRole
+import com.appthere.drafts.core.model.Emphasis
 import com.appthere.drafts.core.model.Heading
+import com.appthere.drafts.core.model.Paragraph
 import com.appthere.drafts.core.model.plainText
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -208,6 +210,25 @@ class FountainParserTest {
     }
 
     @Test
+    fun `a block's words carry its inline markup`() {
+        // The inline pass runs over every block, so an emphasised word in action is emphasis and
+        // not three asterisks.
+        val action = parse("She reads the *last* page.\n").blocks.single()
+
+        assertTrue(action.inlinesOf().any { it is Emphasis }, "The emphasis was left as characters")
+        assertEquals("She reads the last page.", action.words())
+    }
+
+    @Test
+    fun `a boneyard keeps its characters exactly`() {
+        // "Emphasis does not apply inside Boneyard or Notes."
+        val block = parse("/" + "*\nan *emphatic* note\n*" + "/\n").blocks.single()
+
+        assertTrue(block.inlinesOf().none { it is Emphasis })
+        assertTrue(block.words().contains("*emphatic*"), "The markers were eaten: ${block.words()}")
+    }
+
+    @Test
     fun `action is the fallback`() {
         assertEquals(BlockRole.ACTION, roleOf("She crosses the room and opens the door.\n"))
     }
@@ -257,12 +278,14 @@ class FountainParserTest {
 
     private fun roleOf(source: String) = parse(source).blocks.single().role
 
-    private fun Block.words(): String =
+    private fun Block.inlinesOf(): List<com.appthere.drafts.core.model.Inline> =
         when (this) {
-            is Heading -> inlines.plainText()
-            is com.appthere.drafts.core.model.Paragraph -> inlines.plainText()
-            else -> ""
+            is Heading -> inlines
+            is Paragraph -> inlines
+            else -> emptyList()
         }
+
+    private fun Block.words(): String = inlinesOf().plainText()
 
     private companion object {
         val SCREENPLAY =
