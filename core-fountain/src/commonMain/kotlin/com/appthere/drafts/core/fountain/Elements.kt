@@ -1,4 +1,16 @@
-package com.appthere.drafts.core.parse.fountain
+package com.appthere.drafts.core.fountain
+
+/*
+ * What Fountain's syntax is, kept apart from both reading and writing it.
+ *
+ * `fountain.md` has no separate grammar for output: Fountain is its own canonical serialisation, so
+ * the rules below are read in both directions. "A line in all uppercase ending in `TO:`" is how the
+ * parser recognises a transition *and* how the serialiser knows it can write one without a `>` in
+ * front. If those two answers ever disagreed the round-trip would stop being byte-identical, in the
+ * quietest possible way -- so there is one answer, in one place, and neither module owns it.
+ *
+ * That is also why these are not `internal`. Being shared is the whole point of the module.
+ */
 
 /**
  * What a chunk turned out to be, before it becomes blocks.
@@ -6,7 +18,7 @@ package com.appthere.drafts.core.parse.fountain
  * Only the kinds a *chunk* can be. Dialogue and parentheticals are lines inside a character chunk
  * rather than chunks of their own, so they are not here.
  */
-internal enum class Element {
+enum class Element {
     PAGE_BREAK,
     SCENE_HEADING,
     ACTION,
@@ -24,7 +36,7 @@ internal enum class Element {
  * `fountain.md`: "Every element type has a **forcing character** that removes ambiguity. When
  * implementing, check forcing characters first -- they short-circuit all inference."
  */
-internal data class Forced(
+data class Forced(
     val element: Element,
     /** How many characters of the line are the marker rather than the words. */
     val markerLength: Int,
@@ -63,7 +75,7 @@ data class FountainKeywords(
  * ellipsis". And a line beginning with `>` is centred text if it also ends with `<`, which is why
  * the two are decided together rather than in sequence.
  */
-internal fun forcingOf(line: String): Forced? {
+fun forcingOf(line: String): Forced? {
     val trimmed = line.trimStart()
     val marker = line.length - trimmed.length
 
@@ -88,7 +100,7 @@ internal fun forcingOf(line: String): Forced? {
  * The three is what keeps it apart from a synopsis, which `fountain.md` names as a conflict to
  * resolve: "disambiguate by requiring three or more `=` with no other content for a page break."
  */
-internal fun isPageBreak(line: String): Boolean {
+fun isPageBreak(line: String): Boolean {
     val trimmed = line.trim()
 
     return trimmed.length >= PAGE_BREAK_MINIMUM && trimmed.all { it == '=' }
@@ -101,7 +113,7 @@ internal fun isPageBreak(line: String): Boolean {
  * permitted." A line of digits is not a character name, which is why the count matters as well as
  * the case.
  */
-internal fun isUppercase(line: String): Boolean {
+fun isUppercase(line: String): Boolean {
     val letters = line.filter { it.isLetter() }
 
     return letters.isNotEmpty() && letters.all { it.isUpperCase() }
@@ -115,7 +127,7 @@ internal fun isUppercase(line: String): Boolean {
  * extension is a stage direction rather than a name. Testing the whole line would read that as
  * action and silently lose the speech under it.
  */
-internal fun isCharacter(line: String): Boolean = isUppercase(withoutExtension(line))
+fun isCharacter(line: String): Boolean = isUppercase(withoutExtension(line))
 
 /** [line] without a trailing parenthesised extension, which is not part of the name. */
 private fun withoutExtension(line: String): String {
@@ -128,7 +140,7 @@ private fun withoutExtension(line: String): String {
 }
 
 /** Whether [line] begins with one of [keywords]'s scene prefixes, at a word boundary. */
-internal fun isSceneHeading(
+fun isSceneHeading(
     line: String,
     keywords: FountainKeywords,
 ): Boolean {
@@ -148,7 +160,7 @@ internal fun isSceneHeading(
  * escape." So the end of the line is tested exactly, while the start is trimmed: transitions are
  * conventionally typed far to the right and the leading whitespace means nothing.
  */
-internal fun isTransition(
+fun isTransition(
     line: String,
     keywords: FountainKeywords,
 ): Boolean = isUppercase(line) && line.trimStart().endsWith(keywords.transitionSuffix)
@@ -160,7 +172,7 @@ internal fun isTransition(
  * with hyphens and periods." They are the one production feature Fountain keeps, "because they
  * matter for archival", so they are read out of the heading rather than left in its words.
  */
-internal fun sceneNumberIn(line: String): Pair<String, Int>? {
+fun sceneNumberIn(line: String): Pair<String, Int>? {
     val trimmed = line.trimEnd()
     val open =
         trimmed
@@ -177,7 +189,7 @@ internal fun sceneNumberIn(line: String): Pair<String, Int>? {
 }
 
 /** Whether [line] is a parenthetical: "a line wrapped in parentheses". */
-internal fun isParenthetical(line: String): Boolean {
+fun isParenthetical(line: String): Boolean {
     val trimmed = line.trim()
 
     return trimmed.length >= PARENTHETICAL_MINIMUM && trimmed.startsWith("(") && trimmed.endsWith(")")

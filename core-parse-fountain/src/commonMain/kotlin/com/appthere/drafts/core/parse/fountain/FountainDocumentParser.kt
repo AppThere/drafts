@@ -1,5 +1,14 @@
 package com.appthere.drafts.core.parse.fountain
 
+import com.appthere.drafts.core.fountain.Element
+import com.appthere.drafts.core.fountain.Forced
+import com.appthere.drafts.core.fountain.FountainKeywords
+import com.appthere.drafts.core.fountain.forcingOf
+import com.appthere.drafts.core.fountain.isCharacter
+import com.appthere.drafts.core.fountain.isParenthetical
+import com.appthere.drafts.core.fountain.isSceneHeading
+import com.appthere.drafts.core.fountain.isTransition
+import com.appthere.drafts.core.fountain.sceneNumberIn
 import com.appthere.drafts.core.model.Attributes
 import com.appthere.drafts.core.model.Block
 import com.appthere.drafts.core.model.BlockRole
@@ -167,6 +176,10 @@ class FountainDocumentParser(
                 chunk.lines.map { line -> lyric(source, line) }
             }
 
+            Element.CENTERED -> {
+                chunk.lines.map { line -> centred(source, line) }
+            }
+
             Element.PAGE_BREAK -> {
                 listOf(paragraph(source, chunk.source, BlockRole.PAGE_BREAK))
             }
@@ -195,7 +208,18 @@ class FountainDocumentParser(
     ): Block {
         val line = chunk.lines.first()
         val numbered = sceneNumberIn(line.text)
-        val words = SourceSpan.of(line.start + marker, line.start + (numbered?.second ?: line.text.length))
+
+        // Trailing whitespace is separator rather than slugline: the space in `INT. HOUSE - DAY #1#`
+        // is what holds the number off the end of the heading, and it belongs to neither. Leaving it
+        // in the words was an accumulating corruption rather than a cosmetic one -- the serialiser
+        // writes the number back with its own space in front, so every canonical write added one
+        // more, and a heading edited three times drifted three spaces to the left of its number.
+        val end =
+            line.text
+                .take(numbered?.second ?: line.text.length)
+                .trimEnd()
+                .length
+        val words = SourceSpan.of(line.start + marker, line.start + end)
 
         return Paragraph(
             inlines = inlinesIn(source, words),

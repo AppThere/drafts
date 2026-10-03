@@ -43,6 +43,12 @@ plugins {
 
 // --- core: pure commonMain, no platform code ---------------------------------------------
 include(":core-model")
+
+// Fountain's syntax, which both the parser and the serialiser have to agree on. Separate from
+// both: a round-trip is only byte-identical if "looks like a scene heading" means exactly the
+// same thing when reading and when writing, and two copies of that rule would drift.
+include(":core-fountain")
+
 include(":core-parse-markdown")
 include(":core-parse-fountain")
 include(":core-serialise")

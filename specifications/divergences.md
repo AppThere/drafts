@@ -339,3 +339,59 @@ cover, which is what makes it tolerable.
 
 **Closes when:** there is a reason to think it has been hit. A `Service` or `WorkManager` would
 close it and would cost more than the case is worth until then.
+
+---
+
+## 3 — A module the module list does not have: `:core-fountain`
+
+**Spec:** the module list names `:core-parse-fountain` ("hand-written Fountain 1.1 parser") and
+`:core-serialise` ("IR → Markdown / Fountain, source-preserving") and nothing between them.
+
+**Code:** there is a third, `:core-fountain`, holding Fountain's shape rules — the scene-heading
+prefixes, the transition suffix, the forcing characters, and the predicates that decide whether a
+line *looks like* each element. Both of the spec's modules depend on it.
+
+**Why:** `fountain.md` says "Fountain is its own canonical serialisation", and that is a stronger
+statement than it first reads as. It means there is no separate output grammar: the rule that
+decides whether `CUT TO:` is a transition on the way **in** is the same rule that decides whether
+the serialiser may write it without a `>` in front on the way **out**. If the two modules each kept
+their own copy, a round-trip would stay byte-identical only for as long as the copies agreed, and
+the day they stopped agreeing the symptom would be a forcing character appearing in someone's script
+on a save — silently, and only for edited blocks.
+
+Putting the rules in the parser and having the serialiser depend on it was the alternative, and it
+is the one the module list implies. It was rejected because `:core-serialise`'s build file has
+carried the opposite instruction since Phase 1 — "the serialiser itself must never depend on a
+parser, or the IR stops being the contract" — and that is the right instruction. The syntax is not
+the parser; it is a fact about the format that the parser also happens to use.
+
+**Closes when:** never. The alternative is two copies of one rule.
+
+---
+
+## 7 (Fountain) — What the canonical path cannot express
+
+**Spec:** `fountain.md`'s round-trip claim is about untouched regions, and the code delivers it:
+every block that still holds its source span is re-emitted byte for byte. This entry is about the
+other path — a block the user edited, which has to be written from the IR.
+
+**Code:** three places where the IR holds something Fountain has no way to write down.
+
+- **Markdown inlines in a screenplay.** A link, an image, a code span or a strikethrough can reach a
+  Fountain block only by having been edited as Markdown, and Fountain has no spelling for any of
+  them. Each keeps its words and loses its markup: a link becomes its text, an image its alt text. A
+  footnote reference becomes nothing, because it has no words of its own and its body lives
+  elsewhere in the document.
+- **Markdown blocks in a screenplay.** A table, a list or a code block is written as Markdown inside
+  the Fountain file, where Fountain will read it back as action. That is lossy in structure and not
+  in content, and it is better than the alternatives: dropping it loses the user's text, and
+  inventing a Fountain spelling for a table means inventing syntax no other Fountain tool can read.
+- **A scene heading whose words begin with a full stop.** The forcing character for a scene heading
+  is `.`, and `..` is reserved for action beginning with an ellipsis, so a slugline that genuinely
+  starts with a period and does not begin with a recognised prefix cannot be written at all. It is
+  re-emitted verbatim while it is untouched; edited, it becomes action.
+
+**Closes when:** the first two close if the editor ever has to carry a document between the two
+formats in earnest rather than by accident, at which point the question is a conversion UI and not a
+serialiser. The third does not close — it is Fountain's grammar, and no Fountain tool can express it
+either.

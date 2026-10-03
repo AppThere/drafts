@@ -2,7 +2,10 @@ package com.appthere.drafts.core.serialise
 
 import com.appthere.drafts.core.model.Block
 import com.appthere.drafts.core.model.BlockIndex
+import com.appthere.drafts.core.model.Document
+import com.appthere.drafts.core.model.Origin
 import com.appthere.drafts.core.model.Paragraph
+import com.appthere.drafts.core.model.RawPassthrough
 import com.appthere.drafts.core.model.Text
 import com.appthere.drafts.core.parse.markdown.MarkdownDocumentParser
 import kotlin.test.Test
@@ -118,11 +121,37 @@ class EditedBlockTest {
                 blocks = document.blocks + Paragraph(inlines = listOf(Text("appended"))),
             )
 
-        val output = serialiser.serialise(withInsertion, source)
+        // Exact bytes rather than a containment check. A containment check passes while the insertion
+        // is run straight onto the end of the previous paragraph with no blank line between them,
+        // which is a different document.
+        assertEquals("first\n\nsecond\n\nappended\n", serialiser.serialise(withInsertion, source))
+    }
 
-        assertTrue("first" in output, "Original content was consumed: $output")
-        assertTrue("second" in output, "Original content was consumed: $output")
-        assertTrue("appended" in output, "The insertion did not land: $output")
+    @Test
+    fun `an insertion after a block that already ends in a blank line does not double it`() {
+        // Raw passthrough keeps its own trailing newlines, because they were in the file and nothing
+        // read them. Appending the usual blank line after one would put four newlines in a row.
+        val document =
+            Document(
+                blocks =
+                    listOf(
+                        RawPassthrough("<div>\n  raw\n</div>\n\n", Origin.RAW_HTML),
+                        Paragraph(inlines = listOf(Text("appended"))),
+                    ),
+            )
+
+        assertEquals("<div>\n  raw\n</div>\n\nappended", serialiser.serialise(document, source = ""))
+    }
+
+    @Test
+    fun `an insertion after a block that wrote nothing does not start the file with a blank line`() {
+        // An empty paragraph is what a brand-new untitled document is made of -- the editor gives it
+        // one so that there is somewhere to put the caret -- so this is the first thing that happens
+        // when anyone starts typing into a second block before the first has any text.
+        val document =
+            Document(blocks = listOf(Paragraph(inlines = emptyList()), Paragraph(inlines = listOf(Text("typed")))))
+
+        assertEquals("typed", serialiser.serialise(document, source = ""))
     }
 
     private fun Block.isParagraphContaining(fragment: String): Boolean =
