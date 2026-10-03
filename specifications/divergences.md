@@ -149,19 +149,21 @@ dim the wrong half of a sentence for most of the world.
 
 ---
 
-## 10.1 — No outline view
+## 10.1 — The outline lists headings, not scenes
 
-**Spec:** §10.1's outline view, "disproportionately valuable for screen reader users, who cannot
-skim".
+**Spec:** "An **outline view** exposing the heading/scene hierarchy as a navigable list."
 
-**Code:** §10.1's block semantics are in place — headings are headings, other blocks are named
-before their words ("Block quote, …", "Code block, Kotlin, …") without the preview's decoration,
-the block being edited is read as its raw source, and structural edits are announced politely
-("Heading level 2.", "Joined with the block above."). Checked in the semantics tree and in what
-Android hands TalkBack. There is no outline view.
+**Code:** it is built. Headings, in document order, indented by level, each one a 48dp button
+announced with its level -- "Heading level 2, Chapter one" -- because the indentation that says so
+to the eye says nothing to anything else. Choosing one scrolls the document there and puts the
+caret in it. 6's two shapes are both there: a pane beside the document on an Expanded window, which
+the document gives up width for, and a sheet over it on anything narrower.
 
-**Closes when:** it is built. It is a feature of its own rather than plumbing, and the audit can
-report on what exists without it.
+What is missing is the other half of "heading/scene". Fountain's scene headings are a different
+block type and arrive with Fountain in Phase 7; `outlineOf` gets another branch then rather than a
+second list.
+
+**Closes when:** Phase 7 lands.
 
 ---
 
@@ -265,9 +267,11 @@ status dot and panels — onto the wider side of it. Three things are narrower t
 **Verified** on the `pixel_fold` AVD: flat, the measure spans the inner display; half-opened, it
 sits entirely left of the hinge WindowManager reports at x=1104.
 
-**Closes when:** the outline lands, which makes two panes possible and is the better answer on a
-841dp display than half of one. The horizontal case closes if a flip-phone-shaped device turns up
-to test it on.
+**Closes when:** possibly never for the vertical case. The outline has since landed, so 6's other
+option -- "split into two panes at the hinge" -- is now buildable: the outline on one side of the
+fold and the document on the other. Whether that is *better* than a column on one side is a
+question about reading on a half-folded device that nobody here has done enough of to answer. The
+horizontal case closes if a flip-phone-shaped device turns up to test it on.
 
 ---
 

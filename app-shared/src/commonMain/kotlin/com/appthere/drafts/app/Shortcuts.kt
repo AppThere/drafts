@@ -11,6 +11,7 @@ import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.key_escape
 import com.appthere.drafts.i18n.resources.shortcut_close
 import com.appthere.drafts.i18n.resources.shortcut_list
+import com.appthere.drafts.i18n.resources.shortcut_outline
 import com.appthere.drafts.i18n.resources.shortcut_reader_controls
 import com.appthere.drafts.i18n.resources.shortcut_save
 import com.appthere.drafts.i18n.resources.shortcut_save_as
@@ -61,9 +62,12 @@ internal object WindowShortcuts {
     /** This list -- the key most applications that have one use for it. */
     val KeyboardShortcuts = Shortcut(Res.string.shortcut_list, Key.Slash, "/", primary = true)
 
+    /** 10.1's outline, on the shortcut writing applications use for theirs. */
+    val Outline = Shortcut(Res.string.shortcut_outline, Key.O, "O", primary = true, shift = true)
+
     /** Escape, which cancels whatever is being asked and closes whatever is open. */
     val Dismiss = Shortcut(Res.string.shortcut_close, Key.Escape, KeyLabel.Named(Res.string.key_escape))
 
     /** In the order the list shows them. */
-    val all: List<Shortcut> = listOf(Save, SaveAs, ReaderControls, KeyboardShortcuts, Dismiss)
+    val all: List<Shortcut> = listOf(Save, SaveAs, Outline, ReaderControls, KeyboardShortcuts, Dismiss)
 }

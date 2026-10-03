@@ -174,6 +174,21 @@
       5.1: the fonts ship under the SIL Open Font License, which requires the licence to travel
       with them. "Licences" rather than "About": what this screen is for is the obligation.
     -->
+    <!--
+      10.1's outline: "An outline view exposing the heading/scene hierarchy as a navigable list is
+      disproportionately valuable for screen reader users, who cannot skim. Treat it as an
+      accessibility feature, not a convenience feature."
+
+      "Outline" is what writing applications call it and what a reader will be looking for. The
+      empty heading is a real position in a document being written, and a row with nothing in it
+      would be a row a screen reader reads as silence.
+    -->
+    <string name="outline">Outline</string>
+    <string name="open_outline">Show the outline</string>
+    <string name="shortcut_outline">Show or hide the outline</string>
+    <string name="outline_no_headings">This document has no headings yet.</string>
+    <string name="outline_empty_heading">Empty heading</string>
+
     <string name="licences">Licences</string>
     <string name="close">Close</string>
 

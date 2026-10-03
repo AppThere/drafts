@@ -1,13 +1,16 @@
 package com.appthere.drafts.app
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.appthere.drafts.design.LocalWindowSize
 import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.design.WidthClass
@@ -15,6 +18,8 @@ import com.appthere.drafts.editor.ui.Shortcut
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.keyboard_shortcuts
 import com.appthere.drafts.i18n.resources.licences
+import com.appthere.drafts.i18n.resources.open_outline
+import com.appthere.drafts.i18n.resources.outline
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -45,7 +50,17 @@ internal fun BoxScope.WindowPanels(
     if (!panels.controls) {
         Box(Modifier.align(Alignment.TopEnd).padding(controlsInset)) {
             FadingChrome(hidden = hidden) {
-                ReaderControlsButton(enabled = !hidden, onClick = refocused(panels::openControls))
+                Row(horizontalArrangement = Arrangement.spacedBy(buttonGap)) {
+                    // 10.1 calls the outline an accessibility feature rather than a convenience,
+                    // so it gets a way in that needs no keyboard, beside the one the controls have.
+                    PanelButton(
+                        text = stringResource(Res.string.outline),
+                        description = stringResource(Res.string.open_outline),
+                        onClick = refocused(panels::toggleOutline),
+                        enabled = !hidden,
+                    )
+                    ReaderControlsButton(enabled = !hidden, onClick = refocused(panels::openControls))
+                }
             }
         }
     }
@@ -93,9 +108,12 @@ internal fun BoxScope.WindowPanels(
  * be hiding text for no reason.
  */
 @Composable
-private fun BoxScope.panelPlacement(roomy: Alignment): Modifier =
+internal fun BoxScope.panelPlacement(roomy: Alignment): Modifier =
     if (LocalWindowSize.current.width == WidthClass.Compact) {
         Modifier.align(Alignment.BottomCenter).fillMaxWidth()
     } else {
         Modifier.align(roomy).padding(controlsInset)
     }
+
+/** Between the outline button and the reader controls button. */
+private val buttonGap = 8.dp

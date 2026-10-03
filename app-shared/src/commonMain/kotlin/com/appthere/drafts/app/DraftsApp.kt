@@ -8,9 +8,11 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -49,11 +51,14 @@ import com.appthere.drafts.design.LocalWindowSize
 import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.design.WindowSize
 import com.appthere.drafts.design.clearanceWithin
+import com.appthere.drafts.editor.engine.Caret
 import com.appthere.drafts.editor.engine.DocumentSession
 import com.appthere.drafts.editor.ui.BlockEditor
 import com.appthere.drafts.editor.ui.EditorState
+import com.appthere.drafts.editor.ui.OutlineEntry
 import com.appthere.drafts.editor.ui.Shortcut
 import com.appthere.drafts.editor.ui.handleShortcut
+import com.appthere.drafts.editor.ui.outlineOf
 import com.appthere.drafts.platform.files.WriteOutcome
 import com.appthere.drafts.platform.intents.DocumentKind
 import com.appthere.drafts.platform.windows.currentFold
@@ -324,27 +329,108 @@ private fun DraftsWindow(
                             .windowInsetsPadding(WindowInsets.safeDrawing)
                             .padding(start = hinge.start, end = hinge.end),
                     ) {
-                        BlockEditor(state = editor, scroll = scroll)
-
-                        // Whatever belongs to a document that came from a file: 8.4's badge, and 8.2's
-                        // refusal when there is one. Placed by the caller, because where they go depends on
-                        // what they are and this function does not know.
-                        chrome()
-
-                        WindowPanels(
+                        DocumentPage(
+                            editor = editor,
+                            scroll = scroll,
                             panels = panels,
-                            settings = settings,
-                            hidden = chromeHidden,
-                            hostShortcuts = hostShortcuts,
-                            onSettingsChange = onSettingsChange,
                             refocused = refocused,
-                        )
+                            chrome = chrome,
+                        ) {
+                            WindowPanels(
+                                panels = panels,
+                                settings = settings,
+                                hidden = chromeHidden,
+                                hostShortcuts = hostShortcuts,
+                                onSettingsChange = onSettingsChange,
+                                refocused = refocused,
+                            )
+                        }
                     }
                 }
             }
         }
     }
 }
+
+/**
+ * The document, and 10.1's outline when it is open.
+ *
+ * Two shapes, which is 6's table read from the outline's side. On a window wide enough for two
+ * panes the outline sits *beside* the document and the document gives up the width -- "Optional
+ * two-pane: document + outline". Anywhere narrower it is a sheet over the document, placed like
+ * every other panel: along the bottom on a phone, beside the text on a tablet.
+ *
+ * Which shape it is decides one more thing. A sheet is covering the document, so choosing a
+ * heading in it closes it: the reader asked to go somewhere and the sheet is in the way of
+ * arriving. A pane is not covering anything, so it stays, which is what makes it worth having
+ * open while writing.
+ */
+@Composable
+private fun DocumentPage(
+    editor: EditorState,
+    scroll: LazyListState,
+    panels: Panels,
+    refocused: (() -> Unit) -> () -> Unit,
+    chrome: @Composable BoxScope.() -> Unit,
+    overlays: @Composable BoxScope.() -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val twoPane = panels.outline && LocalWindowSize.current.allowsTwoPanes
+
+    // Only while it is open. The scan is cheap -- one pass over the blocks -- but it is a pass per
+    // keystroke, and a document nobody is looking at the outline of should not pay for one.
+    val entries = if (panels.outline) remember(editor.blocks) { outlineOf(editor.blocks) } else emptyList()
+
+    val go: (OutlineEntry) -> Unit = { entry ->
+        // The caret, not just the scroll: 10.1's list is navigable, and arriving somewhere you
+        // cannot type is arriving next to the document rather than in it. Placing it also puts
+        // keyboard focus in the block, which is the half of "navigable" a screen reader needs.
+        editor.place(Caret(entry.id, 0))
+        scope.launch { scroll.scrollToItem(entry.index) }
+        if (!twoPane) panels.closeOutline()
+    }
+
+    Row(Modifier.fillMaxSize()) {
+        if (twoPane) {
+            Outline(
+                entries = entries,
+                onGo = go,
+                onClose = refocused(panels::closeOutline),
+                modifier = Modifier.width(outlinePane).fillMaxHeight(),
+            )
+        }
+
+        Box(Modifier.weight(1f).fillMaxHeight()) {
+            BlockEditor(state = editor, scroll = scroll)
+
+            // Whatever belongs to a document that came from a file: 8.4's badge, and 8.2's refusal
+            // when there is one. Placed by the caller, because where they go depends on what they
+            // are and this function does not know.
+            chrome()
+
+            overlays()
+
+            if (panels.outline && !twoPane) {
+                Outline(
+                    entries = entries,
+                    onGo = go,
+                    onClose = refocused(panels::closeOutline),
+                    modifier = panelPlacement(Alignment.TopStart),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * How wide 6's outline pane is.
+ *
+ * Fixed rather than a fraction: the pane holds one line per heading and a line of text has a
+ * comfortable length whatever the window is doing. A fraction would make it grow on a desktop
+ * monitor into a column of short titles and a lot of air, and it would take width from the measure
+ * 5.3 is trying to protect.
+ */
+private val outlinePane = 260.dp
 
 /**
  * What the window as a whole listens for.

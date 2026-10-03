@@ -52,7 +52,14 @@ internal class Panels {
     var shortcuts by mutableStateOf(false)
         private set
 
-    val anyOpen: Boolean get() = controls || licences || shortcuts
+    /**
+     * 10.1's outline. Unlike the other three it is not always over the document: on a window wide
+     * enough for 6's two panes it sits beside it and the document narrows. Open is open either way.
+     */
+    var outline by mutableStateOf(false)
+        private set
+
+    val anyOpen: Boolean get() = controls || licences || shortcuts || outline
 
     fun toggleControls() {
         controls = !controls
@@ -86,6 +93,18 @@ internal class Panels {
         shortcuts = false
     }
 
+    fun toggleOutline() {
+        outline = !outline
+    }
+
+    fun openOutline() {
+        outline = true
+    }
+
+    fun closeOutline() {
+        outline = false
+    }
+
     /**
      * The keys that open and close panels, answered; false for any other key.
      *
@@ -101,6 +120,11 @@ internal class Panels {
 
             WindowShortcuts.KeyboardShortcuts.matches(event) -> {
                 toggleShortcuts()
+                true
+            }
+
+            WindowShortcuts.Outline.matches(event) -> {
+                toggleOutline()
                 true
             }
 
@@ -128,6 +152,14 @@ internal class Panels {
 
             controls -> {
                 controls = false
+                true
+            }
+
+            // Last, because it is the one that can be beside the document rather than over it: a
+            // reader with the outline open and the controls over the top of it means to close the
+            // controls.
+            outline -> {
+                outline = false
                 true
             }
 
@@ -218,7 +250,7 @@ fun PanelLink(
 
 /** A bordered text button at 10.2's 48dp target, the one shape of button the panels use. */
 @Composable
-private fun PanelButton(
+internal fun PanelButton(
     text: String,
     description: String,
     onClick: () -> Unit,
