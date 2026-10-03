@@ -167,30 +167,33 @@ second list.
 
 ---
 
-## 11.1 — Three things are still built by joining strings
+## 11.1 — Nothing has been translated yet
 
-**Spec:** "No string concatenation; use positional parameters. Pluralisation via plural resources,
-not `if (n == 1)`."
+**Spec:** "Compose Multiplatform Resources with `stringResource` and **per-locale directories**. No
+string concatenation; use positional parameters. Pluralisation via plural resources."
 
-The strings themselves have moved: `values/strings.xml` in `:i18n` holds all 102 of them, read with
-`stringResource` in a composition and `getString` outside one, and a translation is a sibling
-directory with no code change. What is left is three places that still join strings in code.
+**Code:** all 110 strings are in `values/strings.xml` in `:i18n`, read with `stringResource` in a
+composition and `getString` outside one. Everything user-facing that was a joined string is a
+positional-parameter resource: the "Document, Saved" pattern behind every content description, the
+units in the reader controls, and the mark between a number and its fraction.
 
-**The units in the reader controls.** "18sp", "0.75em", "1.60" are a number and a suffix stuck
-together. The suffix is user-facing and a language could want it elsewhere or spelled differently,
-so each wants a `%1$s` resource of its own.
+**What is left is the thing a second language would prove.** There is one directory, `values`, and
+no translation — so nothing demonstrates that `values-fr` beside it resolves, and nothing can tell
+a resource lookup from a literal that happens to match the English. Changing a string in the file
+does change what is on screen, which is checked; that a *different locale* would is not.
 
-**A key chord.** `Shortcut.keys()` joins "Ctrl", "Shift" and the key with a plus. Deliberate: a
-chord is a notation rather than a sentence, the number of parts varies, and the plus is the same
-notation everywhere. The names being joined *are* resources, which is the part that matters.
+Inventing a translation to test the mechanism would be worse than the gap: a half-translated
+language shows a reader their own words for five things and English for the rest, and a
+machine-translated whole one is a quality claim nobody here can stand behind.
 
-**File names.** `suggestedFileName` builds `name.md` and `copyName` builds `chapter (my version).md`.
-A file name is not prose; only the words inside it come from resources, and they do.
+**Two joins stay as they are, with reasons.** A key chord ("Ctrl+Shift+S") is a notation rather
+than a sentence, the number of parts varies, and the plus is the same everywhere; the key *names*
+in it are resources. A file name is not prose, and only the words inside one come from resources.
 
-**Pluralisation** has nothing to fix yet: nothing in the application counts anything out loud. The
+**Pluralisation** has nothing to fix: nothing in the application counts anything out loud. The
 first thing that does should reach for a plural resource rather than an `if`.
 
-**Closes when:** the units are resources. The other two are settled as they are.
+**Closes when:** there is a real translation, which needs a translator rather than a commit.
 
 ---
 

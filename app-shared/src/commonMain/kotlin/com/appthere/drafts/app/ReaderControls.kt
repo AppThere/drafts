@@ -43,6 +43,7 @@ import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.design.Theme
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.body_weight
+import com.appthere.drafts.i18n.resources.decimal_separator
 import com.appthere.drafts.i18n.resources.decrease
 import com.appthere.drafts.i18n.resources.focus
 import com.appthere.drafts.i18n.resources.focus_block
@@ -71,6 +72,8 @@ import com.appthere.drafts.i18n.resources.theme_system
 import com.appthere.drafts.i18n.resources.typewriter
 import com.appthere.drafts.i18n.resources.typewriter_off
 import com.appthere.drafts.i18n.resources.typewriter_on
+import com.appthere.drafts.i18n.resources.value_em
+import com.appthere.drafts.i18n.resources.value_sp
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
@@ -177,7 +180,13 @@ private fun TypeSteppers(
     Column(verticalArrangement = Arrangement.spacedBy(rowGap)) {
         Stepper(
             label = stringResource(Res.string.text_size),
-            value = "${settings.base.value.roundToInt()}sp",
+            value =
+                stringResource(
+                    Res.string.value_sp,
+                    settings.base.value
+                        .roundToInt()
+                        .toString(),
+                ),
             onLess = { onChange(settings.copy(base = (settings.base.value - 1).sp).clamped()) },
             onMore = { onChange(settings.copy(base = (settings.base.value + 1).sp).clamped()) },
         )
@@ -191,21 +200,22 @@ private fun TypeSteppers(
 
         Stepper(
             label = stringResource(Res.string.letter_spacing),
-            value = "${format(settings.letterSpacing)}em",
+            value = stringResource(Res.string.value_em, format(settings.letterSpacing)),
             onLess = { onChange(settings.copy(letterSpacing = settings.letterSpacing - SPACING_STEP).clamped()) },
             onMore = { onChange(settings.copy(letterSpacing = settings.letterSpacing + SPACING_STEP).clamped()) },
         )
 
         Stepper(
             label = stringResource(Res.string.measure),
-            value = "${settings.characters.roundToInt()}",
+            // A count, with no unit after it: the label already says what is being counted.
+            value = settings.characters.roundToInt().toString(),
             onLess = { onChange(settings.copy(characters = settings.characters - MEASURE_STEP).clamped()) },
             onMore = { onChange(settings.copy(characters = settings.characters + MEASURE_STEP).clamped()) },
         )
 
         Stepper(
             label = stringResource(Res.string.paragraph_spacing),
-            value = "${format(settings.paragraphSpacing)}em",
+            value = stringResource(Res.string.value_em, format(settings.paragraphSpacing)),
             onLess = {
                 onChange(
                     settings.copy(paragraphSpacing = settings.paragraphSpacing - PARAGRAPH_STEP).clamped(),
@@ -220,7 +230,9 @@ private fun TypeSteppers(
 
         Stepper(
             label = stringResource(Res.string.body_weight),
-            value = "${settings.bodyWeight}",
+            // A weight on the usual 100-900 scale, which is a number and not an amount of
+            // anything: 400 is 400 in every language.
+            value = settings.bodyWeight.toString(),
             onLess = { onChange(settings.copy(bodyWeight = settings.bodyWeight - WEIGHT_STEP).clamped()) },
             onMore = { onChange(settings.copy(bodyWeight = settings.bodyWeight + WEIGHT_STEP).clamped()) },
         )
@@ -418,10 +430,20 @@ private fun Button(
     )
 }
 
-/** Two decimals, without pulling in a formatting library for one panel. */
+/**
+ * Two decimals, without pulling in a formatting library for one panel.
+ *
+ * The separator comes from 11.1's resources because there is no locale-aware number formatter in
+ * common Kotlin, and a hardcoded full stop reads as a thousands separator to most of Europe. The
+ * grouping of a whole part is not handled at all, which costs nothing here: every number this
+ * formats is between zero and two.
+ */
+@Composable
 private fun format(value: Float): String {
     val hundredths = (value * HUNDRED).roundToInt()
-    return "${hundredths / HUNDRED}.${(hundredths % HUNDRED).toString().padStart(2, '0')}"
+    val fraction = (hundredths % HUNDRED).toString().padStart(2, '0')
+
+    return "${hundredths / HUNDRED}${stringResource(Res.string.decimal_separator)}$fraction"
 }
 
 @Composable

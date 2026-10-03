@@ -127,6 +127,31 @@
     <string name="theme_sepia">Sepia</string>
     <string name="theme_high_contrast">High contrast</string>
     <string name="theme_system">Follow the system</string>
+    <!--
+      The reader controls show each setting as a number with a unit after it. The number is a
+      number and is not here; the unit is words, and where it goes relative to the number is a
+      language's business rather than this application's.
+
+      "sp" is Android's name for a size that follows the system font scale. It is an abbreviation a
+      reader may not know, which is a design question 5.5 has not answered yet — but it is also the
+      unit the control actually sets, so a translation should keep whatever its own platform calls
+      that rather than inventing one.
+
+      "em" is typographic and is the same abbreviation in most languages that set type.
+    -->
+    <string name="value_sp">%1$ssp</string>
+    <string name="value_em">%1$sem</string>
+
+    <!--
+      The mark between the whole part of a number and its fraction: a full stop in English, a comma
+      in most of Europe.
+
+      A resource because there is no locale-aware number formatter available to common Kotlin, and
+      a hardcoded full stop would read as a thousands separator to a reader who expects a comma.
+      When this project has a real formatter this string goes and the formatter decides.
+    -->
+    <string name="decimal_separator">.</string>
+
     <string name="text_size">Text size</string>
     <string name="line_height">Line height</string>
     <string name="letter_spacing">Letter spacing</string>
