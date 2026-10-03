@@ -1,10 +1,13 @@
 package com.appthere.drafts.app
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
@@ -15,6 +18,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -25,11 +31,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.appthere.drafts.design.LocalPalette
+import com.appthere.drafts.design.Lucide
 import com.appthere.drafts.design.Prose
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.close
 import com.appthere.drafts.i18n.resources.open_reader_controls
-import com.appthere.drafts.i18n.resources.reader_controls
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -211,8 +217,8 @@ internal fun ReaderControlsButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PanelButton(
-        text = stringResource(Res.string.reader_controls),
+    PanelIconButton(
+        icon = Lucide.Menu,
         description = stringResource(Res.string.open_reader_controls),
         onClick = onClick,
         enabled = enabled,
@@ -274,6 +280,47 @@ internal fun PanelButton(
                 },
     )
 }
+
+/**
+ * [PanelButton]'s shape with an icon in place of the word, for the chrome bar, where a phone has
+ * room for four of these and not for four words.
+ *
+ * The word is not lost: it is the [description], which is what a screen reader announces and what
+ * the button is found by. The icon takes the ink colour, so it follows the reader's theme (5.6).
+ */
+@Composable
+internal fun PanelIconButton(
+    icon: ImageVector,
+    description: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val palette = LocalPalette.current
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier =
+            modifier
+                .sizeIn(minWidth = target, minHeight = target)
+                .border(hairline, palette.muted, RoundedCornerShape(corner))
+                .clickable(enabled = enabled, onClick = onClick)
+                .semantics {
+                    contentDescription = description
+                    role = Role.Button
+                },
+    ) {
+        Image(
+            painter = rememberVectorPainter(icon),
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(palette.ink),
+            modifier = Modifier.size(iconSize),
+        )
+    }
+}
+
+/** Lucide's own size, and half of 10.2's target: the rest is padding a thumb can land on. */
+internal val iconSize = 24.dp
 
 /** 10.2: "Touch targets >= 48dp." */
 private val target = 48.dp

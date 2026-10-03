@@ -67,6 +67,16 @@ class ShortcutListTest {
         }
 
     @Test
+    fun `new and open are listed when the host can do them`() =
+        runSkikoComposeUiTest(size = Size(WIDTH, HEIGHT)) {
+            val host = HostActions(newDocument = {}, openDocument = {})
+            setContent { ShortcutList(onClose = {}, hostShortcuts = host.listed) }
+
+            assertListed(WindowShortcuts.New)
+            assertListed(WindowShortcuts.Open)
+        }
+
+    @Test
     fun `escape closes the list and leaves the controls it was opened from`() =
         runSkikoComposeUiTest(size = Size(WIDTH, HEIGHT)) {
             setContent { DraftsApp(initialText = "A paragraph.\n") }
@@ -94,7 +104,9 @@ class ShortcutListTest {
     fun `no two shortcuts share keys`() {
         // Redo is listed twice on purpose, on two different keys. Two *actions* on one set of keys
         // is the mistake: whichever handler asks first wins, and the other is listed but dead.
-        val shortcuts = EditorShortcuts.all + WindowShortcuts.all
+        // New and Open are in, though only a host that can open windows answers them: Ctrl+O sits
+        // beside the outline's Ctrl+Shift+O, and that pair is exactly where a clash would hide.
+        val shortcuts = EditorShortcuts.all + WindowShortcuts.all + WindowShortcuts.New + WindowShortcuts.Open
         val clashes =
             shortcuts
                 .groupBy { Triple(it.key, it.primary, it.shift) }

@@ -11,8 +11,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
+import com.appthere.drafts.design.BundledLicences
 import com.appthere.drafts.design.DraftsTheme
-import com.appthere.drafts.design.FontLicences
 import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.licences
@@ -31,7 +31,7 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalTestApi::class)
 class LicencesTest {
     @Test
-    fun `every bundled font has its licence shown in full`() =
+    fun `everything bundled has its licence shown in full`() =
         runSkikoComposeUiTest(size = Size(WIDTH, HEIGHT)) {
             setContent { DraftsTheme(ReaderSettings()) { Licences(onClose = {}) } }
             waitForIdle()
@@ -39,16 +39,16 @@ class LicencesTest {
             // `assertExists`, not `assertIsDisplayed`: the first licence is ninety lines, so the
             // second family's heading starts below the fold. It is in the scroll, which is what
             // the obligation asks for -- the reader can reach it.
-            FontLicences.all.forEach { licence ->
-                onNodeWithText(licence.family).assertExists()
+            BundledLicences.all.forEach { licence ->
+                onNodeWithText(licence.name).assertExists()
             }
         }
 
     @Test
-    fun `both copyright notices are present, not just one`() =
+    fun `every copyright notice is present, not just the first`() =
         runSkikoComposeUiTest(size = Size(WIDTH, HEIGHT)) {
-            // The two licence bodies are identical and only the copyright lines differ. Showing one
-            // and implying it covers the other would drop an attribution the licence requires.
+            // The two font licence bodies are identical and only the copyright lines differ. Showing
+            // one and implying it covers the other would drop an attribution the licence requires.
             setContent { DraftsTheme(ReaderSettings()) { Licences(onClose = {}) } }
             waitForIdle()
 
@@ -57,9 +57,9 @@ class LicencesTest {
                     .fetchSemanticsNodes()
 
             assertEquals(
-                FontLicences.all.size,
+                BundledLicences.all.size,
                 notices.size,
-                "Expected one copyright notice per family, found ${notices.size}",
+                "Expected one copyright notice per licence, found ${notices.size}",
             )
         }
 

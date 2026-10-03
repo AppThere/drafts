@@ -12,7 +12,7 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
-import com.appthere.drafts.design.FontLicences
+import com.appthere.drafts.design.BundledLicences
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.close
 import com.appthere.drafts.i18n.resources.licences
@@ -121,11 +121,11 @@ class DraftsAppTest {
             setContent { DraftsApp(initialText = "A paragraph.\n") }
             onNodeWithContentDescription(words(Res.string.open_reader_controls)).performClick()
             onNodeWithContentDescription(words(Res.string.licences)).performScrollTo().performClick()
-            onNodeWithText(FontLicences.all.first().family).assertExists()
+            onNodeWithText(BundledLicences.all.first().name).assertExists()
 
             onRoot().performKeyInput { pressKey(Key.Escape) }
 
-            onNodeWithText(FontLicences.all.first().family).assertDoesNotExist()
+            onNodeWithText(BundledLicences.all.first().name).assertDoesNotExist()
             onNodeWithContentDescription(LARGER).assertExists()
         }
 

@@ -76,12 +76,16 @@ import com.appthere.drafts.editor.engine.EditorBlock
  * `key` is not a detail. `engineering-conventions.md` 4.2: a `LazyColumn` without stable keys
  * "causes focus and caret loss on structural edits -- a correctness bug, not a performance one".
  * The engine hands out ids that survive a reparse precisely so this line can use them.
+ *
+ * [topInset] is room above the first block for chrome drawn over the editor: inside the list, so
+ * text scrolls up under the chrome and has the whole height once it fades (12).
  */
 @Composable
 fun BlockEditor(
     state: EditorState,
     modifier: Modifier = Modifier,
     scroll: LazyListState = rememberLazyListState(),
+    topInset: Dp = 0.dp,
 ) {
     val layer = remember { SelectionLayer() }
     val focus = remember { FocusRequester() }
@@ -145,7 +149,13 @@ fun BlockEditor(
                             onRelease = { state.endSelection() },
                         )
                     },
-            contentPadding = PaddingValues(vertical = documentPadding, horizontal = column.gutter),
+            contentPadding =
+                PaddingValues(
+                    start = column.gutter,
+                    top = documentPadding + topInset,
+                    end = column.gutter,
+                    bottom = documentPadding,
+                ),
             // 5.3: "centred with generous margins on a desktop window". The column stops at its
             // measure and the leftover becomes margin on both sides rather than all on the right.
             horizontalAlignment = Alignment.CenterHorizontally,

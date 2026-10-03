@@ -1,9 +1,9 @@
 package com.appthere.drafts.app
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -12,24 +12,57 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.appthere.drafts.design.LocalWindowSize
+import com.appthere.drafts.design.Lucide
 import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.design.WidthClass
-import com.appthere.drafts.editor.ui.Shortcut
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.keyboard_shortcuts
 import com.appthere.drafts.i18n.resources.licences
+import com.appthere.drafts.i18n.resources.new_document
+import com.appthere.drafts.i18n.resources.open_document
 import com.appthere.drafts.i18n.resources.open_outline
-import com.appthere.drafts.i18n.resources.outline
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * The reader's panels, and the way in to them that needs no keyboard.
+ * The ways in to the reader's panels that need no keyboard, at the end of the chrome bar.
  *
- * Together because they are one thing from the reader's side -- the button and what it opens --
- * and because they share 6's placement rule: a sheet along the bottom on a phone, a panel beside
- * the document anywhere wider. 12's fade applies to the button and not to the panels: a panel is
- * summoned deliberately and stays until answered, and fading something the reader just asked for
- * would be the interface taking it away from them.
+ * They fade with the rest of the chrome (12), and cannot be pressed while faded. Gone while the
+ * controls are open: on a wide window the panel is in the same corner with its own Close, and on a
+ * phone it is a sheet that has one.
+ *
+ * Icons, so that with 7.4's kind switch the whole bar fits one line on a phone. They still wrap
+ * rather than overflow, for a phone at 200% text.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun PanelButtons(
+    panels: Panels,
+    hidden: Boolean,
+    refocused: (() -> Unit) -> () -> Unit,
+) {
+    if (panels.controls) return
+
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(buttonGap, Alignment.End),
+        verticalArrangement = Arrangement.spacedBy(buttonGap),
+    ) {
+        // 10.1 calls the outline an accessibility feature rather than a convenience, so it gets a
+        // way in that needs no keyboard, beside the one the controls have.
+        PanelIconButton(
+            icon = Lucide.ListTree,
+            description = stringResource(Res.string.open_outline),
+            onClick = refocused(panels::toggleOutline),
+            enabled = !hidden,
+        )
+        ReaderControlsButton(enabled = !hidden, onClick = refocused(panels::openControls))
+    }
+}
+
+/**
+ * The reader's panels, placed by 6's rule: a sheet along the bottom on a phone, a panel beside the
+ * document anywhere wider. They do not fade: a panel is summoned deliberately and stays until
+ * answered, and fading something the reader just asked for would be the interface taking it away
+ * from them.
  *
  * [refocused] hands focus back to the window root after each of these, because a button pressed
  * with a pointer takes focus and is then removed -- leaving no focus owner for 10.2's shortcuts to
@@ -39,31 +72,11 @@ import org.jetbrains.compose.resources.stringResource
 internal fun BoxScope.WindowPanels(
     panels: Panels,
     settings: WindowSettings,
-    hidden: Boolean,
-    hostShortcuts: List<Shortcut>,
+    host: HostActions,
     onSettingsChange: suspend (ReaderSettings) -> Boolean,
     refocused: (() -> Unit) -> () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-
-    // Hidden while the controls are open: the panel is in the same corner, with its own Close.
-    if (!panels.controls) {
-        Box(Modifier.align(Alignment.TopEnd).padding(controlsInset)) {
-            FadingChrome(hidden = hidden) {
-                Row(horizontalArrangement = Arrangement.spacedBy(buttonGap)) {
-                    // 10.1 calls the outline an accessibility feature rather than a convenience,
-                    // so it gets a way in that needs no keyboard, beside the one the controls have.
-                    PanelButton(
-                        text = stringResource(Res.string.outline),
-                        description = stringResource(Res.string.open_outline),
-                        onClick = refocused(panels::toggleOutline),
-                        enabled = !hidden,
-                    )
-                    ReaderControlsButton(enabled = !hidden, onClick = refocused(panels::openControls))
-                }
-            }
-        }
-    }
 
     if (panels.controls) {
         ReaderControls(
@@ -75,6 +88,28 @@ internal fun BoxScope.WindowPanels(
             modifier = panelPlacement(Alignment.TopEnd),
             onClose = refocused(panels::closeControls),
         ) {
+            // 7.1's other windows, here because 12 allows no other chrome to put them in. The
+            // panel closes first: the reader is going to another window, not staying in this one.
+            host.newDocument?.let { create ->
+                PanelLink(
+                    stringResource(Res.string.new_document),
+                    onClick =
+                        refocused {
+                            panels.closeControls()
+                            create()
+                        },
+                )
+            }
+            host.openDocument?.let { open ->
+                PanelLink(
+                    stringResource(Res.string.open_document),
+                    onClick =
+                        refocused {
+                            panels.closeControls()
+                            open()
+                        },
+                )
+            }
             PanelLink(stringResource(Res.string.keyboard_shortcuts), onClick = panels::openShortcuts)
             PanelLink(stringResource(Res.string.licences), onClick = panels::openLicences)
         }
@@ -91,7 +126,7 @@ internal fun BoxScope.WindowPanels(
         ShortcutList(
             onClose = refocused(panels::closeShortcuts),
             modifier = panelPlacement(Alignment.Center),
-            hostShortcuts = hostShortcuts,
+            hostShortcuts = host.listed,
         )
     }
 }

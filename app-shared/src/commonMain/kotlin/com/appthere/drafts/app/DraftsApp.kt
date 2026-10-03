@@ -2,7 +2,6 @@ package com.appthere.drafts.app
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -10,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
@@ -42,7 +42,9 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.appthere.drafts.design.DraftsTheme
 import com.appthere.drafts.design.Fold
@@ -56,7 +58,6 @@ import com.appthere.drafts.editor.engine.DocumentSession
 import com.appthere.drafts.editor.ui.BlockEditor
 import com.appthere.drafts.editor.ui.EditorState
 import com.appthere.drafts.editor.ui.OutlineEntry
-import com.appthere.drafts.editor.ui.Shortcut
 import com.appthere.drafts.editor.ui.handleShortcut
 import com.appthere.drafts.editor.ui.outlineOf
 import com.appthere.drafts.platform.files.WriteOutcome
@@ -97,8 +98,9 @@ fun DraftsApp(
         // Nowhere to keep them, which is not the same as failing to: nothing to tell the reader.
         onSettingsChange = { true },
         fold = fold,
+        chrome = DocumentChrome.None,
         modifier = modifier,
-    ) {}
+    )
 }
 
 /**
@@ -114,8 +116,8 @@ fun DraftsApp(
  * [onKindChange] is 7.4's choice of kind while the document is untitled. The host records it; the
  * window only offers it, and only while there is no file whose extension already says.
  *
- * [hostShortcuts] are the keys the host answers outside the window -- full screen, on the desktop
- * -- listed with the window's own so that 10.2's shortcut list is the whole of it.
+ * [host] is what the platform adds: keys it answers outside the window, and new and opened
+ * documents in windows of their own (7.1).
  */
 @Composable
 fun DraftsApp(
@@ -127,7 +129,7 @@ fun DraftsApp(
     kind: String = DEFAULT_KIND,
     saveAs: (suspend () -> WriteOutcome?)? = null,
     onKindChange: ((DocumentKind) -> Unit)? = null,
-    hostShortcuts: List<Shortcut> = emptyList(),
+    host: HostActions = HostActions(),
     fold: Fold? = currentFold(),
 ) {
     val scope = rememberCoroutineScope()
@@ -148,7 +150,7 @@ fun DraftsApp(
         // No store is a build without settings storage, not a failed write, and says nothing.
         onSettingsChange = { changed -> settingsStore?.remember(kind, changed) ?: true },
         scroll = scroll,
-        hostShortcuts = hostShortcuts,
+        host = host,
         fold = fold,
         autoHide = autoHide,
         onDocumentKey = { event ->
@@ -184,27 +186,29 @@ fun DraftsApp(
                 }
             }
         },
-        modifier = modifier,
-    ) {
         // 12: "The status indicator (8.4) is the only persistent chrome, and it's a dot" -- and
         // "**Chrome auto-hides.** On sustained typing, toolbars and rails fade out."
         //
         // The dot is what fades. The controls panel, the conflict dialog and the restore banner
         // are each summoned deliberately and stay until answered: fading something the reader just
         // asked for, or is about to Tab into, would be the interface taking it away from them.
-        StatusChrome(
-            document = document,
-            kind = kind,
-            hidden = autoHide.hidden,
-            onKindChange = onKindChange,
-            modifier = Modifier.align(Alignment.TopStart).padding(controlsInset),
-            // The same save the Ctrl+S shortcut reaches, for the readers who have no Ctrl. An
-            // untitled document goes through Save As, which `Saving` already decides.
-            onSave = { scope.launch { saving.save(saveAs) } },
-        )
-
-        DocumentPrompts(document, keeper, saving, saveAs)
-    }
+        chrome =
+            DocumentChrome(
+                status = {
+                    StatusChrome(
+                        document = document,
+                        kind = kind,
+                        hidden = autoHide.hidden,
+                        onKindChange = onKindChange,
+                        // The same save the Ctrl+S shortcut reaches, for the readers who have no
+                        // Ctrl. An untitled document goes through Save As, which `Saving` decides.
+                        onSave = { scope.launch { saving.save(saveAs) } },
+                    )
+                },
+                prompts = { DocumentPrompts(document, keeper, saving, saveAs) },
+            ),
+        modifier = modifier,
+    )
 }
 
 /**
@@ -231,12 +235,12 @@ private fun DraftsWindow(
     initialSettings: ReaderSettings,
     onDocumentKey: (KeyEvent) -> Boolean,
     onSettingsChange: suspend (ReaderSettings) -> Boolean,
+    chrome: DocumentChrome,
     modifier: Modifier = Modifier,
     scroll: LazyListState = rememberLazyListState(),
-    hostShortcuts: List<Shortcut> = emptyList(),
+    host: HostActions = HostActions(),
     fold: Fold? = null,
     autoHide: AutoHide? = null,
-    chrome: @Composable BoxScope.() -> Unit,
 ) {
     // Null is a window with no auto-hide rather than one that never hides: a buffer built from a
     // string has no document whose edits 12's timer could be watching.
@@ -287,11 +291,14 @@ private fun DraftsWindow(
                     Modifier
                         .fillMaxSize()
                         .background(LocalPalette.current.background)
-                        // The panels first, then whatever depends on there being a file -- saving,
-                        // and answering 8.2's refusal, which the window cannot know about and so
-                        // asks -- and then the editor.
+                        // The panels first, then the host's other windows, then whatever depends
+                        // on there being a file -- saving, and answering 8.2's refusal, which the
+                        // window cannot know about and so asks -- and then the editor.
                         .windowInput(root, autoHide) { event ->
-                            panels.answer(event) || onDocumentKey(event) || editor.handleShortcut(event, clipboard)
+                            panels.answer(event) ||
+                                host.answer(event) ||
+                                onDocumentKey(event) ||
+                                editor.handleShortcut(event, clipboard)
                         },
                 ) {
                     LaunchedEffect(Unit) { root.requestFocus() }
@@ -334,13 +341,13 @@ private fun DraftsWindow(
                             scroll = scroll,
                             panels = panels,
                             refocused = refocused,
+                            hidden = chromeHidden,
                             chrome = chrome,
                         ) {
                             WindowPanels(
                                 panels = panels,
                                 settings = settings,
-                                hidden = chromeHidden,
-                                hostShortcuts = hostShortcuts,
+                                host = host,
                                 onSettingsChange = onSettingsChange,
                                 refocused = refocused,
                             )
@@ -364,6 +371,9 @@ private fun DraftsWindow(
  * heading in it closes it: the reader asked to go somewhere and the sheet is in the way of
  * arriving. A pane is not covering anything, so it stays, which is what makes it worth having
  * open while writing.
+ *
+ * The chrome bar goes over the document, on the document's side of any outline pane, and the
+ * editor is told how tall it is so the first line starts below it.
  */
 @Composable
 private fun DocumentPage(
@@ -371,10 +381,17 @@ private fun DocumentPage(
     scroll: LazyListState,
     panels: Panels,
     refocused: (() -> Unit) -> () -> Unit,
-    chrome: @Composable BoxScope.() -> Unit,
+    hidden: Boolean,
+    chrome: DocumentChrome,
     overlays: @Composable BoxScope.() -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+
+    // Measured, not assumed: the bar is one line or two depending on the window, the kind switch,
+    // and the reader's font scale. A frame late on the first layout, which is the price of not
+    // guessing; it does not change while the chrome fades, so nothing moves when it does.
+    var barHeight by remember { mutableStateOf(0.dp) }
     val twoPane = panels.outline && LocalWindowSize.current.allowsTwoPanes
 
     // Only while it is open. The scan is cheap -- one pass over the blocks -- but it is a pass per
@@ -401,12 +418,23 @@ private fun DocumentPage(
         }
 
         Box(Modifier.weight(1f).fillMaxHeight()) {
-            BlockEditor(state = editor, scroll = scroll)
+            BlockEditor(state = editor, scroll = scroll, topInset = barHeight)
 
-            // Whatever belongs to a document that came from a file: 8.4's badge, and 8.2's refusal
-            // when there is one. Placed by the caller, because where they go depends on what they
-            // are and this function does not know.
-            chrome()
+            ChromeBar(
+                hidden = hidden,
+                start = chrome.status,
+                end = { PanelButtons(panels, hidden, refocused) },
+                modifier =
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .fillMaxWidth()
+                        .onSizeChanged { barHeight = with(density) { it.height.toDp() } },
+            )
+
+            // Whatever else belongs to a document that came from a file: 8.2's refusal, 8.3's
+            // banner. Placed by the caller, because where they go depends on what they are and
+            // this function does not know.
+            chrome.prompts(this)
 
             overlays()
 
@@ -493,39 +521,6 @@ private fun SessionEffects(
 }
 
 /**
- * The chrome at the window's top start: 8.4's status, and 7.4's kind while the document is untitled
- * -- *Untitled · Markdown*, a control "until the first save".
- *
- * All of it fades together on sustained typing (12), and the kind cannot be changed while faded.
- */
-@Composable
-private fun StatusChrome(
-    document: OpenDocument,
-    kind: String,
-    hidden: Boolean,
-    onKindChange: ((DocumentKind) -> Unit)?,
-    modifier: Modifier = Modifier,
-    onSave: (() -> Unit)? = null,
-) {
-    Box(modifier) {
-        FadingChrome(hidden = hidden) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(chromeGap),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                // Faded chrome cannot be pressed, for the same reason the controls button cannot:
-                // a tap on an empty-looking corner should not save a document.
-                DocumentStateBadge(document.lifecycle.state, onSave = onSave.takeIf { !hidden })
-
-                if (document.isUntitled && onKindChange != null) {
-                    KindSwitch(kind = kindOf(kind), enabled = !hidden, onChange = onKindChange)
-                }
-            }
-        }
-    }
-}
-
-/**
  * 7.3 stores `scrollOffset` as a single number, and a LazyColumn's position is an index plus an
  * offset within that item. Folding them together keeps the field one number, at the cost of
  * assuming no block is taller than this -- which restores to the right block and, for a very tall
@@ -543,6 +538,3 @@ private const val DEFAULT_KIND = "markdown"
 
 /** Far enough from the corner to read as a panel over the document rather than part of the frame. */
 internal val controlsInset = 16.dp
-
-/** Between the status badge and the kind beside it. */
-private val chromeGap = 12.dp

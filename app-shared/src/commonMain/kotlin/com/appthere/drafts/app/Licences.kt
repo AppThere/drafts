@@ -26,8 +26,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.appthere.drafts.design.FontLicence
-import com.appthere.drafts.design.FontLicences
+import com.appthere.drafts.design.BundledLicence
+import com.appthere.drafts.design.BundledLicences
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.Prose
 import com.appthere.drafts.i18n.resources.Res
@@ -70,7 +70,7 @@ fun Licences(
             Modifier.verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(rowGap),
         ) {
-            FontLicences.all.forEach { licence -> LicenceText(licence) }
+            BundledLicences.all.forEach { licence -> LicenceText(licence) }
         }
     }
 }
@@ -83,13 +83,13 @@ fun Licences(
  * family name is shown on its own, which is honest -- the licence is loading, not absent.
  */
 @Composable
-private fun LicenceText(licence: FontLicence) {
+private fun LicenceText(licence: BundledLicence) {
     val palette = LocalPalette.current
-    val text by produceState(initialValue = "", licence) { value = FontLicences.textOf(licence) }
+    val text by produceState(initialValue = "", licence) { value = BundledLicences.textOf(licence) }
 
     Column(verticalArrangement = Arrangement.spacedBy(lineGap)) {
         BasicText(
-            text = licence.family,
+            text = licence.name,
             style = TextStyle(color = palette.ink, fontSize = labelSize, fontWeight = Prose.H5.weight),
         )
         BasicText(

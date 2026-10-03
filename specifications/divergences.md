@@ -111,15 +111,18 @@ can honestly change, it changes.
 
 ---
 
-## 7.4 — No Windows jump list, and no *File > New* anywhere
+## 7.4 — No Windows jump list, and *File > New* is in the reader controls rather than a menu bar
 
 **Spec:** the launcher entry points table — Linux `.desktop` actions; macOS Dock menu and *File >
 New*; Windows jump list tasks and *File > New*.
 
 **Code:** the Linux actions, built and used from an installed package. The macOS Dock menu,
-written and never run (no Mac here). No Windows jump list, and no *File > New* on any platform.
-Every route shares one request type (`--new <kind>`), so each missing one is a caller, not a
-mechanism.
+written and never run (no Mac here). No Windows jump list. *New document* and *Open…* are in every
+window's reader controls and on Ctrl+N and Ctrl+O, on desktop and Android alike (decided
+2026-10-03): the one control 12 allows now opens the window's other actions as well as its
+settings, which keeps 12's chrome to a dot and one button. Each opens a window of its own, through
+the same request as every other launch (`LaunchRequest` on desktop, `LauncherActivity` and a
+`DocumentActivity` intent on Android), so each missing route is still a caller, not a mechanism.
 
 **Why:** a jump list is Windows' `ICustomDestinationList`, a COM API that neither `jpackage` nor
 Compose exposes; it needs a native bridge. *File > New* needs a menu bar, and the application has
@@ -127,9 +130,9 @@ none. On Windows and Linux a menu bar is chrome that sits in the window permanen
 not allow ("The only chrome is the status indicator … and one control that opens the reader
 settings"). macOS's menu bar is outside the window and would not conflict.
 
-**Closes when:** a human decides whether §12 or §7.4 gives way on Windows and Linux — a macOS-only
-menu bar is the obvious first step either way — and a native bridge for the jump list is judged
-worth its weight.
+**Closes when:** a macOS menu bar carries *File > New* (it sits outside the window, so §12 is not
+in question there), and a native bridge for the jump list is judged worth its weight. Whether
+Windows and Linux ever get a menu bar is settled for now: they do not, and New is in the panel.
 
 ---
 

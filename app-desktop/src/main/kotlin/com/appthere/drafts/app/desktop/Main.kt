@@ -37,6 +37,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.appthere.drafts.app.DocumentOpening
 import com.appthere.drafts.app.DraftsApp
+import com.appthere.drafts.app.HostActions
 import com.appthere.drafts.app.KindChange
 import com.appthere.drafts.app.Notice
 import com.appthere.drafts.app.SampleDocument
@@ -55,6 +56,7 @@ import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.my_version
 import com.appthere.drafts.i18n.resources.new_fountain
 import com.appthere.drafts.i18n.resources.new_markdown
+import com.appthere.drafts.i18n.resources.open_document_title
 import com.appthere.drafts.i18n.resources.opening
 import com.appthere.drafts.i18n.resources.save_as
 import com.appthere.drafts.i18n.resources.shortcut_full_screen
@@ -70,6 +72,7 @@ import com.appthere.drafts.platform.files.SessionRecord
 import com.appthere.drafts.platform.files.SnapshotStore
 import com.appthere.drafts.platform.files.SnapshotTrigger
 import com.appthere.drafts.platform.files.WindowRecord
+import com.appthere.drafts.platform.files.chooseFileToOpen
 import com.appthere.drafts.platform.files.chooseSaveLocation
 import com.appthere.drafts.platform.files.desktopIdentity
 import com.appthere.drafts.platform.files.desktopInstanceAddress
@@ -106,7 +109,8 @@ import java.awt.Taskbar
  * sessions from last time rejoin it on launch. With neither, an untitled document opens (7.4) --
  * see [sessionsAtLaunch].
  *
- * File > Open is still absent. The save dialog it would sit beside is in `:platform-files`.
+ * New and Open are in each window's reader controls and on Ctrl+N and Ctrl+O: requests on the same
+ * channel as every other launch's, so each is a window of its own.
  */
 fun main(args: Array<String>) {
     // 9.4's single instance, one per user: the socket lives where only this user can reach it.
@@ -251,6 +255,7 @@ private fun ApplicationScope.DraftsApplication(
                 // and its title follows.
                 onMove = { moved -> open.replaceAll { if (it.documentId == moved.documentId) moved else it } },
                 onClose = { open.removeAll { it.documentId == record.documentId } },
+                windows = { requests.trySend(it) },
             )
         }
     }
@@ -285,6 +290,7 @@ private fun ApplicationScope.DocumentWindow(
     stores: Stores,
     onMove: (SessionRecord) -> Unit,
     onClose: () -> Unit,
+    windows: (LaunchRequest) -> Unit,
 ) {
     val state =
         rememberWindowState(
@@ -328,6 +334,7 @@ private fun ApplicationScope.DocumentWindow(
             parent = window,
             onMove = onMove,
             onReadyToClose = { closing = it },
+            windows = windows,
         )
     }
 
@@ -370,6 +377,7 @@ private fun FileDocument(
     parent: Frame,
     onMove: (SessionRecord) -> Unit,
     onReadyToClose: (suspend () -> Unit) -> Unit,
+    windows: (LaunchRequest) -> Unit,
 ) {
     val identity = remember(record.documentId) { record.identity() }
 
@@ -399,8 +407,20 @@ private fun FileDocument(
                     keeper = keeper,
                     settingsStore = stores.settings,
                     kind = record.kind,
-                    // Listed with the rest, though the window rather than the document answers it.
-                    hostShortcuts = listOf(fullScreen),
+                    // Full screen is listed with the rest, though the window answers it. New and Open
+                    // are requests like any other launch's: each a window of its own (7.1, 9.4).
+                    host =
+                        HostActions(
+                            shortcuts = listOf(fullScreen),
+                            newDocument = { windows(LaunchRequest.New()) },
+                            openDocument = {
+                                scope.launch {
+                                    val title = getString(Res.string.open_document_title)
+                                    chooseFileToOpen(parent, title, openable, near = record.accessToken)
+                                        ?.let { windows(LaunchRequest.Open(it)) }
+                                }
+                            },
+                        ),
                     saveAs = {
                         val suggested =
                             opening.document.suggestedSaveName(
@@ -469,6 +489,9 @@ private class Stores(
  * describe; the list says it in words instead.
  */
 private val fullScreen = Shortcut(Res.string.shortcut_full_screen, Key.F11, "F11")
+
+/** What Open offers: every extension 9.1 says is a document this application reads. */
+private val openable = DocumentKind.entries.flatMap { it.extensions }
 
 private fun togglesFullScreen(event: KeyEvent): Boolean =
     fullScreen.matches(event) ||

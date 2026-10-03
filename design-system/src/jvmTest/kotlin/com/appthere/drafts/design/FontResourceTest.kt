@@ -56,12 +56,12 @@ class FontResourceTest {
             // Not decoration: section 4 of the OFL requires the licence to be distributed with the
             // fonts. The two bodies are identical and the copyright lines are not, so each family
             // carries its own -- and dropping one would drop an attribution.
-            FontLicences.all.forEach { licence ->
-                val text = FontLicences.textOf(licence)
+            BundledLicences.fonts.forEach { licence ->
+                val text = BundledLicences.textOf(licence)
 
-                assertTrue("SIL OPEN FONT LICENSE" in text.uppercase(), "${licence.family} has no OFL")
-                assertTrue("Version 1.1" in text, "${licence.family} is not on OFL 1.1")
-                assertTrue("Copyright" in text, "${licence.family} ships no copyright notice")
+                assertTrue("SIL OPEN FONT LICENSE" in text.uppercase(), "${licence.name} has no OFL")
+                assertTrue("Version 1.1" in text, "${licence.name} is not on OFL 1.1")
+                assertTrue("Copyright" in text, "${licence.name} ships no copyright notice")
             }
         }
 

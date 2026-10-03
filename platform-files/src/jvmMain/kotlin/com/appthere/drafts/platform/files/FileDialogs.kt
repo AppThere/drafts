@@ -39,6 +39,32 @@ fun chooseSaveLocation(
     return File(dialog.directory, name).path
 }
 
+/**
+ * Opening a document from disk on the desktop, through the same platform dialog as [chooseSaveLocation]
+ * and for the same reasons: it is the one the reader already knows.
+ *
+ * [extensions] are the ones the application can open (9.1), offered as a filter -- which macOS and
+ * GTK honour and Windows' native dialog ignores, so a file of another kind can still be chosen
+ * there; what happens to it then is the opener's business, as it is for a file dropped on the
+ * application. Modal, like the save dialog. Returns the chosen path, or null if the reader cancelled.
+ */
+fun chooseFileToOpen(
+    parent: Frame?,
+    title: String,
+    extensions: List<String>,
+    near: String? = null,
+): String? {
+    val dialog =
+        FileDialog(parent, title, FileDialog.LOAD).apply {
+            directory = near?.let { File(it).parent } ?: defaultFolder()
+            setFilenameFilter { _, name -> name.substringAfterLast('.', "").lowercase() in extensions }
+        }
+    dialog.isVisible = true
+
+    val name = dialog.file ?: return null
+    return File(dialog.directory, name).path
+}
+
 /** Documents, where the reader keeps their writing, or their home folder if there is no such thing. */
 private fun defaultFolder(): String {
     val home = File(System.getProperty("user.home"))

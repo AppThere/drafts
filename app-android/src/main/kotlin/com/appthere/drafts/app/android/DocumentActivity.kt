@@ -6,7 +6,9 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -18,6 +20,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import com.appthere.drafts.app.DocumentOpening
 import com.appthere.drafts.app.DraftsApp
+import com.appthere.drafts.app.HostActions
 import com.appthere.drafts.app.KindChange
 import com.appthere.drafts.app.Notice
 import com.appthere.drafts.app.SaveAs
@@ -187,6 +190,10 @@ class DocumentActivity : ComponentActivity() {
                 val kinds = remember(storage) { KindChange(storage.sessions, storage.settings) { onMove(it) } }
                 val choose = rememberSaveLocation()
                 val scope = rememberCoroutineScope()
+                val openFile =
+                    rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { chosen ->
+                        chosen?.let(::openInItsOwnWindow)
+                    }
 
                 // Handed over rather than called: 8.1's closing snapshot happens after the window
                 // has gone, and the composition is the only thing that knows what to snapshot.
@@ -225,6 +232,13 @@ class DocumentActivity : ComponentActivity() {
                             } else {
                                 null
                             },
+                        // 7.1: another document is another task. New is the request tapping the
+                        // icon again makes (7.4); Open hands its choice over as Files would.
+                        host =
+                            HostActions(
+                                newDocument = { startActivity(Intent(this, LauncherActivity::class.java)) },
+                                openDocument = { openFile.launch(openable) },
+                            ),
                     )
                 }
             }
@@ -271,6 +285,25 @@ class DocumentActivity : ComponentActivity() {
             null -> documentUri(intent)?.let { uri -> storage.opening(uri) }
             else -> reopened(storage.sessions, storage.snapshots, session)
         }
+
+    /**
+     * A document chosen with Open, in a task of its own.
+     *
+     * Handed to a new `DocumentActivity` exactly as the Files app hands one over (9.2), so it is let
+     * in the same way: its grant persisted, its kind decided, and a file this application cannot
+     * read answered with a notice in that window rather than nothing at all. `ACTION_OPEN_DOCUMENT`'s
+     * grant is persistable and belongs to this application, so the new task can keep it.
+     */
+    private fun openInItsOwnWindow(uri: Uri) {
+        startActivity(
+            Intent(Intent.ACTION_VIEW, uri, this, DocumentActivity::class.java)
+                .addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_DOCUMENT or
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                ),
+        )
+    }
 
     /** A document from outside: its grant persisted (7.3), and its kind decided, as it is let in. */
     private suspend fun Storage.opening(uri: Uri): SessionRecord? {
@@ -414,3 +447,9 @@ class DocumentActivity : ComponentActivity() {
  * which is the same thing 9.2 already relies on when one arrives from elsewhere.
  */
 private fun mimeFor(kind: String): String = kindOf(kind).mimeTypes.firstOrNull() ?: "text/plain"
+
+/**
+ * What Open's picker offers. Text, and the type Fountain usually arrives as -- it has none of its
+ * own, so providers call it `application/octet-stream` -- matching the manifest's own filters.
+ */
+private val openable = arrayOf("text/*", "application/octet-stream")

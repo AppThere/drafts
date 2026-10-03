@@ -218,6 +218,16 @@
     <string name="close">Close</string>
 
     <!--
+      7.1's "one window = one document": another document means another window. Offered in the
+      reader controls (12 allows no other chrome) and on Ctrl+N and Ctrl+O, where these same words
+      are what the shortcut list shows. "Open…" with an ellipsis, because it asks where before it
+      does anything; "New document" without, because it does not.
+    -->
+    <string name="new_document">New document</string>
+    <string name="open_document">Open…</string>
+    <string name="open_document_title">Open</string>
+
+    <!--
       What pressing the status indicator does, for a reader who has no keyboard to press Ctrl+S
       with. Spoken by assistive technology as the indicator's action rather than shown beside it.
     -->

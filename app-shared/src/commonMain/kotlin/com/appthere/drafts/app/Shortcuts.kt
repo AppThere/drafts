@@ -9,6 +9,8 @@ import com.appthere.drafts.editor.ui.KeyLabel
 import com.appthere.drafts.editor.ui.Shortcut
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.key_escape
+import com.appthere.drafts.i18n.resources.new_document
+import com.appthere.drafts.i18n.resources.open_document
 import com.appthere.drafts.i18n.resources.shortcut_close
 import com.appthere.drafts.i18n.resources.shortcut_list
 import com.appthere.drafts.i18n.resources.shortcut_outline
@@ -70,4 +72,13 @@ internal object WindowShortcuts {
 
     /** In the order the list shows them. */
     val all: List<Shortcut> = listOf(Save, SaveAs, Outline, ReaderControls, KeyboardShortcuts, Dismiss)
+
+    /**
+     * A new document in a new window (7.1), on the shortcut every application uses for it. Not in
+     * [all]: only a host that can open a window answers it, so [HostActions] lists it.
+     */
+    val New = Shortcut(Res.string.new_document, Key.N, "N", primary = true)
+
+    /** A document from disk in a new window. Listed by [HostActions], like [New]. */
+    val Open = Shortcut(Res.string.open_document, Key.O, "O", primary = true)
 }

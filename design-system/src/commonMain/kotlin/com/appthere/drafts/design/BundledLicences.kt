@@ -4,19 +4,21 @@ import androidx.compose.runtime.Immutable
 import com.appthere.drafts.design.resources.Res
 
 /**
- * A typeface the app ships, and the licence it ships under.
+ * Something the app ships that is someone else's work -- a typeface, a set of icons -- and the
+ * licence it ships under.
  *
  * `appthere-drafts.md` 5.1: "Ship the OFL text in an in-app licences screen." That is not a
  * courtesy. Section 4 of the SIL Open Font License requires the licence to be distributed with the
- * fonts, and a screen nobody can reach is not distribution.
+ * fonts, and a screen nobody can reach is not distribution. Lucide's ISC licence asks the same of
+ * its icons: the notice is to "appear in all copies".
  */
 @Immutable
-data class FontLicence(
-    val family: String,
+data class BundledLicence(
+    val name: String,
     val resourcePath: String,
 )
 
-object FontLicences {
+object BundledLicences {
     /**
      * Every font in the artifact, each with its own licence file.
      *
@@ -25,12 +27,18 @@ object FontLicences {
      * and claiming it covers both would drop an attribution the licence requires, so both are
      * shipped and both are shown.
      */
-    val all =
+    val fonts =
         listOf(
-            FontLicence("Atkinson Hyperlegible Next", "files/ofl_atkinson_next.txt"),
-            FontLicence("Atkinson Hyperlegible Mono", "files/ofl_atkinson_mono.txt"),
+            BundledLicence("Atkinson Hyperlegible Next", "files/ofl_atkinson_next.txt"),
+            BundledLicence("Atkinson Hyperlegible Mono", "files/ofl_atkinson_mono.txt"),
         )
 
+    /** The icons in [Lucide]. */
+    val icons = listOf(BundledLicence("Lucide", "files/isc_lucide.txt"))
+
+    /** Everything the licences screen shows, fonts first. */
+    val all = fonts + icons
+
     /** The licence text, read from the artifact rather than repeated in the source. */
-    suspend fun textOf(licence: FontLicence): String = Res.readBytes(licence.resourcePath).decodeToString()
+    suspend fun textOf(licence: BundledLicence): String = Res.readBytes(licence.resourcePath).decodeToString()
 }
