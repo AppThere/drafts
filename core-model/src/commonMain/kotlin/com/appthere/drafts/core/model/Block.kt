@@ -43,11 +43,19 @@ data class Heading(
     val level: Int,
     val inlines: List<Inline>,
     val style: HeadingStyle = HeadingStyle.ATX,
+    /**
+     * [BlockRole.HEADING] for Markdown, and [BlockRole.SECTION] for Fountain.
+     *
+     * A Fountain section (`## Sequence A`) has a depth and a heading's shape, and is the other
+     * half of 10.1's "heading/scene hierarchy" -- so it is a [Heading]. What it is not is a
+     * heading in the *output*: `fountain.md` says sections are "not rendered in output -- they
+     * exist for the writer's navigation", which is what [BlockRole.SECTION] records and a fixed
+     * role could not.
+     */
+    override val role: BlockRole = BlockRole.HEADING,
     override val attrs: Attributes = Attributes.EMPTY,
     override val source: SourceSpan? = null,
 ) : Block {
-    override val role: BlockRole get() = BlockRole.HEADING
-
     init {
         require(level in MIN_LEVEL..MAX_LEVEL) {
             "Heading level must be $MIN_LEVEL..$MAX_LEVEL, got $level"

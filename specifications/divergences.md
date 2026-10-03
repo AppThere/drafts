@@ -167,6 +167,29 @@ second list.
 
 ---
 
+## 7 (Fountain) — Two roles the parser does not use
+
+**Spec:** `export-pipeline.md`'s `BlockRole` enum, which lists `DUAL_DIALOGUE_LEFT` and
+`DUAL_DIALOGUE_RIGHT` among the Fountain roles.
+
+**Code:** a dual-dialogue speech keeps the roles it had -- `CHARACTER`, `PARENTHETICAL`,
+`DIALOGUE` -- and carries a `dual` class instead. What the `^` marker decides is a *layout*:
+`appthere-drafts.md` 5.4 calls dual dialogue "a two-column layout at the 16.7%/25% insets", and on
+a compact window it "stacks vertically". Spending the role on the column would lose what each block
+actually is, and a renderer would have to work out from the text that the first line of a
+right-hand column is a character name.
+
+The two roles are therefore unused. They become right if the renderer turns out to want them, which
+is a question 5.4's deliverable will answer.
+
+**Also:** a Fountain title page has no role at all -- neither 5.4's inset table nor the enum has
+one -- so it is a `BODY` paragraph holding its own source, with its `Title:` and `Author:` lifted
+into `DocMetadata`. It round-trips exactly; what it does not yet do is look like a title page.
+
+**Closes when:** 5.4's screenplay rendering lands and says what it needs.
+
+---
+
 ## 11.1 — Nothing has been translated yet
 
 **Spec:** "Compose Multiplatform Resources with `stringResource` and **per-locale directories**. No
