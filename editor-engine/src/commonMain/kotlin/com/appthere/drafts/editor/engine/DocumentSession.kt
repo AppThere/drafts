@@ -3,7 +3,6 @@ package com.appthere.drafts.editor.engine
 import com.appthere.drafts.core.model.Block
 import com.appthere.drafts.core.model.Paragraph
 import com.appthere.drafts.core.model.SourceSpan
-import com.appthere.drafts.core.parse.markdown.MarkdownDocumentParser
 
 /**
  * What one edit cost, so the gate can be asserted rather than observed.
@@ -38,15 +37,18 @@ data class EditOutcome(
  */
 class DocumentSession(
     initialText: String,
-    private val parser: MarkdownDocumentParser = MarkdownDocumentParser(),
+    parser: BlockParser = BlockParser.Markdown(),
 ) {
+    /** How this document is read: Markdown or Fountain, and changeable while it is untitled (7.4). */
+    private var parser: BlockParser = parser
+
     private val ids = BlockIds()
 
     var text: String = initialText
         private set
 
     /** The blocks the parser found, which are what a reparse window is made of. */
-    private var parsed: List<EditorBlock> = parser.parse(initialText).blocks.map { EditorBlock(ids.next(), it) }
+    private var parsed: List<EditorBlock> = parser.parse(initialText).map { EditorBlock(ids.next(), it) }
 
     /** The empty paragraphs in the blank lines between them; see [roomsIn]. */
     private var rooms: List<EditorBlock> = roomsFor(emptyList(), inheriting = null)
@@ -82,7 +84,19 @@ class DocumentSession(
         // so the field the reader is typing into is not destroyed under them after one character.
         val inheriting = rooms.firstOrNull { range.length == 0 && it.block.source?.start == range.start }?.id
 
-        val window = dirtyWindow(range)
+        var window = dirtyWindow(range)
+        var reparseSpan = reparseSpan(window, range, replacement.length, delta, updated.length)
+
+        // Widened until the parser can read it -- whole chunks, for Fountain -- and the window
+        // takes in every block the wider span reaches.
+        while (!window.isEmpty()) {
+            val widened = parser.window(updated, reparseSpan)
+            val grown = grownTo(window, widened, delta)
+            if (grown == window && widened == reparseSpan) break
+            window = grown
+            reparseSpan = widened.union(reparseSpan(window, range, replacement.length, delta, updated.length))
+        }
+
         val before = if (window.isEmpty()) emptyList() else parsed.subList(0, window.first)
         val after = if (window.isEmpty()) emptyList() else parsed.subList(window.last + 1, parsed.size)
 
@@ -91,11 +105,7 @@ class DocumentSession(
         // which is exactly what the list-joining test caught.
         val windowIds = window.map { parsed[it].id }.toSet()
 
-        val reparseSpan = reparseSpan(window, range, replacement.length, delta, updated.length)
-        val reparsed = parser.parse(updated.substring(reparseSpan.start.value, reparseSpan.endExclusive.value))
-
-        val replacement0 =
-            reparsed.blocks.map { it.shiftedBy(reparseSpan.start.value) }
+        val replacement0 = parser.reparse(updated, reparseSpan, before.lastOrNull()?.block)
         val edited = SourceSpan.of(range.start.value, range.start.value + replacement.length)
         val reconciled = reconcile(window.map { parsed[it] }, replacement0, edited, inheriting)
 
@@ -218,6 +228,58 @@ class DocumentSession(
             EditorBlock(id = id, block = block)
         }
     }
+
+    /** A new session over [text], read the way this one is: what reloading from disk starts from. */
+    fun freshWith(text: String): DocumentSession = DocumentSession(text, parser)
+
+    /**
+     * Reads the whole text again with [parser] -- 7.4's choice of kind while a document is
+     * untitled: "choosing Fountain re-interprets the same text as Fountain". The text is unchanged,
+     * so the history still applies to it; the blocks are new.
+     *
+     * The one place a whole document is reparsed after it has opened, and only because the reader
+     * asked for exactly that.
+     */
+    fun reinterpretAs(parser: BlockParser) {
+        this.parser = parser
+        parsed = parser.parse(text).map { EditorBlock(ids.next(), it) }
+        rooms = roomsFor(emptyList(), inheriting = null)
+        blocks = merged()
+    }
+
+    /**
+     * [window] grown to every block that [span] reaches, reading block spans in the new text's
+     * offsets: those after the edit have moved by [delta].
+     */
+    private fun grownTo(
+        window: IntRange,
+        span: SourceSpan,
+        delta: Int,
+    ): IntRange {
+        fun startOf(index: Int): Int =
+            parsed[index]
+                .block.source
+                ?.start
+                ?.value
+                ?.let { if (index > window.last) it + delta else it } ?: 0
+
+        fun endOf(index: Int): Int =
+            parsed[index]
+                .block.source
+                ?.endExclusive
+                ?.value
+                ?.let { if (index > window.last) it + delta else it } ?: 0
+
+        var first = window.first
+        while (first > 0 && endOf(first - 1) > span.start.value) first--
+        var last = window.last
+        while (last < parsed.lastIndex && startOf(last + 1) < span.endExclusive.value) last++
+
+        return first..last
+    }
+
+    private fun SourceSpan.union(other: SourceSpan): SourceSpan =
+        SourceSpan.of(minOf(start.value, other.start.value), maxOf(endExclusive.value, other.endExclusive.value))
 
     /**
      * The rooms in the text as it now stands, keeping the identity of any that were already there.

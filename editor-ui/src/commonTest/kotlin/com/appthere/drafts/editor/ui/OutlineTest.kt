@@ -1,5 +1,6 @@
 package com.appthere.drafts.editor.ui
 
+import com.appthere.drafts.editor.engine.BlockParser
 import com.appthere.drafts.editor.engine.DocumentSession
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -69,6 +70,26 @@ class OutlineTest {
         val outline = outlineOf(DocumentSession("# Title\n\n> A quote.\n\n- An item\n\n## Next\n").blocks)
 
         assertEquals(listOf("Title", "Next"), outline.map { it.text })
+    }
+
+    @Test
+    fun `a screenplay's scenes are in the outline under its acts`() {
+        // 10.1's "heading/scene hierarchy". A Fountain section is a heading; a scene sits one level
+        // under the section above it, and is named as a scene rather than as a heading.
+        val script = "# Act One\n\nINT. KITCHEN - NIGHT\n\nA kettle sings.\n\nEXT. GARDEN - DAWN\n"
+        val outline = outlineOf(DocumentSession(script, BlockParser.Fountain()).blocks)
+
+        assertEquals(listOf("Act One", "INT. KITCHEN - NIGHT", "EXT. GARDEN - DAWN"), outline.map { it.text })
+        assertEquals(listOf(1, 2, 2), outline.map { it.level })
+        assertEquals(listOf(false, true, true), outline.map { it.scene })
+    }
+
+    @Test
+    fun `a script with no sections is its scenes at the top level`() {
+        val outline =
+            outlineOf(DocumentSession("INT. KITCHEN - NIGHT\n\nEXT. GARDEN - DAWN\n", BlockParser.Fountain()).blocks)
+
+        assertEquals(listOf(1, 1), outline.map { it.level })
     }
 
     private companion object {

@@ -42,7 +42,10 @@ internal data class Chunk(
 }
 
 /**
- * Splits [source] into chunks, from [from] onwards.
+ * Splits [source] into chunks, from [from] up to [to].
+ *
+ * [whitespaceBefore] says whether the blank line just before [from] held spaces, which only a
+ * window that starts mid-document has to be told: the first chunk of it may be more of a speech.
  *
  * A line of nothing at all ends a chunk. A line of only spaces or tabs ends one too, but says so,
  * because dialogue may want it back.
@@ -53,26 +56,28 @@ internal data class Chunk(
 internal fun chunksOf(
     source: String,
     from: Int = 0,
+    to: Int = source.length,
+    whitespaceBefore: Boolean = false,
 ): List<Chunk> {
     val chunks = mutableListOf<Chunk>()
     var lines = mutableListOf<Line>()
     var at = from
-    var whitespaceBefore = false
+    var spaced = whitespaceBefore
 
     fun finish() {
         if (lines.isNotEmpty()) {
-            chunks += Chunk(lines, whitespaceBefore)
+            chunks += Chunk(lines, spaced)
             lines = mutableListOf()
         }
     }
 
-    while (at < source.length) {
-        val lineEnd = source.indexOf('\n', at).takeIf { it >= 0 } ?: source.length
+    while (at < to) {
+        val lineEnd = source.indexOf('\n', at).takeIf { it in 0 until to } ?: to
         val text = source.substring(at, lineEnd)
 
         if (text.isBlank()) {
             finish()
-            whitespaceBefore = text.isNotEmpty()
+            spaced = text.isNotEmpty()
         } else {
             lines += Line(text, at)
         }
@@ -82,4 +87,30 @@ internal fun chunksOf(
 
     finish()
     return chunks
+}
+
+/**
+ * [from] to [to] widened to the blank lines either side, so that no chunk is cut: from the start of
+ * the first line of the chunk [from] is in, to the end of the last line of the chunk [to] is in.
+ */
+internal fun chunkBoundsAround(
+    source: String,
+    from: Int,
+    to: Int,
+): SourceSpan {
+    var start = source.lastIndexOf('\n', (from - 1).coerceAtLeast(0)).let { if (from == 0 || it < 0) 0 else it + 1 }
+    while (start > 0) {
+        val previousStart = source.lastIndexOf('\n', start - 2) + 1
+        if (source.substring(previousStart, start - 1).isBlank()) break
+        start = previousStart
+    }
+
+    var end = source.indexOf('\n', to.coerceAtMost(source.length)).let { if (it < 0) source.length else it }
+    while (end < source.length) {
+        val nextEnd = source.indexOf('\n', end + 1).let { if (it < 0) source.length else it }
+        if (source.substring(end + 1, nextEnd).isBlank()) break
+        end = nextEnd
+    }
+
+    return SourceSpan.of(start, end)
 }

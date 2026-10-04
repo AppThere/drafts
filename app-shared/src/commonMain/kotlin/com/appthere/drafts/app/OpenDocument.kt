@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
+import com.appthere.drafts.editor.engine.BlockParser
 import com.appthere.drafts.editor.engine.Caret
 import com.appthere.drafts.editor.engine.DocumentSession
 import com.appthere.drafts.editor.engine.UndoHistory
@@ -20,6 +21,7 @@ import com.appthere.drafts.platform.files.Recovery
 import com.appthere.drafts.platform.files.SessionRecord
 import com.appthere.drafts.platform.files.SnapshotStore
 import com.appthere.drafts.platform.files.WriteOutcome
+import com.appthere.drafts.platform.intents.DocumentKind
 
 /**
  * One open document: the text being edited, and where it came from.
@@ -147,7 +149,7 @@ class OpenDocument(
             return
         }
 
-        editor = EditorState(DocumentSession(contents.text))
+        editor = editor.reloaded(contents.text)
         savedRevision = editor.revision
         restoredButUnsaved = false
         recorded = recorded.reloaded(contents)
@@ -180,7 +182,7 @@ fun openUntitled(
     text: String = "",
     record: SessionRecord? = null,
 ): OpenDocument {
-    val editor = EditorState(DocumentSession(text))
+    val editor = EditorState(DocumentSession(text, blockParserFor(record?.kind)))
     record?.caret?.let { editor.placeAt(it) }
 
     // 7.4: "ready to type into", and "Nothing stands between launching the app and writing."
@@ -243,11 +245,12 @@ fun rememberOpenDocument(
     store: DocumentStore,
     ref: DocumentRef,
     recover: (suspend (Digest) -> Recovery)? = null,
+    kind: String? = null,
 ): DocumentOpening {
-    val opening by produceState<DocumentOpening>(DocumentOpening.Opening, store, ref, recover) {
+    val opening by produceState<DocumentOpening>(DocumentOpening.Opening, store, ref, recover, kind) {
         value =
             runCatching { store.read(ref) }
-                .map { contents -> DocumentOpening.Opened(openedWith(store, ref, contents, recover)) }
+                .map { contents -> DocumentOpening.Opened(openedWith(store, ref, contents, recover, kind)) }
                 .getOrElse {
                     // Gone, or there and unreadable: the two need different answers.
                     val there = runCatching { store.exists(ref) }.getOrDefault(false)
@@ -274,7 +277,7 @@ fun openVanished(
     text: String,
     record: SessionRecord? = null,
 ): OpenDocument {
-    val editor = EditorState(DocumentSession(text))
+    val editor = EditorState(DocumentSession(text, blockParserFor(record?.kind)))
     record?.caret?.let { editor.placeAt(it) }
 
     return OpenDocument(
@@ -317,10 +320,11 @@ private suspend fun openedWith(
     ref: DocumentRef,
     contents: DocumentContents,
     recover: (suspend (Digest) -> Recovery)?,
+    kind: String?,
 ): OpenDocument {
     val recovery = recover?.invoke(contents.facts.digest) ?: Recovery.NothingToRestore()
     val restored = recovery as? Recovery.UnsavedWork
-    val editor = EditorState(DocumentSession(restored?.text ?: contents.text))
+    val editor = EditorState(DocumentSession(restored?.text ?: contents.text, blockParserFor(kind)))
 
     // 7.3's caret and scroll, whichever way the document opened. They used to come back only with
     // unsaved work, so a document that had been read and closed reopened at the top every time.
@@ -333,6 +337,16 @@ private suspend fun openedWith(
         reopening = Reopening(fromSnapshot = restored != null, scrollOffset = recovery.record?.scrollOffset),
     )
 }
+
+/**
+ * How a document of [kind] is read: 9.1's two grammars. Markdown when nothing says -- the sample
+ * document, a file of no recognised extension, a buffer that never had a kind.
+ */
+fun blockParserFor(kind: String?): BlockParser =
+    when (kind?.let(::kindOf)) {
+        DocumentKind.Fountain -> BlockParser.Fountain()
+        else -> BlockParser.Markdown()
+    }
 
 /**
  * Puts the caret back where 7.3 recorded it.

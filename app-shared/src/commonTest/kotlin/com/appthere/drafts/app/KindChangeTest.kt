@@ -1,5 +1,8 @@
 package com.appthere.drafts.app
 
+import com.appthere.drafts.core.model.BlockRole
+import com.appthere.drafts.editor.engine.DocumentSession
+import com.appthere.drafts.editor.ui.EditorState
 import com.appthere.drafts.platform.files.DocumentRef
 import com.appthere.drafts.platform.files.SessionIdentity
 import com.appthere.drafts.platform.files.SessionRecord
@@ -30,7 +33,10 @@ class KindChangeTest {
             val record = sessions.opened(SessionIdentity.untitled(kind = "markdown", displayName = "Untitled"))
             var shown: SessionRecord? = null
 
-            KindChange(sessions, settings) { shown = it }.to(DocumentKind.Fountain, record, keeper = null)
+            KindChange(
+                sessions,
+                settings,
+            ) { shown = it }.to(DocumentKind.Fountain, record, keeper = null, editor = blank())
 
             assertEquals("fountain", shown?.kind)
             assertEquals("fountain", sessions.restorable().single().kind)
@@ -44,10 +50,30 @@ class KindChangeTest {
             val document = openUntitled(store, "INT. DOCK - NIGHT\n")
             val keeper = SnapshotKeeper(document, snapshots, identity)
 
-            KindChange(sessions, settings) {}.to(DocumentKind.Fountain, record, keeper)
+            KindChange(sessions, settings) {}.to(DocumentKind.Fountain, record, keeper, document.editor)
             keeper.snapshotOn(SnapshotTrigger.FocusLost)
 
             assertEquals("fountain", snapshots.recordOf(identity.documentId)?.kind)
+        }
+
+    @Test
+    fun `the open document is read again as the kind chosen`() =
+        runTest {
+            // 7.4: "choosing Fountain re-interprets the same text as Fountain". In Markdown a scene
+            // heading is an ordinary paragraph; read as Fountain it is a scene heading.
+            val record = sessions.opened(SessionIdentity.untitled(kind = "markdown", displayName = "Untitled"))
+            val document = openUntitled(store, "INT. DOCK - NIGHT\n", record)
+            val before = document.editor.text
+
+            KindChange(sessions, settings) {}.to(DocumentKind.Fountain, record, keeper = null, editor = document.editor)
+
+            assertEquals(before, document.editor.text)
+            assertEquals(
+                BlockRole.SCENE_HEADING,
+                document.editor.blocks
+                    .first()
+                    .block.role,
+            )
         }
 
     @Test
@@ -55,7 +81,7 @@ class KindChangeTest {
         runTest {
             val record = sessions.opened(SessionIdentity.untitled(kind = "markdown", displayName = "Untitled"))
 
-            KindChange(sessions, settings) {}.to(DocumentKind.Fountain, record, keeper = null)
+            KindChange(sessions, settings) {}.to(DocumentKind.Fountain, record, keeper = null, editor = blank())
 
             assertEquals(DocumentKind.Fountain, settings.kindForNew())
         }
@@ -75,7 +101,10 @@ class KindChangeTest {
                 )
 
             assertFailsWith<IllegalArgumentException> {
-                KindChange(sessions, settings) {}.to(DocumentKind.Fountain, record, keeper = null)
+                KindChange(sessions, settings) {}.to(DocumentKind.Fountain, record, keeper = null, editor = blank())
             }
         }
+
+    /** An editor for the tests that are about the records rather than the text. */
+    private fun blank() = EditorState(DocumentSession(""))
 }

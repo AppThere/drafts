@@ -22,17 +22,29 @@ import com.appthere.drafts.core.model.SourceSpan
  *
  * An unterminated boneyard runs to the end of the document, which is what every Fountain
  * implementation does and the only answer that does not lose the writer's text.
+ *
+ * Looked for between [from] and [to], so that the editor's reparse of one window reads only that
+ * window. A boneyard that does not close inside it is cut at [to]: the blocks after the window are
+ * left as they were, and the next whole parse -- reopening the document -- runs it to the end.
  */
-internal fun boneyardsIn(source: String): List<SourceSpan> {
+internal fun boneyardsIn(
+    source: String,
+    from: Int = 0,
+    to: Int = source.length,
+): List<SourceSpan> {
     val found = mutableListOf<SourceSpan>()
-    var at = 0
+    var at = from
 
-    while (at < source.length) {
-        val open = source.indexOf(OPEN, at)
-        if (open < 0) break
+    while (at < to) {
+        val open = source.indexOf(OPEN, at).takeIf { it in 0 until to } ?: break
 
         // One opened mid-line is inline rather than block-level: step past it and keep looking.
-        val boneyard = if (startsItsLine(source, open)) endingAt(source, open) else null
+        val boneyard =
+            if (startsItsLine(source, open)) {
+                endingAt(source, open).let { SourceSpan.of(it.start.value, minOf(it.endExclusive.value, to)) }
+            } else {
+                null
+            }
 
         boneyard?.let { found += it }
         at = boneyard?.endExclusive?.value ?: (open + OPEN.length)

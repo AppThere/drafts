@@ -47,23 +47,66 @@ class FountainDocumentParser(
     private val keywords: FountainKeywords = FountainKeywords.ENGLISH,
 ) {
     fun parse(source: String): Document {
-        val boneyards = boneyardsIn(source)
-        val blocks = mutableListOf<Block>()
         var metadata = DocMetadata()
-        var at = 0
+        val blocks = blocksIn(source, 0, source.length, previous = null) { metadata = it }
+
+        return Document(blocks = blocks, metadata = metadata)
+    }
+
+    /**
+     * The blocks between [from] and [to] of [source], in the whole document's offsets -- what the
+     * editor reparses after an edit, rather than the whole screenplay.
+     *
+     * Read in context, because Fountain is positional: a title page only at the very start of the
+     * file ("Must be the first thing in the file"), and a chunk after a blank line of spaces is more
+     * of the speech before it -- which only [previous], the role of the block just above the window,
+     * can say. Parsing the window as if it were a file of its own would find title pages in the
+     * middle of a script and break speeches at the window's edge.
+     */
+    fun parseWindow(
+        source: String,
+        from: Int,
+        to: Int,
+        previous: BlockRole?,
+    ): List<Block> = blocksIn(source, from, to, previous) {}
+
+    /**
+     * The smallest window holding [from] to [to] that starts and ends on a chunk boundary -- the
+     * window [parseWindow] has to be given.
+     *
+     * A chunk is read as a whole: a character is an uppercase line *with words under it*, so a
+     * window cut between the two sees an uppercase line alone, which is action. Widening to the
+     * blank lines either side keeps every chunk whole.
+     */
+    fun windowAround(
+        source: String,
+        from: Int,
+        to: Int,
+    ): SourceSpan = chunkBoundsAround(source, from, to)
+
+    private fun blocksIn(
+        source: String,
+        from: Int,
+        to: Int,
+        previous: BlockRole?,
+        titled: (DocMetadata) -> Unit,
+    ): List<Block> {
+        val blocks = mutableListOf<Block>()
+        var at = from
+        var above = previous
 
         // Between each boneyard and the next: ordinary document, chunked and classified. The
         // boneyards themselves are emitted where they fall, so the blocks stay in source order and
         // nothing between them is lost.
-        boneyards.forEach { boneyard ->
-            blocks += bodyIn(source, at, boneyard.start.value) { metadata = it }
+        boneyardsIn(source, from, to).forEach { boneyard ->
+            blocks += bodyIn(source, at, boneyard.start.value, above, titled)
             blocks += Paragraph(listOf(verbatim(source, boneyard)), BlockRole.NOTE, source = boneyard)
+            above = BlockRole.NOTE
             at = boneyard.endExclusive.value
         }
 
-        blocks += bodyIn(source, at, source.length) { metadata = it }
-
-        return Document(blocks = blocks, metadata = metadata)
+        blocks += bodyIn(source, at, to, blocks.lastOrNull()?.role ?: above, titled)
+        return blocks
     }
 
     /**
@@ -77,13 +120,14 @@ class FountainDocumentParser(
         source: String,
         from: Int,
         to: Int,
+        above: BlockRole?,
         titled: (DocMetadata) -> Unit,
     ): List<Block> {
         if (from >= to) return emptyList()
 
-        val chunks = chunksOf(source.substring(0, to), from)
+        val chunks = chunksOf(source, from, to, whitespaceBefore = blankLineOfSpacesBefore(source, from))
         val blocks = mutableListOf<Block>()
-        var previous: BlockRole? = null
+        var previous: BlockRole? = above
         var first = true
 
         chunks.forEach { chunk ->
@@ -99,6 +143,20 @@ class FountainDocumentParser(
         }
 
         return blocks
+    }
+
+    /**
+     * Whether the line just before [at] is blank but not empty -- the "blank line that contains at
+     * least one space" that keeps a speech together across a window's edge.
+     */
+    private fun blankLineOfSpacesBefore(
+        source: String,
+        at: Int,
+    ): Boolean {
+        // Nothing before the start of the text, and nothing before a first line.
+        val end = source.lastIndexOf('\n', at - 1).takeIf { at > 0 && it >= 0 } ?: return false
+        val line = source.substring(source.lastIndexOf('\n', end - 1) + 1, end)
+        return line.isNotEmpty() && line.isBlank()
     }
 
     /**

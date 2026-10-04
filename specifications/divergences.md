@@ -95,22 +95,6 @@ and Windows go through the same lookup, which Skiko implements for them; neither
 
 ---
 
-## 7.4 — Choosing Fountain does not yet re-interpret the text
-
-**Spec:** "choosing Fountain re-interprets the same text as Fountain and applies the Fountain reader
-settings."
-
-**Code:** choosing Fountain changes the session's kind, the extension *Save As* offers, the reader
-settings the window wears, and the kind the next new document starts as. The text is still parsed
-as Markdown, as every `.fountain` file is today.
-
-**Why:** there is no Fountain parser yet; `:core-parse-fountain` is Phase 7. Everything the choice
-can honestly change, it changes.
-
-**Closes when:** Phase 7's parser exists and the editor chooses its parser by kind.
-
----
-
 ## 7.4 — No Windows jump list, and *File > New* is in the reader controls rather than a menu bar
 
 **Spec:** the launcher entry points table — Linux `.desktop` actions; macOS Dock menu and *File >
@@ -149,24 +133,6 @@ question with `;`. 11.1 requires the application to work in those languages, and
 dim the wrong half of a sentence for most of the world.
 
 **Closes when:** 11.5's ICU-style segmentation exists. The sentence option belongs with it.
-
----
-
-## 10.1 — The outline lists headings, not scenes
-
-**Spec:** "An **outline view** exposing the heading/scene hierarchy as a navigable list."
-
-**Code:** it is built. Headings, in document order, indented by level, each one a 48dp button
-announced with its level -- "Heading level 2, Chapter one" -- because the indentation that says so
-to the eye says nothing to anything else. Choosing one scrolls the document there and puts the
-caret in it. 6's two shapes are both there: a pane beside the document on an Expanded window, which
-the document gives up width for, and a sheet over it on anything narrower.
-
-What is missing is the other half of "heading/scene". Fountain's scene headings are a different
-block type and arrive with Fountain in Phase 7; `outlineOf` gets another branch then rather than a
-second list.
-
-**Closes when:** Phase 7 lands.
 
 ---
 

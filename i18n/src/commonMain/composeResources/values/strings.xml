@@ -45,6 +45,7 @@
     -->
     <string name="block_paragraph">Paragraph</string>
     <string name="block_heading_level">Heading level %1$s</string>
+    <string name="block_scene">Scene</string>
     <string name="block_quote">Block quote</string>
     <string name="block_code">Code block</string>
     <string name="block_code_in">Code block, %1$s</string>

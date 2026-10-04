@@ -228,7 +228,7 @@ class DocumentActivity : ComponentActivity() {
                         // 7.4's kind, while there is no file whose extension already says.
                         onKindChange =
                             if (open.uri == null) {
-                                { chosen -> scope.launch { kinds.to(chosen, open, keeper) } }
+                                { chosen -> scope.launch { kinds.to(chosen, open, keeper, opening.document.editor) } }
                             } else {
                                 null
                             },

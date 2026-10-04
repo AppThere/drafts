@@ -28,6 +28,7 @@ import com.appthere.drafts.design.interfaceTextStyle
 import com.appthere.drafts.editor.ui.OutlineEntry
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.block_heading_level
+import com.appthere.drafts.i18n.resources.block_scene
 import com.appthere.drafts.i18n.resources.outline
 import com.appthere.drafts.i18n.resources.outline_empty_heading
 import com.appthere.drafts.i18n.resources.outline_no_headings
@@ -100,7 +101,11 @@ private fun Entry(
     val described =
         stringResource(
             Res.string.said_after,
-            stringResource(Res.string.block_heading_level, entry.level.toString()),
+            if (entry.scene) {
+                stringResource(Res.string.block_scene)
+            } else {
+                stringResource(Res.string.block_heading_level, entry.level.toString())
+            },
             words,
         )
 

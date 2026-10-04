@@ -435,7 +435,7 @@ private fun FileDocument(
                     // 7.4's kind, while there is no file whose extension already says.
                     onKindChange =
                         if (record.uri == null) {
-                            { chosen -> scope.launch { kinds.to(chosen, record, keeper) } }
+                            { chosen -> scope.launch { kinds.to(chosen, record, keeper, opening.document.editor) } }
                         } else {
                             null
                         },

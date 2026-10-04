@@ -18,17 +18,20 @@ import com.appthere.drafts.core.model.SourceSpan
 import com.appthere.drafts.design.Prose
 import com.appthere.drafts.design.ProseRole
 import com.appthere.drafts.editor.engine.BlockId
+import com.appthere.drafts.editor.engine.BlockParser
 import com.appthere.drafts.editor.engine.Caret
 import com.appthere.drafts.editor.engine.DocumentSession
 import com.appthere.drafts.editor.engine.EditorBlock
 import com.appthere.drafts.editor.engine.Selection
 import com.appthere.drafts.editor.engine.UndoHistory
 import com.appthere.drafts.editor.engine.caretAfter
+import com.appthere.drafts.editor.engine.caretAt
 import com.appthere.drafts.editor.engine.caretBefore
 import com.appthere.drafts.editor.engine.changeBetween
 import com.appthere.drafts.editor.engine.delete
 import com.appthere.drafts.editor.engine.editRecording
 import com.appthere.drafts.editor.engine.mergeWithPrevious
+import com.appthere.drafts.editor.engine.offsetIn
 import com.appthere.drafts.editor.engine.redo
 import com.appthere.drafts.editor.engine.selectAll
 import com.appthere.drafts.editor.engine.sourceOf
@@ -250,6 +253,22 @@ class EditorState(
         caret = moved
         return true
     }
+
+    /**
+     * Reads the same text again as another kind: 7.4's "choosing Fountain re-interprets the same
+     * text as Fountain". The caret stays at the same place in the text, in whichever block it now
+     * falls; the words and their history are untouched.
+     */
+    fun reinterpretAs(parser: BlockParser) {
+        val at = caret?.let { session.offsetIn(it) }
+        session.reinterpretAs(parser)
+        adopt()
+        selection = null
+        caret = at?.let { session.caretAt(it) }
+    }
+
+    /** A fresh editor over [text], read the way this one reads -- what a reload from disk shows. */
+    fun reloaded(text: String): EditorState = EditorState(session.freshWith(text))
 
     /**
      * Undoes the last edit, putting the caret back where the edit started.

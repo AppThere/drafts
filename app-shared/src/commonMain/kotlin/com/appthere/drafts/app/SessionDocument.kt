@@ -36,7 +36,7 @@ fun rememberSessionDocument(
     val recover: suspend (Digest) -> Recovery =
         remember(record.documentId) { { digest -> snapshots.examine(record.documentId, digest) } }
 
-    val opening = rememberOpenDocument(store, ref, recover)
+    val opening = rememberOpenDocument(store, ref, recover, record.kind)
     val missing = opening is DocumentOpening.Failed && opening.reason == DocumentOpening.Reason.Missing
 
     return if (missing) rememberVanishedDocument(store, snapshots, ref, record.documentId) else opening
