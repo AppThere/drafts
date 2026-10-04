@@ -52,6 +52,34 @@ internal suspend fun documentsAtLaunch(
 }
 
 /**
+ * Marks closed every open session whose document no longer has a task: its window was closed.
+ *
+ * Closing a document records it as closed (`closeDocument`), but on Android the record can be lost.
+ * The reader closing the last window removes its task, and the system kills the process at once --
+ * often before the write that records the close has reached the disk. The session then stays open,
+ * and every launch after brings the window back that the reader closed. Found on a Chromebook,
+ * 2026-10-04, where closing four windows and launching again brought two of them back.
+ *
+ * So the tasks are the record. A window the reader closes takes its task with it; a process the
+ * system kills for memory, or one that crashes, leaves its tasks in Recents -- measured, rather
+ * than assumed -- and those sessions are restored as 7.3 asks. [onScreen] is the documents that
+ * still have a task, or null when one of them could not be told apart, in which case nothing is
+ * closed: a session that stays open by mistake costs a window to close, and one closed by mistake
+ * could be a reader's unsaved work.
+ */
+internal suspend fun forgetClosedWindows(
+    sessions: SessionList,
+    onScreen: Set<String>?,
+) {
+    onScreen ?: return
+
+    sessions
+        .restorable()
+        .filter { it.documentId !in onScreen }
+        .forEach { sessions.closed(it.documentId) }
+}
+
+/**
  * How a document this application already knows about is named to [DocumentActivity].
  *
  * A session rather than a file: an untitled document (7.4) has no file, and the ones that do are

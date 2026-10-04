@@ -1,5 +1,6 @@
 package com.appthere.drafts.app.android
 
+import android.app.ActivityManager
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -7,6 +8,7 @@ import androidx.lifecycle.lifecycleScope
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.untitled
 import com.appthere.drafts.platform.files.SessionRecord
+import com.appthere.drafts.platform.files.androidDocumentId
 import com.appthere.drafts.platform.intents.DocumentKind
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
@@ -32,6 +34,8 @@ class LauncherActivity : ComponentActivity() {
         val storage = Storage(this)
 
         lifecycleScope.launch {
+            forgetClosedWindows(storage.sessions, documentsWithTasks())
+
             val open =
                 documentsAtLaunch(
                     sessions = storage.sessions,
@@ -65,6 +69,27 @@ class LauncherActivity : ComponentActivity() {
                 .setData(sessionUri(record.documentId))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT),
         )
+    }
+
+    /**
+     * The documents this application's tasks are showing, for [forgetClosedWindows]: each one named
+     * by the session id in its intent, or -- opened from Files, or with *Open* -- by its file.
+     *
+     * Null if any document task cannot be told apart. A document shared to the application arrives
+     * with its file in an extra that a task's base intent does not keep, and with one of those on
+     * screen it is safer to close nothing than to guess.
+     */
+    private fun documentsWithTasks(): Set<String>? {
+        val tasks = getSystemService(ActivityManager::class.java)?.appTasks ?: return null
+
+        val documents =
+            tasks
+                // A task can be removed between being listed and being read; then it shows nothing.
+                .mapNotNull { task -> runCatching { task.taskInfo.baseIntent }.getOrNull() }
+                .filter { it.component?.className == DocumentActivity::class.java.name }
+                .map { intent -> sessionIdOf(intent) ?: intent.data?.let(::androidDocumentId) }
+
+        return documents.takeIf { null !in it }?.filterNotNull()?.toSet()
     }
 
     /**

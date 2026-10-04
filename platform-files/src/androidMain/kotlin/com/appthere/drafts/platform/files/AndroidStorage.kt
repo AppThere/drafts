@@ -55,13 +55,21 @@ fun androidIdentity(
     val name = displayNameOf(context.contentResolver, uri) ?: uri.lastPathSegment ?: return null
 
     return SessionIdentity(
-        documentId = sha256(uri.toString().encodeToByteArray()).hex,
+        documentId = androidDocumentId(uri),
         uri = uri.toString(),
         displayName = name,
         kind = kind,
         accessToken = if (granted) uri.toString() else null,
     )
 }
+
+/**
+ * The 7.3 document id of a file reached through [uri]: the same URI is always the same document.
+ *
+ * Its own function because two places need it to agree -- the identity recorded when a document is
+ * opened, and the launcher asking which documents still have a task (`forgetClosedWindows`).
+ */
+fun androidDocumentId(uri: Uri): String = sha256(uri.toString().encodeToByteArray()).hex
 
 /**
  * Resolves an Android access token back to a document, or null if the grant has lapsed.

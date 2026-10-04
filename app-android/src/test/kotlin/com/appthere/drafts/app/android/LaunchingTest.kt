@@ -108,6 +108,44 @@ class LaunchingTest {
             assertEquals(opened.map { it.documentId }, sessions.restorable().map { it.documentId })
         }
 
+    @Test
+    fun `a window the reader closed does not come back, though its close was never recorded`() =
+        runBlocking {
+            // Closing the last window kills the process, often before the close reaches the disk.
+            // Its task is gone, and that is what says the reader closed it.
+            val closed = sessions.opened(SessionIdentity.untitled(kind = "markdown", displayName = "Closed"))
+            val kept = sessions.opened(SessionIdentity.untitled(kind = "markdown", displayName = "Kept"))
+
+            forgetClosedWindows(sessions, onScreen = setOf(kept.documentId))
+
+            assertEquals(listOf("Kept"), atLaunch().map { it.displayName })
+            assertTrue(closed.documentId !in sessions.restorable().map { it.documentId })
+        }
+
+    @Test
+    fun `a document whose task survived a crash is restored`() =
+        runBlocking {
+            // A crash, or the system reclaiming memory, leaves the tasks in Recents. Those sessions
+            // are the reader's work and 7.3 restores them.
+            val crashed = sessions.opened(SessionIdentity.untitled(kind = "markdown", displayName = "Mid-sentence"))
+
+            forgetClosedWindows(sessions, onScreen = setOf(crashed.documentId))
+
+            assertEquals(listOf("Mid-sentence"), atLaunch().map { it.displayName })
+        }
+
+    @Test
+    fun `nothing is closed when a task cannot be told apart`() =
+        runBlocking {
+            // A shared document's task does not keep its file. Closing on a guess could close the
+            // reader's unsaved work, so with one of those on screen nothing is closed at all.
+            sessions.opened(SessionIdentity.untitled(kind = "markdown", displayName = "Shared"))
+
+            forgetClosedWindows(sessions, onScreen = null)
+
+            assertEquals(listOf("Shared"), atLaunch().map { it.displayName })
+        }
+
     private suspend fun atLaunch(
         requested: DocumentKind? = null,
         showing: Boolean = false,
