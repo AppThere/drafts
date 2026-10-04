@@ -10,6 +10,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SkikoComposeUiTest
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
+import com.appthere.drafts.design.DraftsTheme
 import com.appthere.drafts.editor.engine.DocumentSession
 import kotlinx.coroutines.runBlocking
 import kotlin.system.measureNanoTime
@@ -30,6 +31,9 @@ import kotlin.test.assertTrue
  * compared against the frame budget measures the harness and not the editor. [floor] is measured
  * and subtracted, the same way `TypingLatencyTest` does it.
  *
+ * The editor is composed inside [DraftsTheme], as it is in the application. Outside one it builds
+ * its own font families per text style, which is a cost the application does not pay.
+ *
  * And the first sweep through the document is dominated by JIT: it starts around three times slower
  * than it ends. Comparing early samples against late ones without warming up says the editor slows
  * down as the reader scrolls, which is the opposite of what happens. [WARMUP_SWEEPS] full sweeps
@@ -42,7 +46,7 @@ class ScrollLatencyTest {
         runSkikoComposeUiTest(size = Size(WIDTH, HEIGHT)) {
             val state = EditorState(DocumentSession(gateDocument()))
             val scroll = LazyListState()
-            setContent { BlockEditor(state = state, scroll = scroll) }
+            setContent { DraftsTheme { BlockEditor(state = state, scroll = scroll) } }
             waitForIdle()
 
             repeat(WARMUP_SWEEPS) { sweep(scroll, state.blocks.size) }
@@ -99,7 +103,7 @@ class ScrollLatencyTest {
         runSkikoComposeUiTest(size = Size(WIDTH, HEIGHT)) {
             val state = EditorState(DocumentSession(gateDocument()))
             val scroll = LazyListState()
-            setContent { BlockEditor(state = state, scroll = scroll) }
+            setContent { DraftsTheme { BlockEditor(state = state, scroll = scroll) } }
             waitForIdle()
             repeat(WARMUP_SWEEPS) { sweep(scroll, state.blocks.size) }
 

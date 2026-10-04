@@ -1,7 +1,7 @@
 package com.appthere.drafts.editor.ui
 
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -105,6 +105,7 @@ fun BlockEditor(
         val focusMode = LocalReaderSettings.current.focusMode
         val typewriter = LocalReaderSettings.current.typewriterScrolling
         val focused = state.caret?.block
+        val fade = rememberRevealFade(focused, LocalMotion.current.revealMillis)
 
         // 12: "**Typewriter scrolling** as an option: keep the caret at a fixed vertical position."
         //
@@ -173,8 +174,16 @@ fun BlockEditor(
                     id = editorBlock.id,
                     content = content,
                     spaceBefore = collapsedSpace(above, content.role),
-                    spaceAfter = if (index == state.blocks.lastIndex) proseStyleOf(content.role).spaceAfter else 0.dp,
+                    spaceAfter =
+                        if (index ==
+                            state.blocks.lastIndex
+                        ) {
+                            proseStyleOf(content.role).spaceAfter
+                        } else {
+                            0.dp
+                        },
                     emphasis = emphasisOf(editorBlock.id, focused, focusMode),
+                    fade = fade.of(editorBlock.id),
                     columnWidth = column.contentWidth,
                 )
             }
@@ -203,10 +212,12 @@ private fun BlockRow(
     spaceBefore: Dp,
     spaceAfter: Dp,
     emphasis: RowEmphasis,
+    fade: Animatable<Float, AnimationVector1D>?,
     columnWidth: Dp,
     modifier: Modifier = Modifier,
 ) {
     val prose = proseStyleOf(content.role)
+    val revealed = emphasis == RowEmphasis.Focused
     val textWidth = with(LocalDensity.current) { columnWidth.roundToPx() }
 
     Column(
@@ -234,10 +245,11 @@ private fun BlockRow(
         // was actually written for, and a far smaller one.
         val reserved =
             reservedHeightOf(
-                content.preview.text,
-                if (content.softWrapped) reflowedForDisplay(content.source) else content.source,
-                prose.textStyle,
-                textWidth,
+                preview = content.preview.text,
+                source = if (content.softWrapped) reflowedForDisplay(content.source) else content.source,
+                revealed = revealed,
+                style = prose.textStyle,
+                widthPx = textWidth,
             )
 
         Box(Modifier.fillMaxWidth().heightIn(min = reserved)) {
@@ -247,22 +259,12 @@ private fun BlockRow(
             // instantaneous."
             //
             // No layout animation is the reserved height above, which both states already share.
-            // This fades only what is drawn inside it, and the duration is the one token the design
-            // system has for it -- zero under reduced motion, which makes the switch instant
-            // without a branch here to forget.
-            Crossfade(
-                targetState = emphasis == RowEmphasis.Focused,
-                animationSpec = tween(LocalMotion.current.revealMillis),
-            ) { revealed ->
-                if (revealed) {
-                    RevealField(
-                        state = state,
-                        id = id,
-                        source = content.source,
-                        style = prose.textStyle,
-                        softWrapped = content.softWrapped,
-                    )
-                } else {
+            // This fades only what is drawn inside it, and only for the two blocks the caret is
+            // moving between; see `RevealFade`.
+            RevealContent(
+                revealed = revealed,
+                fade = fade,
+                preview = {
                     PreviewText(
                         state = state,
                         layer = layer,
@@ -271,8 +273,17 @@ private fun BlockRow(
                         style = prose.textStyle,
                         modifier = Modifier.spoken(content.spoken),
                     )
-                }
-            }
+                },
+                reveal = {
+                    RevealField(
+                        state = state,
+                        id = id,
+                        source = content.source,
+                        style = prose.textStyle,
+                        softWrapped = content.softWrapped,
+                    )
+                },
+            )
         }
     }
 }

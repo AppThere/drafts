@@ -1,6 +1,10 @@
 package com.appthere.drafts.design
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.ProvidableCompositionLocal
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -57,11 +61,43 @@ private val registeredWeights =
  * a weight it was registered at renders that instance rather than a synthetic bold.
  */
 @Composable
-fun proseFontFamily(): FontFamily = chain(Res.font.atkinson_next, Res.font.atkinson_next_italic)
+fun proseFontFamily(): FontFamily =
+    LocalTypefaces.current?.prose ?: chain(Res.font.atkinson_next, Res.font.atkinson_next_italic)
 
 /** The monospace family, for code blocks and all Fountain content (5.1). */
 @Composable
-fun monoFontFamily(): FontFamily = chain(Res.font.atkinson_mono, Res.font.atkinson_mono_italic)
+fun monoFontFamily(): FontFamily =
+    LocalTypefaces.current?.mono ?: chain(Res.font.atkinson_mono, Res.font.atkinson_mono_italic)
+
+/**
+ * Both families, built once for everything inside a [DraftsTheme].
+ *
+ * Building one is ten composable resource lookups, each with its own remembered state, and every
+ * [proseStyleOf] needs a family -- three or four times for each block the editor composes. Built
+ * per call, that was a quarter of the cost of composing a row, and paid again when the row was
+ * recycled, because each lookup is state to tear down (measured 2026-10-03). Built here, it is paid
+ * once per window.
+ */
+@Immutable
+class Typefaces(
+    val prose: FontFamily,
+    val mono: FontFamily,
+)
+
+/**
+ * The families [DraftsTheme] built, or null outside one -- where [proseFontFamily] builds its own,
+ * as it always did, so a composable tested on its own still gets the right faces.
+ */
+val LocalTypefaces: ProvidableCompositionLocal<Typefaces?> = staticCompositionLocalOf { null }
+
+/** Both families, remembered: the lookups settle once the font files have loaded, and then hold. */
+@Composable
+internal fun rememberTypefaces(): Typefaces {
+    val prose = chain(Res.font.atkinson_next, Res.font.atkinson_next_italic)
+    val mono = chain(Res.font.atkinson_mono, Res.font.atkinson_mono_italic)
+
+    return remember(prose, mono) { Typefaces(prose, mono) }
+}
 
 /**
  * A family built from a face and its italic, at every weight the scale asks for.

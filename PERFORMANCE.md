@@ -190,3 +190,54 @@ for both documents and are plainly an artefact.
 survives contact with Android: a document 200 times longer than the other costs one extra frame at
 the 90th percentile, not 200 times anything. It does not establish that §10.3's budget is met on the
 slowest supported device, because no such device has run it.
+### Scrolling, 2026-10-03 — a different machine, and a cheaper row
+
+**A new machine, so not comparable with the figures above.** From here the JVM gates run on an
+aarch64 Chromebook (Crostini, 6.6 GB). The Phase 6 figures came from the machine that ran the
+`pixel_fold` emulator, which this one cannot run. Its floor is about 11,000–14,000 microseconds
+against the earlier machine's few thousand, so only comparisons within this section mean anything.
+Measured with a fresh Gradle daemon (`./gradlew --stop` first): a daemon left running all day had
+grown to 4.7 GB and a full core, and inflated every timing.
+
+`ScrollLatencyTest` now composes the editor inside `DraftsTheme`, as the application does.
+
+| Scroll per screen, attributable | Four runs | Median |
+|---|---|---|
+| Before | 31,488 / 34,085 / 33,516 / 33,655 | ~33,600 us |
+| Measure only the state not on screen | 20,069 / 31,892 / 21,772 / 31,327 | ~26,500 us |
+| … and build the font families once per window | 14,310 / 17,908 / 18,202 / 14,728 | ~16,300 us |
+| … and one reveal cross-fade for the editor, not one per row | 10,458 / 12,654 / 10,028 / 11,951 | ~11,200 us |
+| As committed: a measurer per row again, not one shared | 18,458 / 9,899 / 19,776 / 29,432 / 11,593 / 10,161 / 14,111 / 12,369 | **~13,000 us** |
+
+The rows above the last shared one text measurer across the editor; it took a `CompositionLocal`
+the lint allowlist does not permit, and it only helped blocks scrolled back into view, which the
+gate never measures. The last row is the code as committed. Its first four runs scatter from 9,899
+to 29,432 -- the floor moved from 10,114 to 16,505 between them -- so eight are recorded, and the
+difference from ~11,200 is within that spread.
+
+Found with a JFR profile of the gate at 1ms sampling. Of the time spent composing a row, the
+per-row `Crossfade` was 36% and building font families 26% (ten composable resource lookups per
+`proseStyleOf`, three or four of those per row); both were also paid again tearing the row down,
+because each was state to deactivate. `reservedHeightOf` measured both states on every row, two text
+layouts on top of the row's own.
+
+**On the device it made no difference a reader would see.** Release builds compiled ahead of time
+(`pm compile -m speed`), on ARC on the same Chromebook (API 33, 60Hz), scrolling the 788-line
+`appthere-drafts.md` by hand:
+
+| | Before | After |
+|---|---|---|
+| Janky frames | 31% | 36% |
+| 50th / 90th / 99th percentile | 21 / 32 / 61 ms | 22 / 32 / 89 ms |
+| Frames slow on the UI thread | 19% | 17% |
+| Frames slow issuing draw commands | 20% | 26% |
+| GPU 90th percentile | 6 ms | 6 ms |
+
+The UI thread got cheaper, as the gate says. What holds frames back on ARC is issuing draw commands
+on the render thread, which this change did not touch and the JVM gate does not measure. One hand
+scroll each, so the differences in the janky share and the 99th percentile are within what two
+scrolls differ by; neither is evidence of a regression. A debug build is worse than either (90th
+percentile around 93ms), so the lag a reader notices in a development build is mostly the build.
+
+Not yet tried: a render layer per row, so a scroll moves recorded rows rather than re-issuing their
+text. And ARC's virtualised GPU is not a phone; the slowest supported device has still not run this.

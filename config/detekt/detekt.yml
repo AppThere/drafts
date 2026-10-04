@@ -339,6 +339,11 @@ Compose:
   # values, read almost everywhere, that would otherwise be threaded through every signature in the
   # editor. `appthere-drafts.md` 5.5 makes them user-adjustable at runtime, so they have to be
   # ambient rather than constants. Anything else needs a reason and a line here.
+  #
+  # LocalTypefaces (decided 2026-10-03): the font families, a theme value of the same kind. Not
+  # user-adjustable, but a Compose Resources font can only be loaded inside a composition, so built
+  # anywhere but the theme they were rebuilt by every text style -- a quarter of the cost of
+  # composing an editor row. Measured in PERFORMANCE.md, "Scrolling, 2026-10-03".
   CompositionLocalAllowlist:
     active: true
     allowedCompositionLocals:
@@ -346,3 +351,4 @@ Compose:
       - LocalMotion
       - LocalWindowSize
       - LocalReaderSettings
+      - LocalTypefaces

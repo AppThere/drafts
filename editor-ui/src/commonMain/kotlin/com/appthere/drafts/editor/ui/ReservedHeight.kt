@@ -8,7 +8,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
-import kotlin.math.max
 
 /**
  * The height a block occupies in *both* states: the larger of the two, measured.
@@ -33,9 +32,17 @@ import kotlin.math.max
  * reserve is the case the spec actually names. Measured across 26,000 words, that case arose zero
  * times; it is kept because "zero in one document" is not "never".
  *
+ * Only the state that is *not* on screen is measured here. The one that is on screen is laid out by
+ * its own text anyway, and the caller reserves this height as a minimum around it -- so the row
+ * ends up at the larger of the two without the shown state being laid out twice. For almost every
+ * row that means measuring the source; for the focused row, the preview. Measuring both used to
+ * cost every row scrolled into view two layouts on top of its own, which was most of the price of
+ * scrolling (measured 2026-10-03). It also makes this exactly what 4.2 prices it at: one extra
+ * measurement when focus changes.
+ *
  * Cost is bounded by the viewport, not the document: only composed blocks are measured, the result
- * is remembered against the two texts and the width, and [androidx.compose.ui.text.TextMeasurer]
- * keeps its own cache behind that.
+ * is remembered against the text and the width, and [androidx.compose.ui.text.TextMeasurer] keeps
+ * its own cache behind that.
  *
  * A block whose two states are the same shape reserves nothing, which is why code blocks show their
  * fences rather than hiding them -- see `appendCode`.
@@ -44,17 +51,17 @@ import kotlin.math.max
 internal fun reservedHeightOf(
     preview: AnnotatedString,
     source: String,
+    revealed: Boolean,
     style: TextStyle,
     widthPx: Int,
 ): Dp {
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
 
-    return remember(preview, source, style, widthPx) {
-        val constraints = Constraints(maxWidth = widthPx)
-        val shown = measurer.measure(preview, style = style, constraints = constraints)
-        val revealed = measurer.measure(AnnotatedString(source), style = style, constraints = constraints)
+    return remember(preview, source, revealed, style, widthPx) {
+        val hidden = if (revealed) preview else AnnotatedString(source)
+        val layout = measurer.measure(hidden, style = style, constraints = Constraints(maxWidth = widthPx))
 
-        with(density) { max(shown.size.height, revealed.size.height).toDp() }
+        with(density) { layout.size.height.toDp() }
     }
 }

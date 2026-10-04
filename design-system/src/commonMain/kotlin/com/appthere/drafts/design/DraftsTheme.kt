@@ -61,6 +61,7 @@ fun DraftsTheme(
         LocalReaderSettings provides held,
         LocalPalette provides palette,
         LocalMotion provides held.motion.motionFor(systemPrefersReducedMotion()),
+        LocalTypefaces provides rememberTypefaces(),
         content = content,
     )
 }
