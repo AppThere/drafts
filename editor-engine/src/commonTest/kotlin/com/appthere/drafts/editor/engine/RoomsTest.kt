@@ -27,7 +27,7 @@ class RoomsTest {
     }
 
     @Test
-    fun `what is typed there is a new paragraph, not more of the old one`() {
+    fun `what is typed there is a new paragraph and not more of the old one`() {
         val session = DocumentSession("Line one")
         val history = UndoHistory()
         val caret = assertNotNull(session.split(Caret(session.blocks.single().id, "Line one".length), history))

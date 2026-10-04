@@ -139,7 +139,7 @@ class CaretTest {
     }
 
     @Test
-    fun `backspace takes an empty paragraph first, then merges`() {
+    fun `backspace takes an empty paragraph first and merges after`() {
         // Two blank lines are an empty paragraph between the two, shown as one. Backspace at the
         // start of the second removes the empty one, as it would in any editor, and only the next
         // Backspace joins the paragraphs.
