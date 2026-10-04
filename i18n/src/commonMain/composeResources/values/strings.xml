@@ -15,7 +15,10 @@
   The custom detekt rule drafts>HardcodedUserFacingString is what keeps literals out of composables
   and sends people here.
 
-  Apostrophes are escaped as \' — the Android resource syntax Compose Resources parses.
+  Apostrophes and quotation marks are written as themselves. Compose Resources is not Android's
+  resource compiler and does not unescape \' — it shows the reader the backslash — so the escape
+  that Android's own res/ files need is wrong here. StringsTest reads every string as the screen
+  does and fails on one.
 -->
 <resources>
     <string name="window_title">Drafts</string>
@@ -282,7 +285,7 @@
       A document that could not be opened, in words about the reader's situation (7.3).
     -->
     <string name="could_not_read">This document could not be read. It may be somewhere Drafts cannot reach just now, such as a drive that is not connected.</string>
-    <string name="file_gone_nothing_kept">This document\'s file is no longer there, and no copy of its words was kept here.</string>
+    <string name="file_gone_nothing_kept">This document's file is no longer there, and no copy of its words was kept here.</string>
 
     <!--
       7.3's banner for a document whose file vanished, and the answer it offers.
