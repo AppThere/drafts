@@ -14,7 +14,6 @@ import com.appthere.drafts.editor.engine.Caret
 import com.appthere.drafts.editor.engine.DocumentSession
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * Keys that arrive faster than the editor composes.
@@ -83,16 +82,11 @@ class FastTypingTest {
         }
 
     @Test
-    fun `backspace straight after a key does not merge the paragraph into the one above`() =
+    fun `backspace straight after a key deletes the key, not the paragraph break`() =
         // The key handler decided "Backspace at the start of a block merges it" from the caret as it
-        // was at the last composition. A key and a Backspace in one frame saw offset 0 and merged
-        // the block into the one above instead of deleting what was just typed.
-        //
-        // What it does not yet do is delete the key. Backspace that is not at a block's start is the
-        // field's own, and this value-based field applies it to the value it was last composed with,
-        // which a frame ago did not have the "x" -- so the Backspace is lost rather than misapplied.
-        // Moving the field to `TextFieldState` would fix that; until then this asserts only what is
-        // true, that nothing is merged and nothing the reader wrote is lost.
+        // was at the last composition, and the field applied Backspace to its last composed value:
+        // a key and a Backspace in one frame first merged the paragraph into the one above, and
+        // later simply lost the Backspace. The field now keeps its own state and is never behind.
         runSkikoComposeUiTest(size = SIZE) {
             val state = show("Above\n\nBelow")
             state.place(Caret(state.blocks.last().id, 0))
@@ -104,10 +98,7 @@ class FastTypingTest {
             mainClock.advanceTimeByFrame()
             waitForIdle()
 
-            val sources = state.blocks.map { state.sourceOf(it.block) }
-            assertEquals(2, sources.size, "Backspace merged the paragraphs: $sources")
-            assertEquals("Above", sources.first())
-            assertTrue(sources.last().endsWith("Below"), "The paragraph lost its text: $sources")
+            assertEquals(listOf("Above", "Below"), state.blocks.map { state.sourceOf(it.block) })
         }
 
     private fun SkikoComposeUiTest.show(text: String): EditorState {

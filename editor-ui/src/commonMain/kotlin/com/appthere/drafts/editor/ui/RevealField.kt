@@ -2,12 +2,16 @@ package com.appthere.drafts.editor.ui
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -20,26 +24,27 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.input.VisualTransformation
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.editor.engine.BlockId
 
 /**
  * Reveal: the raw source, markup visible, in the block's own type.
  *
- * The field is *controlled*: its value is rebuilt from the session and the caret on every
- * recomposition rather than held in local state. Local state was the obvious first shape and it is
- * wrong -- the block object changes identity on every keystroke, so a `remember` keyed on it resets
- * the value and sends the caret back to offset 0 mid-word. Deriving it means there is one copy of
- * the truth and nothing to fall out of step with it.
+ * The field keeps its own [TextFieldState], and while the reader types that state is the truth:
+ * every edit the field makes -- a letter, Backspace, Delete, a word from the input method -- is
+ * applied to its state at once, and handed to the session in the same moment by
+ * [InputTransformation]. Nothing is ever applied against an older copy of the text.
  *
- * The callbacks follow the same rule, and read the block from the session *when the edit arrives*
- * rather than closing over [source] and the span from the last composition. Keys can arrive faster
- * than the editor composes -- two inside one frame on a slow device is ordinary typing -- and an
- * edit applied against the block as it was a frame ago lands in the wrong place: "ab" typed into an
- * empty block came out "aba", and Backspace straight after a key merged the paragraph instead of
- * deleting the key (`FastTypingTest`).
+ * It replaces a value-based field that was rebuilt from the session on every composition, and so
+ * applied the keys it handled itself to the text as it stood a frame ago. Keys arrive faster than
+ * that on a slow device: Backspace straight after a letter was lost, and before the callbacks read
+ * the session directly, letters doubled ("ab" typed into an empty block came out "aba";
+ * `FastTypingTest`).
+ *
+ * The session still wins when *it* changes the block -- undo, a split or merge, a change of kind --
+ * and the field is brought into line after the composition that shows it. The caret travels the
+ * same way, in whichever direction it moved: from the field to the session as the reader moves it,
+ * from the session to the field when something else places it.
  */
 @Composable
 internal fun RevealField(
@@ -53,36 +58,81 @@ internal fun RevealField(
     val caret = state.caret ?: return
     val requester = remember { FocusRequester() }
     val layout = remember { mutableStateOf<TextLayoutResult?>(null) }
+    val field = remember(id) { TextFieldState(source, TextRange(caret.offset.coerceIn(0, source.length))) }
+
+    // The caret offset the field and the session last agreed on, so that a caret the session moved
+    // can be told apart from one the field moved and the session has not heard about yet.
+    val agreed = remember(id) { AgreedCaret(caret.offset) }
+
+    SideEffect {
+        val placed = caret.offset.coerceIn(0, source.length)
+        if (field.text.toString() != source) {
+            field.edit {
+                replace(0, length, source)
+                selection = TextRange(placed)
+            }
+            agreed.offset = placed
+        } else if (caret.offset != agreed.offset && field.selection.start != placed) {
+            field.edit { selection = TextRange(placed) }
+            agreed.offset = placed
+        }
+    }
+
+    // The reader moving the caret within the block -- arrows, a click, a drag -- reaches the
+    // session here. Text edits carry their own caret, through the input transformation below.
+    LaunchedEffect(field) {
+        snapshotFlow { field.selection.start }.collect { at -> agreed.offset = state.caretTo(id, at) ?: at }
+    }
 
     BasicTextField(
-        value = TextFieldValue(source, TextRange(caret.offset.coerceIn(0, source.length))),
-        onValueChange = { edited ->
-            val block = state.blockOf(id)
-            val span = block?.source
-            if (span != null && edited.text != state.sourceOf(block)) {
-                state.replace(span, edited.text, edited.selection.start)
-            } else {
-                state.place(caret.copy(offset = edited.selection.start))
-            }
-        },
-        onTextLayout = { layout.value = it },
+        state = field,
+        inputTransformation =
+            InputTransformation {
+                val block = state.blockOf(id)
+                val span = block?.source ?: return@InputTransformation
+                val edited = toString()
+                if (edited != state.sourceOf(block)) {
+                    state.replace(span, edited, selection.start)
+                    agreed.offset = selection.start
+                }
+            },
+        onTextLayout = { result -> layout.value = result() },
         textStyle = style,
-        visualTransformation =
-            if (softWrapped) ReflowNewlines(LocalPalette.current.muted) else VisualTransformation.None,
+        outputTransformation = if (softWrapped) ReflowNewlines(LocalPalette.current.muted) else null,
         modifier =
             modifier
                 .fillMaxWidth()
                 .focusRequester(requester)
                 .onPreviewKeyEvent { event ->
-                    val now = state.caret?.takeIf { it.block == id } ?: caret
-                    val length = state.blockOf(id)?.let(state::sourceOf)?.length ?: source.length
-                    state.handle(event, now.offset, length, layout.value)
+                    // The field's own caret, which is never behind: the session may not yet have
+                    // heard about a move the reader made this frame.
+                    val at = field.selection.start
+                    state.caretTo(id, at)
+                    state.handle(event, at, field.text.length, layout.value)
                 },
     )
 
     // The field replaces the preview only once focus has already moved here, so it has to claim the
     // caret itself. Without this a click selects the block and then types nowhere.
     LaunchedEffect(id) { requester.requestFocus() }
+}
+
+/** A caret offset, held across compositions without being state that recomposes anything. */
+private class AgreedCaret(
+    var offset: Int,
+)
+
+/**
+ * Moves the session's caret to [offset] in [block], if the caret is in that block and somewhere
+ * else in it. Returns the offset it is now at, or null if the caret is in another block.
+ */
+private fun EditorState.caretTo(
+    block: BlockId,
+    offset: Int,
+): Int? {
+    val current = caret?.takeIf { it.block == block } ?: return null
+    if (current.offset != offset) place(current.copy(offset = offset))
+    return offset
 }
 
 /**

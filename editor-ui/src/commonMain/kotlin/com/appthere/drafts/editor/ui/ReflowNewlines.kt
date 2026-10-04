@@ -1,12 +1,9 @@
 package com.appthere.drafts.editor.ui
 
+import androidx.compose.foundation.text.input.OutputTransformation
+import androidx.compose.foundation.text.input.TextFieldBuffer
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.input.OffsetMapping
-import androidx.compose.ui.text.input.TransformedText
-import androidx.compose.ui.text.input.VisualTransformation
 
 /**
  * The glyph a soft line break is shown as in reveal state.
@@ -40,26 +37,21 @@ internal fun reflowedForDisplay(source: String): String = source.replace('\n', R
  * rather than obeying it shows the author something true that preview does not.
  *
  * **Why it is cheap.** The substitution is one character for one character, so every offset is
- * unchanged and the mapping is the identity. That is the whole difficulty of a
- * [VisualTransformation] and the reason 4.3 rejected transforming the document as a whole:
+ * unchanged and the mapping is the identity. That is the whole difficulty of an output
+ * transformation and the reason 4.3 rejected transforming the document as a whole:
  * "offset mapping between raw and transformed text becomes intractable with hidden markup". Here
  * nothing is hidden and nothing moves, so there is no mapping to get wrong.
  */
 internal class ReflowNewlines(
     private val marker: Color,
-) : VisualTransformation {
-    override fun filter(text: AnnotatedString): TransformedText {
-        if (!text.text.contains('\n')) return TransformedText(text, OffsetMapping.Identity)
-
-        val shown =
-            buildAnnotatedString {
-                append(reflowedForDisplay(text.text))
-                text.text.forEachIndexed { index, character ->
-                    if (character == '\n') addStyle(SpanStyle(color = marker), index, index + 1)
-                }
+) : OutputTransformation {
+    override fun TextFieldBuffer.transformOutput() {
+        for (index in 0 until length) {
+            if (charAt(index) == '\n') {
+                replace(index, index + 1, RETURN_MARK.toString())
+                addStyle(SpanStyle(color = marker), index, index + 1)
             }
-
-        return TransformedText(shown, OffsetMapping.Identity)
+        }
     }
 
     override fun equals(other: Any?): Boolean = other is ReflowNewlines && other.marker == marker
