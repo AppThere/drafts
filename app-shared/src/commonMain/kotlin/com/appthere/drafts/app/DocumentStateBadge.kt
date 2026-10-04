@@ -16,10 +16,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.appthere.drafts.design.LocalPalette
+import com.appthere.drafts.design.interfaceTextStyle
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.document_state
 import com.appthere.drafts.i18n.resources.said_after
@@ -97,7 +97,7 @@ fun DocumentStateBadge(
         Dot(filled = state != DocumentState.Clean, tint = tint)
 
         if (state != DocumentState.Clean) {
-            BasicText(text = label, style = TextStyle(color = tint, fontSize = labelSize))
+            BasicText(text = label, style = interfaceTextStyle(color = tint, fontSize = labelSize))
         }
     }
 }

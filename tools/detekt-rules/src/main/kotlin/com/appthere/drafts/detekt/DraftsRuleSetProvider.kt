@@ -9,8 +9,8 @@ import io.gitlab.arturbosch.detekt.api.RuleSetProvider
  * stock ruleset cannot express.
  *
  * Three of these exist because detekt 1.23.8 has no equivalent rule at all: file length, and the
- * separate composable thresholds from 2.1. The other five are the project-specific antipatterns
- * named in 4.1, 4.2 and 4.4.
+ * separate composable thresholds from 2.1. The other six are the project-specific antipatterns
+ * named in 4.1, 4.2 and 4.4, and one for 5.1's typeface.
  *
  * Every rule here has a test that deliberately violates it and asserts it fires. That is not
  * ceremony: a custom rule that silently never matches looks exactly like a codebase with no
@@ -31,6 +31,7 @@ class DraftsRuleSetProvider : RuleSetProvider {
                 RunBlockingOutsideTests(config),
                 HardcodedUserFacingString(config),
                 TextSizeInDp(config),
+                TextStyleOutsideDesignSystem(config),
                 DirectionalPadding(config),
                 XmlByStringConcatenation(config),
             ),

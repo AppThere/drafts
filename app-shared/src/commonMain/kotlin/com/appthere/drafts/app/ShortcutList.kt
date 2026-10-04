@@ -18,11 +18,11 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.Prose
+import com.appthere.drafts.design.interfaceTextStyle
 import com.appthere.drafts.editor.ui.EditorShortcuts
 import com.appthere.drafts.editor.ui.Shortcut
 import com.appthere.drafts.i18n.resources.Res
@@ -68,7 +68,7 @@ internal fun ShortcutList(
 
         BasicText(
             stringResource(Res.string.shortcuts_on_a_mac),
-            style = TextStyle(color = palette.muted, fontSize = labelSize),
+            style = interfaceTextStyle(color = palette.muted, fontSize = labelSize),
         )
 
         ShortcutSection(stringResource(Res.string.shortcuts_writing), EditorShortcuts.all)
@@ -86,7 +86,7 @@ private fun ShortcutSection(
     Column(verticalArrangement = Arrangement.spacedBy(lineGap)) {
         BasicText(
             text = title,
-            style = TextStyle(color = palette.ink, fontSize = labelSize, fontWeight = Prose.H5.weight),
+            style = interfaceTextStyle(color = palette.ink, fontSize = labelSize, fontWeight = Prose.H5.weight),
             modifier = Modifier.semantics { heading() },
         )
         shortcuts.forEach { shortcut ->
@@ -102,12 +102,12 @@ private fun ShortcutSection(
             ) {
                 BasicText(
                     text = keys,
-                    style = TextStyle(color = palette.ink, fontSize = labelSize),
+                    style = interfaceTextStyle(color = palette.ink, fontSize = labelSize),
                     modifier = Modifier.widthIn(min = keysWidth),
                 )
                 BasicText(
                     text = action,
-                    style = TextStyle(color = palette.muted, fontSize = labelSize),
+                    style = interfaceTextStyle(color = palette.muted, fontSize = labelSize),
                     modifier = Modifier.weight(1f),
                 )
             }

@@ -307,6 +307,21 @@ drafts:
   TextSizeInDp:
     active: true
 
+  # 5.1: text set in the bundled typeface. A bare TextStyle names no font family and falls back
+  # to the platform's default face. Only :design-system builds one -- proseStyleOf for the document
+  # and interfaceTextStyle for the interface -- so it is excluded, as are tests, which style text
+  # only to measure it.
+  TextStyleOutsideDesignSystem:
+    active: true
+    excludes:
+      - '**/design-system/**'
+      - '**/test/**'
+      - '**/commonTest/**'
+      - '**/jvmTest/**'
+      - '**/androidUnitTest/**'
+      - '**/androidInstrumentedTest/**'
+      - '**/iosTest/**'
+
   # 4.4: left/right padding instead of start/end.
   DirectionalPadding:
     active: true

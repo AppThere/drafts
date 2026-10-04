@@ -27,7 +27,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -41,6 +40,7 @@ import com.appthere.drafts.design.Palettes
 import com.appthere.drafts.design.Prose
 import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.design.Theme
+import com.appthere.drafts.design.interfaceTextStyle
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.body_weight
 import com.appthere.drafts.i18n.resources.decimal_separator
@@ -448,10 +448,10 @@ private fun format(value: Float): String {
 
 @Composable
 private fun heading(palette: Palette) =
-    TextStyle(color = palette.ink, fontSize = headingSize, fontWeight = Prose.H4.weight)
+    interfaceTextStyle(color = palette.ink, fontSize = headingSize, fontWeight = Prose.H4.weight)
 
 @Composable
-private fun body(palette: Palette) = TextStyle(color = palette.ink, fontSize = labelSize)
+private fun body(palette: Palette) = interfaceTextStyle(color = palette.ink, fontSize = labelSize)
 
 /**
  * The panel's widths, in multiples of its own label size.

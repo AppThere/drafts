@@ -16,12 +16,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.Prose
+import com.appthere.drafts.design.interfaceTextStyle
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.cancel
 import com.appthere.drafts.i18n.resources.conflict
@@ -71,7 +71,7 @@ fun ConflictDialog(
     ) {
         BasicText(
             text = refusal,
-            style = TextStyle(color = palette.ink, fontSize = messageSize, fontWeight = Prose.H5.weight),
+            style = interfaceTextStyle(color = palette.ink, fontSize = messageSize, fontWeight = Prose.H5.weight),
         )
 
         // Wraps rather than overflowing: three answers do not fit one line at 200% text (10.2).
@@ -101,7 +101,7 @@ private fun Choice(
 
     BasicText(
         text = label,
-        style = TextStyle(color = palette.ink, fontSize = labelSize, textAlign = TextAlign.Center),
+        style = interfaceTextStyle(color = palette.ink, fontSize = labelSize, textAlign = TextAlign.Center),
         modifier =
             Modifier
                 .sizeIn(minWidth = target, minHeight = target)

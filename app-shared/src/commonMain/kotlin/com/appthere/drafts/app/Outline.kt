@@ -19,12 +19,12 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.Prose
+import com.appthere.drafts.design.interfaceTextStyle
 import com.appthere.drafts.editor.ui.OutlineEntry
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.block_heading_level
@@ -74,7 +74,7 @@ internal fun Outline(
         if (entries.isEmpty()) {
             BasicText(
                 text = stringResource(Res.string.outline_no_headings),
-                style = TextStyle(color = palette.muted, fontSize = labelSize),
+                style = interfaceTextStyle(color = palette.muted, fontSize = labelSize),
             )
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(rowGap)) {
@@ -107,7 +107,7 @@ private fun Entry(
     BasicText(
         text = words,
         style =
-            TextStyle(
+            interfaceTextStyle(
                 color = if (entry.text.isEmpty()) palette.muted else palette.ink,
                 fontSize = labelSize,
                 fontWeight = if (entry.level == 1) Prose.H5.weight else null,

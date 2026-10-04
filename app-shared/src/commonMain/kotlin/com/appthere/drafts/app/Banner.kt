@@ -17,11 +17,11 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.appthere.drafts.design.LocalPalette
+import com.appthere.drafts.design.interfaceTextStyle
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.close
 import com.appthere.drafts.i18n.resources.could_not_save
@@ -67,7 +67,7 @@ private fun Banner(
     ) {
         BasicText(
             text = message,
-            style = TextStyle(color = palette.ink, fontSize = messageSize),
+            style = interfaceTextStyle(color = palette.ink, fontSize = messageSize),
             modifier = Modifier.widthIn(max = messageWidth),
         )
 
@@ -151,7 +151,7 @@ private fun Choice(
 
     BasicText(
         text = label,
-        style = TextStyle(color = palette.ink, fontSize = labelSize, textAlign = TextAlign.Center),
+        style = interfaceTextStyle(color = palette.ink, fontSize = labelSize, textAlign = TextAlign.Center),
         modifier =
             Modifier
                 .sizeIn(minWidth = target, minHeight = target)

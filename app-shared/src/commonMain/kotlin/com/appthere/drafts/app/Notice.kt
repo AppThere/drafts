@@ -8,9 +8,9 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import com.appthere.drafts.design.LocalPalette
+import com.appthere.drafts.design.interfaceTextStyle
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.could_not_read
 import com.appthere.drafts.i18n.resources.file_gone_nothing_kept
@@ -40,8 +40,8 @@ fun Notice(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(noticeGap),
         ) {
-            BasicText(text = message, style = TextStyle(color = palette.ink))
-            name?.let { BasicText(text = it, style = TextStyle(color = palette.muted)) }
+            BasicText(text = message, style = interfaceTextStyle(color = palette.ink))
+            name?.let { BasicText(text = it, style = interfaceTextStyle(color = palette.muted)) }
         }
     }
 }

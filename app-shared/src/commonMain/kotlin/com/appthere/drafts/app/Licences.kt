@@ -21,8 +21,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -30,6 +28,7 @@ import com.appthere.drafts.design.BundledLicence
 import com.appthere.drafts.design.BundledLicences
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.Prose
+import com.appthere.drafts.design.interfaceTextStyle
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.licences
 import org.jetbrains.compose.resources.stringResource
@@ -90,15 +89,15 @@ private fun LicenceText(licence: BundledLicence) {
     Column(verticalArrangement = Arrangement.spacedBy(lineGap)) {
         BasicText(
             text = licence.name,
-            style = TextStyle(color = palette.ink, fontSize = labelSize, fontWeight = Prose.H5.weight),
+            style = interfaceTextStyle(color = palette.ink, fontSize = labelSize, fontWeight = Prose.H5.weight),
         )
         BasicText(
             text = text,
             style =
-                TextStyle(
+                interfaceTextStyle(
                     color = palette.muted,
                     fontSize = licenceSize,
-                    fontFamily = FontFamily.Monospace,
+                    monospace = true,
                 ),
         )
     }

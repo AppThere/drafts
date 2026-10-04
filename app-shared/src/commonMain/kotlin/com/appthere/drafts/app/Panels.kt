@@ -26,13 +26,13 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.Lucide
 import com.appthere.drafts.design.Prose
+import com.appthere.drafts.design.interfaceTextStyle
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.close
 import com.appthere.drafts.i18n.resources.open_reader_controls
@@ -193,7 +193,7 @@ internal fun PanelHeader(
     Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier.fillMaxWidth()) {
         BasicText(
             text = title,
-            style = TextStyle(color = palette.ink, fontSize = headingSize, fontWeight = Prose.H4.weight),
+            style = interfaceTextStyle(color = palette.ink, fontSize = headingSize, fontWeight = Prose.H4.weight),
             modifier = Modifier.weight(1f),
         )
         PanelButton(
@@ -241,7 +241,7 @@ fun PanelLink(
 
     BasicText(
         text = text,
-        style = TextStyle(color = palette.accent, fontSize = labelSize),
+        style = interfaceTextStyle(color = palette.accent, fontSize = labelSize),
         modifier =
             modifier
                 .sizeIn(minHeight = target)
@@ -267,7 +267,7 @@ internal fun PanelButton(
 
     BasicText(
         text = text,
-        style = TextStyle(color = palette.ink, fontSize = labelSize, textAlign = TextAlign.Center),
+        style = interfaceTextStyle(color = palette.ink, fontSize = labelSize, textAlign = TextAlign.Center),
         modifier =
             modifier
                 .sizeIn(minWidth = target, minHeight = target)

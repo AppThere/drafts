@@ -323,3 +323,40 @@ class XmlByStringConcatenationTest {
         assertEquals(0, findings.size, "A comparison is not markup")
     }
 }
+
+class TextStyleOutsideDesignSystemTest {
+    @Test
+    fun `reports a TextStyle built outside the design system`() {
+        val code =
+            """
+            val style = TextStyle(color = Color.Black, fontSize = 14.sp)
+            """.trimIndent()
+
+        val findings = TextStyleOutsideDesignSystem(Config.empty).lint(code)
+
+        assertEquals(1, findings.size, "A bare TextStyle must be reported")
+        assertTrue(findings.single().message.contains("interfaceTextStyle"), "The message should name the fix")
+    }
+
+    @Test
+    fun `does not report the design system's own style`() {
+        val code =
+            """
+            val style = interfaceTextStyle(color = Color.Black, fontSize = 14.sp)
+            """.trimIndent()
+
+        assertEquals(0, TextStyleOutsideDesignSystem(Config.empty).lint(code).size)
+    }
+
+    @Test
+    fun `does not report copying a style or reading the default`() {
+        // Neither builds a style from nothing: a copy keeps the family of the style it came from.
+        val code =
+            """
+            val a = style.copy(textAlign = TextAlign.Center)
+            val b = TextStyle.Default
+            """.trimIndent()
+
+        assertEquals(0, TextStyleOutsideDesignSystem(Config.empty).lint(code).size)
+    }
+}
