@@ -76,7 +76,9 @@ fun DocumentSession.delete(
 /** Everything, from the first character of the first block to the last of the last. */
 fun DocumentSession.selectAll(): Selection? {
     val first = blocks.firstOrNull() ?: return null
-    val last = blocks.last()
+    // To the last block with words in it. A room after it (`roomsIn`) is blank lines, and copying
+    // "all of it" should not carry the document's trailing line breaks along.
+    val last = blocks.lastOrNull { (it.block.source?.length ?: 0) > 0 } ?: blocks.last()
     return Selection(
         anchor = Caret(first.id, 0),
         focus = Caret(last.id, last.block.source?.length ?: 0),

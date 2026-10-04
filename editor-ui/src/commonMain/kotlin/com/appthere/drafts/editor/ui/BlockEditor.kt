@@ -16,11 +16,8 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicText
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,28 +29,19 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.isCtrlPressed
-import androidx.compose.ui.input.key.isMetaPressed
-import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.ClipboardManager
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.appthere.drafts.core.model.Block
 import com.appthere.drafts.design.FocusMode
 import com.appthere.drafts.design.LocalMotion
 import com.appthere.drafts.design.LocalPalette
@@ -63,7 +51,6 @@ import com.appthere.drafts.design.ProseRole
 import com.appthere.drafts.design.proseStyleOf
 import com.appthere.drafts.editor.engine.BlockId
 import com.appthere.drafts.editor.engine.Caret
-import com.appthere.drafts.editor.engine.EditorBlock
 
 /**
  * The document, as a vertical list of blocks.
@@ -107,23 +94,7 @@ fun BlockEditor(
         val focused = state.caret?.block
         val fade = rememberRevealFade(focused, LocalMotion.current.revealMillis)
 
-        // 12: "**Typewriter scrolling** as an option: keep the caret at a fixed vertical position."
-        //
-        // Keyed on the block rather than the offset, so it settles when the caret crosses into
-        // another block rather than fighting the reader for the scroll position on every keystroke
-        // within one. The consequence is that it is the *block* that is held at the line, not the
-        // caret inside it -- exact caret placement needs the text layout of the focused field,
-        // which lives a composable below this one. A paragraph is short enough that the difference
-        // is small; a forty-line one, it is not, and this is the honest first cut.
-        LaunchedEffect(focused, typewriter, scroll) {
-            if (!typewriter || focused == null) return@LaunchedEffect
-
-            val index = state.blocks.indexOfFirst { it.id == focused }
-            val viewport = scroll.layoutInfo.viewportSize.height
-            if (index >= 0 && viewport > 0) {
-                scroll.scrollToItem(index, -(viewport * TYPEWRITER_LINE).toInt())
-            }
-        }
+        FollowCaret(state, scroll, focused, typewriter)
 
         // 10.1's structural announcements, beside the list rather than in it: the list's rows come
         // and go as they scroll, and the thing speaking must not.
@@ -310,125 +281,6 @@ private fun collapsedSpace(
 }
 
 /**
- * Reveal: the raw source, markup visible, in the block's own type.
- *
- * The field is *controlled*: its value is rebuilt from the session and the caret on every
- * recomposition rather than held in local state. Local state was the obvious first shape and it is
- * wrong -- the block object changes identity on every keystroke, so a `remember` keyed on it resets
- * the value and sends the caret back to offset 0 mid-word. Deriving it means there is one copy of
- * the truth and nothing to fall out of step with it.
- */
-@Composable
-private fun RevealField(
-    state: EditorState,
-    id: BlockId,
-    source: String,
-    style: TextStyle,
-    softWrapped: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    val caret = state.caret ?: return
-    val span = state.blockOf(id)?.source
-    val requester = remember { FocusRequester() }
-    val layout = remember { mutableStateOf<TextLayoutResult?>(null) }
-
-    BasicTextField(
-        value = TextFieldValue(source, TextRange(caret.offset.coerceIn(0, source.length))),
-        onValueChange = { edited ->
-            if (span != null && edited.text != source) {
-                state.replace(span, edited.text, edited.selection.start)
-            } else {
-                state.place(caret.copy(offset = edited.selection.start))
-            }
-        },
-        onTextLayout = { layout.value = it },
-        textStyle = style,
-        visualTransformation =
-            if (softWrapped) ReflowNewlines(LocalPalette.current.muted) else VisualTransformation.None,
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .focusRequester(requester)
-                .onPreviewKeyEvent { event ->
-                    state.handle(event, caret.offset, source.length, layout.value)
-                },
-    )
-
-    // The field replaces the preview only once focus has already moved here, so it has to claim the
-    // caret itself. Without this a click selects the block and then types nowhere.
-    LaunchedEffect(id) { requester.requestFocus() }
-}
-
-/**
- * The keys that reach outside the block, which the field cannot handle for itself.
- *
- * 4.3 names them: "Up-arrow on the first line of a block, down-arrow on the last, Home/End, and
- * backspace at offset 0 (which merges blocks) all require the engine to move focus and place the
- * caret at the correct offset in the neighbour."
- *
- * Every branch returns false unless it actually did something, which hands the key straight back to
- * the field. That is what leaves ordinary movement *inside* a block completely untouched -- the
- * common case by a wide margin, and the one where interference would be most obvious.
- *
- * Arriving in a neighbour puts the caret at the near edge of it: the end when coming from below,
- * the start when coming from above. Preserving the horizontal position across the jump, as a
- * single-field editor does, needs the target block's layout before it has been composed, and is
- * left for the real navigation work in Phase 4.
- */
-private fun EditorState.handle(
-    event: KeyEvent,
-    offset: Int,
-    length: Int,
-    layout: TextLayoutResult?,
-): Boolean =
-    when {
-        event.type != KeyEventType.KeyDown -> {
-            false
-        }
-
-        event.key == Key.Enter -> {
-            split()
-            true
-        }
-
-        // Only at offset 0, and only when there is something above: everywhere else, and at the top
-        // of the document, Backspace is the field's own.
-        event.key == Key.Backspace -> {
-            offset == 0 && mergeWithPrevious()
-        }
-
-        else -> {
-            moveAcrossBoundary(event, offset, length, layout)
-        }
-    }
-
-/**
- * The four arrow keys, each of which leaves the block only from the edge it points at.
- *
- * Up and Down need the layout, because "the first line" of a block is a question about how the text
- * wrapped, not about offsets. A block that has not been laid out yet is treated as a single line,
- * which is the right guess: it is the state a one-line block is in on its first frame.
- */
-private fun EditorState.moveAcrossBoundary(
-    event: KeyEvent,
-    offset: Int,
-    length: Int,
-    layout: TextLayoutResult?,
-): Boolean {
-    val line = layout?.getLineForOffset(offset)
-    val onFirstLine = line == null || line == 0
-    val onLastLine = layout == null || line == layout.lineCount - 1
-
-    return when (event.key) {
-        Key.DirectionLeft -> offset == 0 && moveToPrevious()
-        Key.DirectionRight -> offset == length && moveToNext()
-        Key.DirectionUp -> onFirstLine && moveToPrevious()
-        Key.DirectionDown -> onLastLine && moveToNext()
-        else -> false
-    }
-}
-
-/**
  * Preview: formatted, markup hidden, same metrics as reveal.
  *
  * `BasicText` with an [AnnotatedString], which is what 4.3 specifies. An earlier version used a
@@ -567,12 +419,3 @@ private fun emphasisOf(
  * palette had spare rather than by what looks calm on one theme.
  */
 private const val DIMMED_ALPHA = 0.35f
-
-/**
- * Where down the window the typewriter line sits, as a fraction of the viewport.
- *
- * Above the middle rather than on it. What a writer needs to see is the sentence they have just
- * finished and the shape of the paragraph it belongs to, which is above the caret; below it there
- * is nothing yet.
- */
-private const val TYPEWRITER_LINE = 0.4f

@@ -143,14 +143,26 @@ class DistractionFreeTest {
 
     @Test
     fun `the document does not move under the reader by default`() {
-        // Typewriter scrolling off. Placing the caret in a block far down must not scroll the
-        // document -- the reader put it there deliberately and the view should stay where it was.
+        // Typewriter scrolling off. Placing the caret in a block far down the window must not
+        // scroll the document -- the reader put it there deliberately and the view should stay
+        // where it was.
+        //
+        // On screen, which is where a reader can put it. This used to place it at TARGET, off the
+        // bottom of the window, and assert the document stayed put -- which left the caret in a
+        // block with no field and the keyboard with nowhere to go (`CaretInViewTest`). A caret off
+        // screen is brought into view whatever this setting says.
         runSkikoComposeUiTest(size = SIZE) {
             val scroll = LazyListState()
             val state = show(ReaderSettings(), scroll)
             waitForIdle()
+            val lowestOnScreen =
+                scroll.layoutInfo.visibleItemsInfo
+                    .last {
+                        it.offset + it.size <=
+                            scroll.layoutInfo.viewportEndOffset
+                    }.index
 
-            state.place(Caret(state.blocks[TARGET].id, 0))
+            state.place(Caret(state.blocks[lowestOnScreen].id, 0))
             waitForIdle()
 
             assertEquals(0, scroll.firstVisibleItemIndex, "The document scrolled without being asked")

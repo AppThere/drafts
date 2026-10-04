@@ -4,7 +4,6 @@ import com.appthere.drafts.core.model.Block
 import com.appthere.drafts.core.model.Paragraph
 import com.appthere.drafts.core.model.SourceSpan
 import com.appthere.drafts.core.parse.markdown.MarkdownDocumentParser
-import kotlin.jvm.JvmName
 
 /**
  * What one edit cost, so the gate can be asserted rather than observed.
@@ -46,7 +45,18 @@ class DocumentSession(
     var text: String = initialText
         private set
 
-    var blocks: List<EditorBlock> = adopted(parser.parse(initialText).blocks)
+    /** The blocks the parser found, which are what a reparse window is made of. */
+    private var parsed: List<EditorBlock> = parser.parse(initialText).blocks.map { EditorBlock(ids.next(), it) }
+
+    /** The empty paragraphs in the blank lines between them; see [roomsIn]. */
+    private var rooms: List<EditorBlock> = roomsFor(emptyList(), inheriting = null)
+
+    /**
+     * Every block the editor shows, in document order: [parsed] and [rooms] together.
+     *
+     * Never none: a document with no text has a room at the start, which is somewhere to type.
+     */
+    var blocks: List<EditorBlock> = merged()
         private set
 
     /**
@@ -68,24 +78,31 @@ class DocumentSession(
         val delta = replacement.length - range.length
         val updated = text.replaceRange(range.start.value, range.endExclusive.value, replacement)
 
-        val window = dirtyWindow(range)
-        val before = blocks.subList(0, window.first)
-        val after = blocks.subList(window.last + 1, blocks.size)
+        // Typing into a room: the paragraph the parser now finds there takes the room's identity,
+        // so the field the reader is typing into is not destroyed under them after one character.
+        val inheriting = rooms.firstOrNull { range.length == 0 && it.block.source?.start == range.start }?.id
 
-        // Captured before `blocks` is reassigned. An edit that merges two blocks into one leaves
+        val window = dirtyWindow(range)
+        val before = if (window.isEmpty()) emptyList() else parsed.subList(0, window.first)
+        val after = if (window.isEmpty()) emptyList() else parsed.subList(window.last + 1, parsed.size)
+
+        // Captured before `parsed` is reassigned. An edit that merges two blocks into one leaves
         // the new list shorter than the window, so reading it afterwards indexes off the end --
         // which is exactly what the list-joining test caught.
-        val windowIds = window.map { blocks[it].id }.toSet()
+        val windowIds = window.map { parsed[it].id }.toSet()
 
-        val reparseSpan = reparseSpan(window, delta, updated.length)
+        val reparseSpan = reparseSpan(window, range, replacement.length, delta, updated.length)
         val reparsed = parser.parse(updated.substring(reparseSpan.start.value, reparseSpan.endExclusive.value))
 
         val replacement0 =
             reparsed.blocks.map { it.shiftedBy(reparseSpan.start.value) }
-        val reconciled = reconcile(blocks.subList(window.first, window.last + 1), replacement0)
+        val edited = SourceSpan.of(range.start.value, range.start.value + replacement.length)
+        val reconciled = reconcile(window.map { parsed[it] }, replacement0, edited, inheriting)
 
         text = updated
-        blocks = adopted(before + reconciled + after.map { EditorBlock(it.id, it.block.shiftedBy(delta)) })
+        parsed = before + reconciled + after.map { EditorBlock(it.id, it.block.shiftedBy(delta)) }
+        rooms = roomsFor(rooms.shiftedPast(range, delta), inheriting)
+        blocks = merged()
 
         return EditOutcome(
             reparsed = reparseSpan,
@@ -103,12 +120,19 @@ class DocumentSession(
      * that paragraph alone.
      */
     private fun dirtyWindow(range: SourceSpan): IntRange {
-        val touched = blocks.indices.filter { index -> blocks[index].touches(range) }
+        if (parsed.isEmpty()) return IntRange.EMPTY
 
-        val first = (touched.minOrNull() ?: blocks.indices.lastOrNull() ?: 0) - 1
-        val last = (touched.maxOrNull() ?: blocks.indices.lastOrNull() ?: 0) + 1
+        val touched = parsed.indices.filter { index -> parsed[index].touches(range) }
 
-        return first.coerceAtLeast(0)..last.coerceAtMost(blocks.lastIndex.coerceAtLeast(0))
+        // An edit that touches no block is in a gap -- typing into a room. Its window is the blocks
+        // either side of the gap, which is where whatever it typed will join or split.
+        val above = parsed.indexOfLast { it.endsAtOrBefore(range.start.value) }.takeIf { it >= 0 }
+        val below = parsed.indexOfFirst { it.startsAtOrAfter(range.endExclusive.value) }.takeIf { it >= 0 }
+
+        val first = (touched.minOrNull() ?: above ?: below ?: parsed.lastIndex) - 1
+        val last = (touched.maxOrNull() ?: below ?: above ?: parsed.lastIndex) + 1
+
+        return first.coerceAtLeast(0)..last.coerceAtMost(parsed.lastIndex)
     }
 
     /**
@@ -120,23 +144,40 @@ class DocumentSession(
      */
     private fun reparseSpan(
         window: IntRange,
+        range: SourceSpan,
+        inserted: Int,
         delta: Int,
         newLength: Int,
     ): SourceSpan {
-        val start =
-            blocks[window.first]
-                .block.source
-                ?.start
-                ?.value ?: 0
-        val oldEnd =
-            blocks[window.last]
-                .block.source
-                ?.endExclusive
-                ?.value ?: text.length
+        if (window.isEmpty()) return SourceSpan.of(0, newLength)
 
+        // From the start of the document, or the end, when the window reaches it: the text beyond
+        // the first or last block is blank lines, cheap to read, and where a room's new words go.
+        val start =
+            if (window.first == 0) {
+                0
+            } else {
+                parsed[window.first]
+                    .block.source
+                    ?.start
+                    ?.value ?: 0
+            }
+        val end =
+            if (window.last == parsed.lastIndex) {
+                newLength
+            } else {
+                (
+                    parsed[window.last]
+                        .block.source
+                        ?.endExclusive
+                        ?.value ?: text.length
+                ) + delta
+            }
+
+        // Wide enough for the edit itself, which typing into a gap can put outside both blocks.
         return SourceSpan.of(
-            start.coerceIn(0, newLength),
-            (oldEnd + delta).coerceIn(start, newLength),
+            minOf(start, range.start.value).coerceIn(0, newLength),
+            maxOf(end, range.start.value + inserted).coerceIn(start.coerceIn(0, newLength), newLength),
         )
     }
 
@@ -151,35 +192,87 @@ class DocumentSession(
     private fun reconcile(
         old: List<EditorBlock>,
         rebuilt: List<com.appthere.drafts.core.model.Block>,
-    ): List<EditorBlock> =
-        rebuilt.mapIndexed { index, block ->
-            EditorBlock(id = old.getOrNull(index)?.id ?: ids.next(), block = block)
+        edited: SourceSpan,
+        inheriting: BlockId?,
+    ): List<EditorBlock> {
+        // Blocks wholly before the edit match from the front, and blocks wholly after it from the
+        // back, so a split or a join does not shuffle the identities of its neighbours. What is
+        // left in the middle -- the block the edit is in -- matches position by position.
+        val front = rebuilt.takeWhile { it.endsAtOrBefore(edited.start.value) }.size.coerceAtMost(old.size)
+        val back =
+            rebuilt
+                .takeLastWhile { it.startsAtOrAfter(edited.endExclusive.value) }
+                .size
+                .coerceAtMost(old.size - front)
+                .coerceAtMost(rebuilt.size - front)
+
+        return rebuilt.mapIndexed { index, block ->
+            val fromBack = rebuilt.size - index
+            val id =
+                when {
+                    inheriting != null && block.source?.start == edited.start -> inheriting
+                    index < front -> old[index].id
+                    fromBack <= back -> old[old.size - fromBack].id
+                    else -> old.getOrNull(index)?.takeIf { index < old.size - back }?.id ?: ids.next()
+                }
+            EditorBlock(id = id, block = block)
         }
+    }
 
     /**
-     * The blocks as the rest of the application sees them: never none.
+     * The rooms in the text as it now stands, keeping the identity of any that were already there.
      *
-     * A document with no text parses to no blocks, and a document with no blocks has nothing to
-     * type into -- no field, no caret, no row to tap. `appthere-drafts.md` 7.4 asks for the
-     * opposite in as many words: a new document is "ready to type into", and "nothing stands
-     * between launching the app and writing". The same state is reached by deleting everything in
-     * a document that did have words, where being unable to start again is worse.
-     *
-     * So an empty document is one empty paragraph covering the empty span at the start. [text] is
-     * untouched by this -- it is still "" -- which is what keeps 8.2's digest and the serialiser
-     * looking at exactly the bytes that are really there.
-     *
-     * It keeps its identity through the first keystroke, because [reconcile] matches by position
-     * and this block is at position zero: the paragraph the parser then produces inherits its id,
-     * so the field the reader is typing into is not destroyed under them after the first character.
+     * [previous] are the rooms from before the edit, already moved by it; one at the same offset is
+     * the same room. [inheriting] has just become a paragraph and is not a room any more.
      */
-    private fun adopted(parsed: List<Block>): List<EditorBlock> =
-        parsed
-            .ifEmpty { listOf(Paragraph(inlines = emptyList(), source = SourceSpan.of(0, 0))) }
-            .map { EditorBlock(ids.next(), it) }
+    private fun roomsFor(
+        previous: List<EditorBlock>,
+        inheriting: BlockId?,
+    ): List<EditorBlock> {
+        val kept =
+            previous.filter { it.id != inheriting }.associateBy {
+                it.block.source
+                    ?.start
+                    ?.value
+            }
 
-    @JvmName("adoptedBlocks")
-    private fun adopted(blocks: List<EditorBlock>): List<EditorBlock> = blocks.ifEmpty { adopted(emptyList<Block>()) }
+        return roomsIn(text, parsed.map { it.block }).map { at ->
+            kept[at] ?: EditorBlock(ids.next(), Paragraph(inlines = emptyList(), source = SourceSpan.of(at, at)))
+        }
+    }
+
+    /** [parsed] and [rooms] in document order. A room is never at the start of a block. */
+    private fun merged(): List<EditorBlock> =
+        (parsed + rooms).sortedBy {
+            it.block.source
+                ?.start
+                ?.value ?: 0
+        }
+
+    private fun List<EditorBlock>.shiftedPast(
+        range: SourceSpan,
+        delta: Int,
+    ): List<EditorBlock> =
+        mapNotNull { room ->
+            val at =
+                room.block.source
+                    ?.start
+                    ?.value ?: return@mapNotNull null
+            when {
+                at < range.start.value -> room
+                at >= range.endExclusive.value && range.length > 0 -> EditorBlock(room.id, room.block.shiftedBy(delta))
+                at > range.start.value -> EditorBlock(room.id, room.block.shiftedBy(delta))
+                else -> room
+            }
+        }
+
+    private fun EditorBlock.endsAtOrBefore(offset: Int): Boolean = block.endsAtOrBefore(offset)
+
+    private fun EditorBlock.startsAtOrAfter(offset: Int): Boolean = block.startsAtOrAfter(offset)
+
+    private fun Block.endsAtOrBefore(offset: Int): Boolean = source?.let { it.endExclusive.value <= offset } ?: false
+
+    private fun Block.startsAtOrAfter(offset: Int): Boolean = source?.let { it.start.value >= offset } ?: false
 
     private fun EditorBlock.touches(range: SourceSpan): Boolean {
         val span = block.source ?: return false

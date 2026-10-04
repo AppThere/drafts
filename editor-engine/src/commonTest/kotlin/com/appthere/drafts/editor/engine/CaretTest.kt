@@ -128,11 +128,28 @@ class CaretTest {
 
     @Test
     fun `merging removes however many blank lines the author left`() {
-        val session = DocumentSession("First.\n\n\n\nSecond.\n")
+        // One blank line and a stray line break: not enough for an empty paragraph (`roomsIn`), so
+        // the gap is all separator and one Backspace takes the whole of it.
+        val session = DocumentSession("First.\n\n\nSecond.\n")
         val caret = Caret(session.blocks[1].id, 0)
 
         session.mergeWithPrevious(caret, UndoHistory())
 
+        assertEquals("First.Second.\n", session.text)
+    }
+
+    @Test
+    fun `backspace takes an empty paragraph first, then merges`() {
+        // Two blank lines are an empty paragraph between the two, shown as one. Backspace at the
+        // start of the second removes the empty one, as it would in any editor, and only the next
+        // Backspace joins the paragraphs.
+        val session = DocumentSession("First.\n\n\n\nSecond.\n")
+        val history = UndoHistory()
+
+        val afterFirst = session.mergeWithPrevious(Caret(session.blocks.last().id, 0), history)
+        assertEquals("First.\n\nSecond.\n", session.text)
+
+        session.mergeWithPrevious(Caret(session.blocks.last().id, afterFirst?.offset ?: 0), history)
         assertEquals("First.Second.\n", session.text)
     }
 
