@@ -8,6 +8,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import com.appthere.drafts.core.model.Block
 import com.appthere.drafts.core.model.BlockQuote
+import com.appthere.drafts.core.model.BlockRole
 import com.appthere.drafts.core.model.CodeBlock
 import com.appthere.drafts.core.model.CodeSpan
 import com.appthere.drafts.core.model.Emphasis
@@ -18,6 +19,7 @@ import com.appthere.drafts.core.model.Inline
 import com.appthere.drafts.core.model.LineBreak
 import com.appthere.drafts.core.model.Link
 import com.appthere.drafts.core.model.ListBlock
+import com.appthere.drafts.core.model.Origin
 import com.appthere.drafts.core.model.Paragraph
 import com.appthere.drafts.core.model.RawInline
 import com.appthere.drafts.core.model.SourceSpan
@@ -47,17 +49,45 @@ import com.appthere.drafts.core.model.Underline
 internal fun previewOfBlock(
     block: Block,
     muted: Color,
+    collapseNotes: Boolean = false,
 ): BlockPreview =
     PreviewBuilder(blockStart = block.source?.start?.value ?: 0)
-        .apply { appendBlock(block, muted) }
-        .build()
+        .apply {
+            when {
+                // 4.5: a whole boneyard, collapsed, is its own delimiters around nothing.
+                collapseNotes && block.role == BlockRole.NOTE -> styled(dim(muted)) { decoration(BONEYARD_FOLDED) }
+
+                block.role in asides -> styled(dim(muted)) { appendBlock(block, muted, collapseNotes) }
+
+                else -> appendBlock(block, muted, collapseNotes)
+            }
+        }.build()
+
+/**
+ * Whether [block] holds a note or a boneyard, which [previewOfBlock] folds away when collapsing.
+ *
+ * A row that has folded something away reserves only its preview's height: 4.2's reservation of the
+ * taller state would keep the room the note took and show nothing in it.
+ */
+internal fun holdsNotes(block: Block): Boolean =
+    block.role == BlockRole.NOTE || (block as? Paragraph)?.inlines?.any(::isNote) == true
+
+private fun isNote(inline: Inline): Boolean =
+    when (inline) {
+        is RawInline -> inline.origin == Origin.FOUNTAIN_NOTE || inline.origin == Origin.FOUNTAIN_BONEYARD
+        is Emphasis -> inline.children.any(::isNote)
+        is Underline -> inline.children.any(::isNote)
+        is Strikethrough -> inline.children.any(::isNote)
+        else -> false
+    }
 
 private fun PreviewBuilder.appendBlock(
     block: Block,
     muted: Color,
+    collapseNotes: Boolean = false,
 ) {
     when (block) {
-        is Paragraph -> appendInlines(block.inlines)
+        is Paragraph -> appendInlines(block.inlines, NoteStyle(muted, collapseNotes))
         is Heading -> appendInlines(block.inlines)
         is CodeBlock -> appendCode(block, muted)
         is ListBlock -> appendList(block, muted)
@@ -178,37 +208,95 @@ private fun PreviewBuilder.appendTable(
     }
 }
 
-private fun PreviewBuilder.appendInlines(inlines: List<Inline>) {
-    inlines.forEach { appendInline(it) }
+/**
+ * How Fountain's notes are drawn in a paragraph: dimmed, and folded to their delimiters when the
+ * reader has collapsed them (4.5). Null where there are none to draw -- anything that is not a
+ * Fountain paragraph.
+ */
+private class NoteStyle(
+    val muted: Color,
+    val collapsed: Boolean,
+)
+
+private fun PreviewBuilder.appendInlines(
+    inlines: List<Inline>,
+    notes: NoteStyle? = null,
+) {
+    inlines.forEach { appendInline(it, notes) }
 }
 
-private fun PreviewBuilder.appendInline(inline: Inline) {
+private fun PreviewBuilder.appendInline(
+    inline: Inline,
+    notes: NoteStyle? = null,
+) {
     when (inline) {
-        is Text -> append(inline.value, inline.source)
+        is Text -> {
+            append(inline.value, inline.source)
+        }
 
-        is Emphasis -> styled(inline.style()) { appendInlines(inline.children) }
+        is Emphasis -> {
+            styled(inline.style()) { appendInlines(inline.children, notes) }
+        }
 
-        is Strikethrough -> styled(struck) { appendInlines(inline.children) }
+        is Strikethrough -> {
+            styled(struck) { appendInlines(inline.children, notes) }
+        }
 
         // Fountain's `_x_`, which underlines rather than italicises. The same decoration a link
         // gets, because that is what underline is -- the two are told apart by colour elsewhere.
-        is Underline -> styled(underlined) { appendInlines(inline.children) }
+        is Underline -> {
+            styled(underlined) { appendInlines(inline.children, notes) }
+        }
 
-        is CodeSpan -> styled(monospace) { append(inline.text, inline.source) }
+        is RawInline if notes != null && isNote(inline) -> {
+            appendNote(inline, notes)
+        }
 
-        is Link -> styled(linked) { appendInlines(inline.children) }
+        is CodeSpan -> {
+            styled(monospace) { append(inline.text, inline.source) }
+        }
 
-        is Image -> styled(linked) { append(inline.alt, inline.source) }
+        is Link -> {
+            styled(linked) { appendInlines(inline.children) }
+        }
+
+        is Image -> {
+            styled(linked) { append(inline.alt, inline.source) }
+        }
 
         // 4.1 lists footnote refs as superscripted. Superscript changes line metrics, so the
         // marker is styled rather than raised until the dual measurement in 4.2 lands.
-        is FootnoteRef -> styled(linked) { append(inline.label, inline.source) }
+        is FootnoteRef -> {
+            styled(linked) { append(inline.label, inline.source) }
+        }
 
         // Shortcodes are opaque. Showing the source is the honest rendering: the editor has no idea
         // what Hugo will turn it into, and pretending otherwise would be a lie in the preview.
-        is RawInline -> styled(monospace) { append(inline.text, inline.source) }
+        is RawInline -> {
+            styled(monospace) { append(inline.text, inline.source) }
+        }
 
-        is LineBreak -> append(if (inline.hard) "\n" else " ", inline.source)
+        is LineBreak -> {
+            append(if (inline.hard) "\n" else " ", inline.source)
+        }
+    }
+}
+
+/**
+ * 4.5: "Notes `[[ ]]`, Boneyard `/* */` -- Dimmed, collapsible". Collapsed, a note is its own
+ * delimiters around an ellipsis: decoration, so a click on it lands beside it and a screen reader
+ * does not read the brackets out.
+ */
+private fun PreviewBuilder.appendNote(
+    inline: RawInline,
+    notes: NoteStyle,
+) {
+    styled(dim(notes.muted)) {
+        when {
+            !notes.collapsed -> append(inline.text, inline.source)
+            inline.origin == Origin.FOUNTAIN_NOTE -> decoration(NOTE_FOLDED)
+            else -> decoration(BONEYARD_FOLDED)
+        }
     }
 }
 
@@ -231,6 +319,16 @@ private const val BULLET = "•"
 /** U+2003, wide enough to read as a column gap. */
 private const val EM_SPACE = "\u2003"
 private const val RULE = "────────"
+
+/** A collapsed note and a collapsed boneyard: Fountain's own delimiters, so a writer knows each. */
+private const val NOTE_FOLDED = "[[…]]"
+private const val BONEYARD_FOLDED = "/* … */"
+
+/**
+ * The Fountain roles that are about the script rather than in it, which 4.5 dims: a whole-block
+ * boneyard, a section and a synopsis.
+ */
+private val asides = setOf(BlockRole.NOTE, BlockRole.SECTION, BlockRole.SYNOPSIS)
 private const val QUOTE_INDENT = "│  "
 
 /** What an indented code block is indented by, per CommonMark and `BlockWriter`. */

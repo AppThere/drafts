@@ -58,6 +58,13 @@
     <string name="block_raw">HTML</string>
     <string name="block_link_reference">Link reference</string>
     <!--
+      Fountain's boneyard (text cut from the script but kept in the file) by the name
+      screenwriters know it by; and a line whose notes the reader has collapsed, said before its
+      words, since the folded marker on screen is not read out.
+    -->
+    <string name="block_boneyard">Boneyard</string>
+    <string name="block_notes_collapsed">Notes collapsed</string>
+    <!--
       5.4's marker on the second of two speeches spoken at once (Fountain's dual dialogue), shown
       beside its name where the two are stacked rather than side by side, and said before the name
       wherever they are. The screenwriter's word for it.
@@ -176,6 +183,12 @@
       10.2: following the operating system is the default, and has to be sayable.
     -->
     <string name="motion_system">Follow the system</string>
+    <!--
+      4.5's notes and boneyard in a screenplay, shown in full or collapsed to their delimiters.
+    -->
+    <string name="notes">Notes</string>
+    <string name="notes_shown">Shown</string>
+    <string name="notes_collapsed">Collapsed</string>
 
     <!--
       11.3's scene-heading words for one screenplay: the panel, opened from the reader controls

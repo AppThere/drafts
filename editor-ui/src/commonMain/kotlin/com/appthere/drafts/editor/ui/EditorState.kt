@@ -44,6 +44,8 @@ import com.appthere.drafts.editor.engine.split
 import com.appthere.drafts.editor.engine.textIn
 import com.appthere.drafts.editor.engine.undo
 import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.block_boneyard
+import com.appthere.drafts.i18n.resources.block_notes_collapsed
 import com.appthere.drafts.i18n.resources.block_simultaneous
 
 /**
@@ -130,19 +132,23 @@ class EditorState(
     internal fun rowContentOf(
         editorBlock: EditorBlock,
         muted: Color,
+        collapseNotes: Boolean = false,
     ): RowContent {
         val source = sourceOf(editorBlock.block)
         val role = settledRoleOf(editorBlock)
         val cached = contents[editorBlock.id]
+        // Only a screenplay has notes to fold, and only a block holding one changes for it.
+        val folds = collapseNotes && screenplay && holdsNotes(editorBlock.block)
 
-        if (cached != null && cached.isFor(source, muted, role)) return cached.content
+        val key = RowKey(source, muted, role, folds)
+        if (cached?.key == key) return cached.content
 
         // Bounded: only blocks that have been on screen are in here, but a long session scrolling a
         // long document would still accumulate. Dropping the lot is fine -- it rebuilds on demand.
         if (contents.size > ROW_CACHE_LIMIT) contents.clear()
 
         val prose = proseRoleOf(editorBlock.block, role)
-        val preview = previewOfBlock(editorBlock.block, muted).let { if (prose.caps) it.inCaps() else it }
+        val preview = previewOfBlock(editorBlock.block, muted, folds).let { if (prose.caps) it.inCaps() else it }
         val content =
             RowContent(
                 preview = preview,
@@ -150,9 +156,10 @@ class EditorState(
                 role = prose,
                 // A screenplay's line breaks are its own -- Fountain keeps them -- so they are obeyed.
                 softWrapped = !screenplay && editorBlock.block is Paragraph,
-                spoken = spokenOf(editorBlock.block, preview),
+                spoken = spokenOf(editorBlock.block, preview, folds),
+                folded = folds,
             )
-        contents[editorBlock.id] = CachedRow(source, muted, role, content)
+        contents[editorBlock.id] = CachedRow(key, content)
         return content
     }
 
@@ -402,53 +409,12 @@ internal data class RowContent(
     val softWrapped: Boolean,
     /** What a screen reader is told about the block beyond its text (10.1). */
     val spoken: Spoken,
+    /**
+     * Whether the preview has collapsed a note or a boneyard (4.5), which makes it shorter than the
+     * source on purpose. Such a row reserves only the preview's height; see [holdsNotes].
+     */
+    val folded: Boolean = false,
 )
-
-/**
- * 10.1's semantics for a block shown in preview: whether it is a heading, the name of any other
- * kind -- "Block quote", "Code block, Kotlin" -- and the words that follow it. Built with the rest
- * of the row, so a block that merely moved keeps the same value and is not composed again.
- *
- * The prefix is a [BlockName] rather than its words: 11.1 puts the words in resources, which are
- * read from a composition, and this is built outside one and cached across recompositions.
- */
-@Immutable
-internal data class Spoken(
-    val heading: Boolean,
-    val prefix: BlockName?,
-    val text: String,
-)
-
-/**
- * The words are the preview's without its decoration -- except for code. A code block's preview
- * shows its fences on purpose (see `appendCode`), and they map to real source, so nothing in the
- * preview can tell them from the code; read aloud they are "grave accent" three times over. The
- * code itself is the block's text, and the language is already in the prefix.
- *
- * And for the second of two speeches spoken at once, its name is said to be simultaneous: the marker
- * that says so on screen appears only where the pair is stacked, and is silent (`SimultaneousMarker`).
- */
-internal fun spokenOf(
-    block: Block,
-    preview: BlockPreview,
-): Spoken =
-    Spoken(
-        heading = block is Heading,
-        prefix =
-            if (isSimultaneous(
-                    block,
-                )
-            ) {
-                BlockName.Named(Res.string.block_simultaneous)
-            } else {
-                BlockNames.prefixOf(block)
-            },
-        text = if (block is CodeBlock) block.text.trimEnd() else preview.spoken,
-    )
-
-/** Whether [block] is the name of the second of two speeches spoken at once (5.4's dual dialogue). */
-internal fun isSimultaneous(block: Block): Boolean =
-    block.role == BlockRole.CHARACTER && block.attrs.hasClass(DUAL_DIALOGUE_CLASS)
 
 /**
  * Which role in the prose scale a block is set in.
@@ -465,20 +431,19 @@ internal fun roleOf(block: Block): ProseRole =
         else -> Prose.Body
     }
 
-/** A row's content and the things it was built from, so a change in any of them rebuilds it. */
-private class CachedRow(
+/** Everything a row's content is built from, so a change in any of them rebuilds it. */
+private data class RowKey(
     val source: String,
     val muted: Color,
     val role: BlockRole?,
+    val folded: Boolean,
+)
+
+/** A row's content and what it was built from. */
+private class CachedRow(
+    val key: RowKey,
     val content: RowContent,
-) {
-    /** Whether this row was built from exactly these, and so is still the row to show. */
-    fun isFor(
-        source: String,
-        muted: Color,
-        role: BlockRole?,
-    ): Boolean = this.source == source && this.muted == muted && this.role == role
-}
+)
 
 /** A block's role as it was when the caret arrived in it (4.5). */
 private class HeldRole(

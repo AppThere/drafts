@@ -63,6 +63,12 @@ data class ReaderSettings(
      * control that has faded is a control that has moved.
      */
     val autoHideChrome: Boolean = true,
+    /**
+     * 4.5: Fountain's notes `[[ ]]` and boneyard `/* */` are "dimmed, collapsible" in preview. Shown
+     * by default: they are the writer's own words, and hiding them unasked would look like losing
+     * them. Collapsed, each is a dimmed marker in its own delimiters until the caret goes into it.
+     */
+    val collapseNotes: Boolean = false,
 ) {
     /** The same settings with every control held to the range 5.5 allows. */
     fun clamped(): ReaderSettings =

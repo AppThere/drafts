@@ -26,6 +26,8 @@ import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.design.Theme
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.licences
+import com.appthere.drafts.i18n.resources.notes
+import com.appthere.drafts.i18n.resources.notes_collapsed
 import com.appthere.drafts.i18n.resources.theme_dark
 import com.appthere.drafts.i18n.resources.theme_high_contrast
 import com.appthere.drafts.i18n.resources.theme_sepia
@@ -101,6 +103,32 @@ class ReaderControlsTest {
             onNodeWithContentDescription("Theme, ${words(Res.string.theme_dark)}").performClick()
 
             assertEquals(Theme.Fixed(Palettes.Dark), settings.theme)
+        }
+
+    @Test
+    fun `a screenplay's notes can be collapsed`() =
+        runSkikoComposeUiTest(size = Size(WIDTH, HEIGHT)) {
+            // 4.5: "Notes, Boneyard -- Dimmed, collapsible".
+            var settings by mutableStateOf(ReaderSettings())
+            setContent {
+                DraftsTheme(settings) { ReaderControls(settings, onChange = { settings = it }, screenplay = true) }
+            }
+
+            onNodeWithContentDescription(
+                "${words(Res.string.notes)}, ${words(Res.string.notes_collapsed)}",
+            ).performClick()
+
+            assertTrue(settings.collapseNotes)
+        }
+
+    @Test
+    fun `prose has no notes to collapse`() =
+        runSkikoComposeUiTest(size = Size(WIDTH, HEIGHT)) {
+            val settings = ReaderSettings()
+            setContent { DraftsTheme(settings) { ReaderControls(settings, onChange = {}) } }
+
+            onNodeWithContentDescription("${words(Res.string.notes)}, ${words(Res.string.notes_collapsed)}")
+                .assertDoesNotExist()
         }
 
     @Test

@@ -58,6 +58,9 @@ import com.appthere.drafts.i18n.resources.motion
 import com.appthere.drafts.i18n.resources.motion_full
 import com.appthere.drafts.i18n.resources.motion_reduced
 import com.appthere.drafts.i18n.resources.motion_system
+import com.appthere.drafts.i18n.resources.notes
+import com.appthere.drafts.i18n.resources.notes_collapsed
+import com.appthere.drafts.i18n.resources.notes_shown
 import com.appthere.drafts.i18n.resources.paragraph_spacing
 import com.appthere.drafts.i18n.resources.reader_controls
 import com.appthere.drafts.i18n.resources.said_after
@@ -99,6 +102,7 @@ fun ReaderControls(
     modifier: Modifier = Modifier,
     unsaved: Boolean = false,
     onClose: (() -> Unit)? = null,
+    screenplay: Boolean = false,
     links: @Composable () -> Unit = {},
 ) {
     val palette = LocalPalette.current
@@ -137,6 +141,9 @@ fun ReaderControls(
         FocusChoice(settings, onChange)
 
         MotionChoice(settings, onChange)
+
+        // 4.5's collapsible notes, which only a screenplay has.
+        if (screenplay) NotesChoice(settings, onChange)
 
         // Ways on to the other panels: 5.1's licences, which have to be reachable, and 10.2's
         // shortcut list. Here rather than in a menu the app does not have yet, and the caller's to
@@ -271,6 +278,27 @@ private fun FocusChoice(
             ),
         selected = settings.focusMode,
         onSelect = { mode -> onChange(settings.copy(focusMode = mode)) },
+    )
+}
+
+/**
+ * 4.5: Fountain's notes and boneyard are "dimmed, collapsible". Collapsed, each shows as its own
+ * delimiters until the caret goes into it.
+ */
+@Composable
+private fun NotesChoice(
+    settings: ReaderSettings,
+    onChange: (ReaderSettings) -> Unit,
+) {
+    Choice(
+        label = stringResource(Res.string.notes),
+        options =
+            listOf(
+                Option(false, stringResource(Res.string.notes_shown)),
+                Option(true, stringResource(Res.string.notes_collapsed)),
+            ),
+        selected = settings.collapseNotes,
+        onSelect = { collapsed -> onChange(settings.copy(collapseNotes = collapsed)) },
     )
 }
 

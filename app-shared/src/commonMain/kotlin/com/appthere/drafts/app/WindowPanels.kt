@@ -93,6 +93,7 @@ internal fun BoxScope.WindowPanels(
             unsaved = settings.unsaved,
             modifier = panelPlacement(Alignment.TopEnd),
             onClose = refocused(panels::closeControls),
+            screenplay = keywords != null,
         ) {
             // 7.1's other windows, here because 12 allows no other chrome to put them in. The
             // panel closes first: the reader is going to another window, not staying in this one.

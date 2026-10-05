@@ -49,6 +49,8 @@ internal data class ReaderSettingsRecord(
     val typewriterScrolling: Boolean,
     val focusMode: String,
     val autoHideChrome: Boolean,
+    /** Defaulted: it arrived after files were already being written. */
+    val collapseNotes: Boolean = false,
 )
 
 /**
@@ -205,6 +207,7 @@ private fun ReaderSettings.toRecord() =
         typewriterScrolling = typewriterScrolling,
         focusMode = focusMode.name,
         autoHideChrome = autoHideChrome,
+        collapseNotes = collapseNotes,
     )
 
 /**
@@ -243,4 +246,5 @@ private fun ReaderSettingsRecord.toSettings(): ReaderSettings =
         typewriterScrolling = typewriterScrolling,
         focusMode = FocusMode.entries.firstOrNull { it.name == focusMode } ?: FocusMode.Off,
         autoHideChrome = autoHideChrome,
+        collapseNotes = collapseNotes,
     ).clamped()

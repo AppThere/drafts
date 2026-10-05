@@ -66,6 +66,29 @@ name, so it takes no height, and is silent to a screen reader: the name itself i
 
 ---
 
+## 4.2 — A row with collapsed notes does not reserve its source's height
+
+**Spec:** 4.2 has every block reserve the taller of its two states, so that nothing moves when the
+caret goes into one; 4.5 makes Fountain's notes `[[ ]]` and boneyard `/* */` "dimmed, collapsible"
+in preview, with "full source" in reveal.
+
+**Code:** collapsing is one choice in a screenplay's reader controls, *Notes: shown / collapsed*,
+kept with the other per-type settings. Collapsed, a note is drawn as `[[…]]` and a whole boneyard
+as `/* … */`, dimmed. A row that has collapsed something reserves only its preview's height. When
+the caret goes into it, its full source is shown and the page below moves down to make room.
+
+**Why:** the two rules cannot both hold. Reserving the source's height would keep the room a
+twenty-line boneyard took and show one line in it: collapsing would hide the words and save none
+of the page. Chosen by the product owner, 2026-10-05, over collapsing element by element.
+
+**Also, where the spec says nothing:** "outline-only styling" for sections and synopses is dimmed,
+with a synopsis set in italic. A screen reader hears a collapsed boneyard as "Boneyard" and a line
+with a collapsed note as "Notes collapsed" before its words; the folded markers are not read out.
+
+**Closes when:** the spec adopts this, or 4.2's reservation learns to tell a collapse from a reveal.
+
+---
+
 ## 8.2 — The conflict dialog offers three of four choices
 
 **Spec:** "[ Save a copy… ] [ Reload and lose my changes ] [ Show differences ] [ Cancel ]"

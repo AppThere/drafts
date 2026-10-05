@@ -134,6 +134,22 @@ object Screenplay {
             monospace = true,
         )
 
+    /**
+     * A `=` synopsis: a line about the script rather than of it. 4.5 gives it "outline-only
+     * styling" -- dimmed, which the preview does, and set in italic like a note in a margin.
+     */
+    val Synopsis =
+        ProseRole(
+            ratio = 1f,
+            weight = FontWeight.W400,
+            lineHeight = LINE,
+            spaceBefore = LINE,
+            spaceAfter = 0f,
+            italic = true,
+            monospace = true,
+        )
+
     /** Every role, so a test can walk the table rather than the entries someone remembered. */
-    val all = listOf(SceneHeading, Action, Character, Parenthetical, Dialogue, Transition, Centered, Lyric, Section)
+    val all =
+        listOf(SceneHeading, Action, Character, Parenthetical, Dialogue, Transition, Centered, Lyric, Section, Synopsis)
 }

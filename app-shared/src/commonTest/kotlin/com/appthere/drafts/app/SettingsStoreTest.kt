@@ -58,6 +58,16 @@ class SettingsStoreTest {
         }
 
     @Test
+    fun `collapsed notes are remembered for screenplays`() =
+        runTest {
+            val settings = store()
+
+            settings.remember("fountain", ReaderSettings(collapseNotes = true))
+
+            assertTrue(requireNotNull(settings.settingsFor("fountain")).collapseNotes)
+        }
+
+    @Test
     fun `markdown and fountain keep separate settings`() =
         runTest {
             // The whole point of "per document type". A screenplay wants a different measure from a

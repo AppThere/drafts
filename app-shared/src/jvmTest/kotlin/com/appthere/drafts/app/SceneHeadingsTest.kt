@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
@@ -176,7 +177,8 @@ class SceneHeadingsTest {
     }
 
     private fun SkikoComposeUiTest.openHeadings() {
-        onNodeWithContentDescription(words(Res.string.scene_headings)).performClick()
+        // The link is at the foot of the controls, which scroll: on a short window it is below the fold.
+        onNodeWithContentDescription(words(Res.string.scene_headings)).performScrollTo().performClick()
         waitForIdle()
     }
 

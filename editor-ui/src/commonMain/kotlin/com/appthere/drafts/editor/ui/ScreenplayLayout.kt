@@ -32,6 +32,7 @@ internal fun screenplayRoleOf(
         BlockRole.CENTERED -> Screenplay.Centered
         BlockRole.LYRIC -> Screenplay.Lyric
         BlockRole.SECTION -> Screenplay.Section
+        BlockRole.SYNOPSIS -> Screenplay.Synopsis
         else -> if (block is Heading) Screenplay.Section else Screenplay.Action
     }
 

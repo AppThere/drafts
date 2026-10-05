@@ -76,7 +76,12 @@ internal class DocumentRows(
         // Everything the row needs that a shift does not change. A block that only moved gets back
         // the identical `RowContent`, so the row is skipped rather than composed again -- measured
         // at one row composed per keystroke instead of every visible one.
-        val content = state.rowContentOf(blocks[index], LocalPalette.current.muted)
+        val content =
+            state.rowContentOf(
+                blocks[index],
+                LocalPalette.current.muted,
+                LocalReaderSettings.current.collapseNotes,
+            )
         val before = collapsedSpace(roleAbove(index), content.role)
         val after = if (index == blocks.lastIndex) proseStyleOf(content.role).spaceAfter else 0.dp
 
@@ -95,7 +100,12 @@ internal class DocumentRows(
         index: Int,
         half: Dp,
     ) {
-        val content = state.rowContentOf(blocks[index], LocalPalette.current.muted)
+        val content =
+            state.rowContentOf(
+                blocks[index],
+                LocalPalette.current.muted,
+                LocalReaderSettings.current.collapseNotes,
+            )
         Block(index, content, RowGeometry.inHalf(half, content.role), dual = null)
     }
 

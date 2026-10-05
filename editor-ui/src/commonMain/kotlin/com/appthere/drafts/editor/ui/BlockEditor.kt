@@ -208,14 +208,21 @@ internal fun BlockRow(
         // Measured against the source *as reveal draws it*: newlines are marked rather than
         // obeyed, so the two states differ only by the markup characters -- which is the case 4.2
         // was actually written for, and a far smaller one.
+        //
+        // Except a row that has collapsed a note (4.5): reserving its source's height would keep the
+        // room the note took, and collapsing would hide the words and nothing else.
         val reserved =
-            reservedHeightOf(
-                preview = content.preview.text,
-                source = if (content.softWrapped) reflowedForDisplay(content.source) else content.source,
-                revealed = revealed,
-                style = prose.textStyle,
-                hiddenWidthPx = if (revealed) previewWidth else revealWidth,
-            )
+            if (content.folded && !revealed) {
+                0.dp
+            } else {
+                reservedHeightOf(
+                    preview = content.preview.text,
+                    source = if (content.softWrapped) reflowedForDisplay(content.source) else content.source,
+                    revealed = revealed,
+                    style = prose.textStyle,
+                    hiddenWidthPx = if (revealed) previewWidth else revealWidth,
+                )
+            }
 
         Box(Modifier.fillMaxWidth().heightIn(min = reserved).then(if (editing) Modifier.editingTint() else Modifier)) {
             // 4.2: "Cross-fade inline decoration over 120ms with no layout animation. Because block

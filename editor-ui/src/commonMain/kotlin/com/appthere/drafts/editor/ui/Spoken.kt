@@ -20,10 +20,17 @@ import androidx.compose.ui.unit.dp
 import com.appthere.drafts.a11y.BlockName
 import com.appthere.drafts.a11y.BlockNames
 import com.appthere.drafts.a11y.spoken
+import com.appthere.drafts.core.fountain.DUAL_DIALOGUE_CLASS
 import com.appthere.drafts.core.model.Block
+import com.appthere.drafts.core.model.BlockRole
+import com.appthere.drafts.core.model.CodeBlock
+import com.appthere.drafts.core.model.Heading
 import com.appthere.drafts.editor.engine.BlockId
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.announced
+import com.appthere.drafts.i18n.resources.block_boneyard
+import com.appthere.drafts.i18n.resources.block_notes_collapsed
+import com.appthere.drafts.i18n.resources.block_simultaneous
 import com.appthere.drafts.i18n.resources.blocks_joined
 import com.appthere.drafts.i18n.resources.said_after
 import kotlinx.coroutines.delay
@@ -47,9 +54,13 @@ internal fun Modifier.spoken(spoken: Spoken): Modifier {
     // resources, and a resource is read where a composition can see it. Only blocks that take a
     // prefix read anything -- which is every kind but a paragraph and a heading, and those are most
     // of a document.
+    //
+    // A prefix with no words after it -- a boneyard collapsed to its delimiters -- is said alone,
+    // rather than as a name followed by a pause for words that are not there.
     val described =
         spoken.prefix?.let { prefix ->
-            stringResource(Res.string.said_after, prefix.spoken(), spoken.text)
+            val name = prefix.spoken()
+            if (spoken.text.isBlank()) name else stringResource(Res.string.said_after, name, spoken.text)
         }
 
     return semantics {
@@ -159,3 +170,59 @@ private fun changeIn(
 
 /** Long enough to have been spoken; short enough that the next structural edit is heard. */
 private const val CLEAR_AFTER_MILLIS = 3_000L
+
+/**
+ * 10.1's semantics for a block shown in preview: whether it is a heading, the name of any other
+ * kind -- "Block quote", "Code block, Kotlin" -- and the words that follow it. Built with the rest
+ * of the row, so a block that merely moved keeps the same value and is not composed again.
+ *
+ * The prefix is a [BlockName] rather than its words: 11.1 puts the words in resources, which are
+ * read from a composition, and this is built outside one and cached across recompositions.
+ */
+@Immutable
+internal data class Spoken(
+    val heading: Boolean,
+    val prefix: BlockName?,
+    val text: String,
+)
+
+/**
+ * The words are the preview's without its decoration -- except for code. A code block's preview
+ * shows its fences on purpose (see `appendCode`), and they map to real source, so nothing in the
+ * preview can tell them from the code; read aloud they are "grave accent" three times over. The
+ * code itself is the block's text, and the language is already in the prefix.
+ *
+ * And for the second of two speeches spoken at once, its name is said to be simultaneous: the marker
+ * that says so on screen appears only where the pair is stacked, and is silent (`SimultaneousMarker`).
+ *
+ * A Fountain boneyard is named as one, and a line whose notes the reader has collapsed (4.5) says so
+ * before its words: the folded marker is decoration, and is not read out.
+ */
+internal fun spokenOf(
+    block: Block,
+    preview: BlockPreview,
+    folded: Boolean = false,
+): Spoken =
+    Spoken(
+        heading = block is Heading,
+        prefix =
+            when {
+                isSimultaneous(block) -> BlockName.Named(Res.string.block_simultaneous)
+                block.role == BlockRole.NOTE -> BlockName.Named(Res.string.block_boneyard)
+                folded -> BlockName.Named(Res.string.block_notes_collapsed)
+                else -> BlockNames.prefixOf(block)
+            },
+        text =
+            when {
+                block is CodeBlock -> block.text.trimEnd()
+
+                // Folded to its delimiters, a boneyard has no words to say; its name says it all.
+                folded && block.role == BlockRole.NOTE -> ""
+
+                else -> preview.spoken
+            },
+    )
+
+/** Whether [block] is the name of the second of two speeches spoken at once (5.4's dual dialogue). */
+internal fun isSimultaneous(block: Block): Boolean =
+    block.role == BlockRole.CHARACTER && block.attrs.hasClass(DUAL_DIALOGUE_CLASS)
