@@ -36,6 +36,36 @@ full-width heights, so the page below stays put on the way in and out (4.2).
 
 ---
 
+## 5.4 — A dual-dialogue pair being written is stacked
+
+**Spec:** "Dual dialogue is a two-column layout at the 16.7%/25% insets, splitting the available
+width. On a compact window it stacks vertically with a connecting rule and a 'simultaneous'
+marker."
+
+**Code:** as the spec says, except while the caret is in either speech of the pair. Then the pair is
+stacked, with the rule and marker, whatever the window: each line its own row, and the line with the
+caret set full width as 4.5's entry above describes. When the caret leaves, the pair goes back side
+by side.
+
+**Why:** the same reason as 4.5's entry. A line being written is not placed yet, and a pair set side
+by side is placed already. It also keeps the field holding the caret out of a regrouping: side by
+side, the pair is one row of the list, and typing or deleting the `^` would otherwise rebuild the
+row around the field. Chosen by the product owner, 2026-10-04, over editing inside the narrow column.
+
+**The cost:** clicking into a side-by-side pair on a wide window moves the page below it, by the
+difference between the pair's height side by side and stacked. 4.2's reserved heights cover one
+block's two states, not a pair's two layouts.
+
+**Also, where the spec says nothing:** within its column each speech is set as it would be in
+dialogue's band across the page (a name keeps its inset beyond dialogue's, scaled to the narrower
+column), and the columns are two characters apart. The marker sits in the margin before the second
+name, so it takes no height, and is silent to a screen reader: the name itself is announced
+"Simultaneous, STEEL", side by side or stacked.
+
+**Closes when:** the spec adopts this, or a better treatment replaces it.
+
+---
+
 ## 8.2 — The conflict dialog offers three of four choices
 
 **Spec:** "[ Save a copy… ] [ Reload and lose my changes ] [ Show differences ] [ Cancel ]"
@@ -172,14 +202,17 @@ a compact window it "stacks vertically". Spending the role on the column would l
 actually is, and a renderer would have to work out from the text that the first line of a
 right-hand column is a character name.
 
-The two roles are therefore unused. They become right if the renderer turns out to want them, which
-is a question 5.4's deliverable will answer.
+The two roles are therefore unused. 5.4's renderer has now been built and did not want them: it
+finds a pair from the marked name's class and the speech before it (`dualPairsOf`), and every block
+keeps the role that decides its insets. Nothing reads or writes either role.
 
 **Also:** a Fountain title page has no role at all -- neither 5.4's inset table nor the enum has
 one -- so it is a `BODY` paragraph holding its own source, with its `Title:` and `Author:` lifted
 into `DocMetadata`. It round-trips exactly; what it does not yet do is look like a title page.
 
-**Closes when:** 5.4's screenplay rendering lands and says what it needs.
+**Closes when:** the two roles are removed from `export-pipeline.md`'s enum and from `BlockRole`,
+which is a change to the model and so a decision rather than a tidy-up. The title page still has no
+look of its own.
 
 ---
 

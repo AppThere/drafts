@@ -68,6 +68,15 @@ data class FountainKeywords(
 }
 
 /**
+ * The class every block of a speech marked `^` carries: `fountain.md`'s dual dialogue.
+ *
+ * A class rather than a role, because what the marker decides is a layout -- 5.4's two columns --
+ * and not what each block is. The parser writes it, the serialiser puts the `^` back for it, and the
+ * editor sets the speech beside the one before it.
+ */
+const val DUAL_DIALOGUE_CLASS = "dual"
+
+/**
  * The forcing character on [line], or null if it has none.
  *
  * Order matters in two places. A line beginning with two or more periods is action starting with

@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
@@ -37,7 +37,6 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
@@ -97,8 +96,6 @@ fun BlockEditor(
         val column =
             screenplay?.column ?: Measure.of(maxWidth, with(density) { settings.base.toDp() }, settings.characters)
 
-        val muted = LocalPalette.current.muted
-        val focusMode = LocalReaderSettings.current.focusMode
         val typewriter = LocalReaderSettings.current.typewriterScrolling
         val focused = state.caret?.block
         val fade = rememberRevealFade(focused, LocalMotion.current.revealMillis)
@@ -108,6 +105,8 @@ fun BlockEditor(
         // 10.1's structural announcements, beside the list rather than in it: the list's rows come
         // and go as they scroll, and the thing speaking must not.
         StructureAnnouncer(state)
+
+        val drawn = DocumentRows(state, layer, column.contentWidth, fade)
 
         // Every row's text styles read the base from the reader settings, so a screenplay's one
         // size reaches them there rather than through every row's signature.
@@ -121,19 +120,7 @@ fun BlockEditor(
                         .onGloballyPositioned { layer.onContainerPositioned(it) }
                         .focusRequester(focus)
                         .focusable()
-                        .pointerInput(layer) {
-                            trackSelectionDrag(
-                                onPress = { point ->
-                                    // The editor takes focus on a press so the shortcuts below have
-                                    // somewhere to arrive. A press that turns out to be a plain click
-                                    // hands focus straight on to the block's field.
-                                    focus.requestFocus()
-                                    layer.caretAt(point)?.let(state::beginSelection)
-                                },
-                                onDrag = { point -> layer.caretAt(point)?.let(state::extendSelection) },
-                                onRelease = { state.endSelection() },
-                            )
-                        },
+                        .selectionInput(state, layer, focus),
                 contentPadding =
                     PaddingValues(
                         start = column.gutter,
@@ -145,32 +132,12 @@ fun BlockEditor(
                 // measure and the leftover becomes margin on both sides rather than all on the right.
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                itemsIndexed(state.blocks, key = { _, block -> block.id.value }) { index, editorBlock ->
-                    // Everything the row needs that a shift does not change. A block that only moved
-                    // gets back the identical `RowContent`, so the row is skipped rather than composed
-                    // again -- measured at one row composed per keystroke instead of every visible one.
-                    val content = state.rowContentOf(editorBlock, muted)
-                    val above = state.blocks.getOrNull(index - 1)?.let { state.proseRoleOf(it) }
+                val blocks = state.blocks
+                val rows = state.rows
 
-                    BlockRow(
-                        state = state,
-                        layer = layer,
-                        id = editorBlock.id,
-                        content = content,
-                        spaceBefore = collapsedSpace(above, content.role),
-                        spaceAfter =
-                            if (index ==
-                                state.blocks.lastIndex
-                            ) {
-                                proseStyleOf(content.role).spaceAfter
-                            } else {
-                                0.dp
-                            },
-                        emphasis = emphasisOf(editorBlock.id, focused, focusMode),
-                        fade = fade.of(editorBlock.id),
-                        columnWidth = column.contentWidth,
-                    )
-                }
+                // Keyed by a block's id, and a folded pair by its first block's: when the caret
+                // arrives in a pair and it unfolds, the pair's first line keeps the pair's place.
+                items(rows.size, key = { blocks[rows.blockAt(it)].id.value }) { row -> drawn.ListRow(row) }
             }
         }
     }
@@ -189,16 +156,15 @@ fun BlockEditor(
  * otherwise, which leaves the row skippable for the shifts that matter.
  */
 @Composable
-private fun BlockRow(
+internal fun BlockRow(
     state: EditorState,
     layer: SelectionLayer,
     id: BlockId,
     content: RowContent,
-    spaceBefore: Dp,
-    spaceAfter: Dp,
     emphasis: RowEmphasis,
     fade: Animatable<Float, AnimationVector1D>?,
-    columnWidth: Dp,
+    geometry: RowGeometry,
+    dual: DualPart?,
     modifier: Modifier = Modifier,
 ) {
     val prose = proseStyleOf(content.role)
@@ -208,12 +174,15 @@ private fun BlockRow(
     // narrower band. The preview is laid out in what is left. The line being edited is not: a
     // screenplay's roles turn on what is typed -- a name is action until someone speaks under it --
     // so it is written full width, on a tint that says it will be placed when the caret leaves.
-    val insetStart = columnWidth * content.role.insetStart
-    val insetEnd = columnWidth * content.role.insetEnd
-    val insets = PaddingValues(start = insetStart, end = insetEnd)
+    val insets = PaddingValues(start = geometry.insetStart, end = geometry.insetEnd)
     val editing = revealed && state.screenplay
-    val previewWidth = with(LocalDensity.current) { (columnWidth - insetStart - insetEnd).roundToPx() }
-    val revealWidth = if (state.screenplay) with(LocalDensity.current) { columnWidth.roundToPx() } else previewWidth
+    val previewWidth =
+        with(LocalDensity.current) { (geometry.width - geometry.insetStart - geometry.insetEnd).roundToPx() }
+    val revealWidth = if (state.screenplay) with(LocalDensity.current) { geometry.width.roundToPx() } else previewWidth
+    // A stacked dual pair's rule and marker, which the line being written goes without: it is set
+    // full width, across the margin they are drawn in.
+    val marked = dual?.takeIf { !revealed }
+    val rule = LocalPalette.current.muted
 
     Column(
         modifier
@@ -225,13 +194,14 @@ private fun BlockRow(
             // the incoming maximum -- minimum as well as maximum -- so a `widthIn` after it has
             // nothing left to constrain, and the measure silently never applied. Capping first and
             // filling second gives the column the width it asked for.
-            .widthIn(max = columnWidth)
+            .widthIn(max = geometry.width)
             .fillMaxWidth()
+            .then(marked?.let { Modifier.dualRule(it, geometry.width, geometry.spaceBefore, rule) } ?: Modifier)
             // 5.2 gives each role its own space before and after, so a heading brings its own air
             // with it. The gap between two blocks is the *larger* of the pair, not the sum: the
             // table reads as CSS margins, and CSS collapses adjacent vertical margins. Adding them
             // gave a document with visibly more air between every pair of blocks than 5.2 asks for.
-            .padding(top = spaceBefore, bottom = spaceAfter),
+            .padding(top = geometry.spaceBefore, bottom = geometry.spaceAfter),
     ) {
         // The hidden state at the width it would be laid out under, which is what makes the
         // reserved height the right one.
@@ -287,6 +257,13 @@ private fun BlockRow(
                     )
                 },
             )
+            if (marked == DualPart.Simultaneous) {
+                SimultaneousMarker(
+                    width = geometry.insetStart,
+                    style = prose.textStyle,
+                    modifier = Modifier.align(Alignment.CenterStart),
+                )
+            }
         }
     }
 }
@@ -313,27 +290,6 @@ private fun Modifier.editingTint(): Modifier {
 
 /** How far the editing tint reaches past the text into the margin. The gutter is never under 16dp. */
 private val tintBleed = 8.dp
-
-/**
- * The gap above a block: the larger of its own space-before and the space-after of the block above.
- *
- * Collapsing, as CSS does it. The two values in 5.2's table are a pair of margins, and margins that
- * meet do not stack -- a heading after a paragraph gets the heading's 1.5em, not 1.5em plus the
- * paragraph's 0.75em.
- *
- * Both are resolved to Dp before comparing, because each is em of its *own* role's size: 0.75em of
- * body is smaller than 1.5em of an H2 by more than the ratio of the two numbers suggests.
- */
-@Composable
-private fun collapsedSpace(
-    above: ProseRole?,
-    role: ProseRole,
-): Dp {
-    val own = proseStyleOf(role).spaceBefore
-    val previous = above?.let { proseStyleOf(it).spaceAfter } ?: 0.dp
-
-    return maxOf(own, previous)
-}
 
 /**
  * Preview: formatted, markup hidden, same metrics as reveal.
@@ -456,7 +412,7 @@ internal enum class RowEmphasis(
  * uniformly faint for no reason the reader could act on -- which is what would happen on every
  * launch, before anyone has clicked anything.
  */
-private fun emphasisOf(
+internal fun emphasisOf(
     id: BlockId,
     focused: BlockId?,
     focusMode: FocusMode,

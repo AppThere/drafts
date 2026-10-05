@@ -1,5 +1,6 @@
 package com.appthere.drafts.core.serialise
 
+import com.appthere.drafts.core.fountain.DUAL_DIALOGUE_CLASS
 import com.appthere.drafts.core.fountain.FountainKeywords
 import com.appthere.drafts.core.fountain.forcingOf
 import com.appthere.drafts.core.fountain.isCharacter
@@ -135,7 +136,7 @@ internal class FountainBlockWriter(
         text: String,
         block: Paragraph,
     ): String {
-        val dual = if (block.attrs.hasClass(DUAL_CLASS)) " $DUAL_MARKER" else ""
+        val dual = if (block.attrs.hasClass(DUAL_DIALOGUE_CLASS)) " $DUAL_MARKER" else ""
         val forced = if (isCharacter(text) && forcingOf(text) == null && !isSceneHeading(text, keywords)) "" else "@"
 
         return forced + text + dual
@@ -162,9 +163,6 @@ internal class FountainBlockWriter(
         const val SYNOPSIS = "="
         const val PAGE_BREAK = "==="
         const val DUAL_MARKER = "^"
-
-        /** Written by the parser, and read back here: 5.4's two-column layout. */
-        const val DUAL_CLASS = "dual"
 
         /** Written by the parser, and read back here: the archival scene number. */
         const val SCENE_NUMBER = "scene"

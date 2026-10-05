@@ -2,13 +2,38 @@ package com.appthere.drafts.editor.ui
 
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.PointerType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+
+/**
+ * The editor's pointer: a press places the caret or begins a selection under it, a drag extends it.
+ *
+ * The editor takes focus on a press so the shortcuts have somewhere to arrive. A press that turns
+ * out to be a plain click hands focus straight on to the block's field.
+ */
+internal fun Modifier.selectionInput(
+    state: EditorState,
+    layer: SelectionLayer,
+    focus: FocusRequester,
+): Modifier =
+    pointerInput(layer) {
+        trackSelectionDrag(
+            onPress = { point ->
+                focus.requestFocus()
+                layer.caretAt(point)?.let(state::beginSelection)
+            },
+            onDrag = { point -> layer.caretAt(point)?.let(state::extendSelection) },
+            onRelease = { state.endSelection() },
+        )
+    }
 
 /**
  * Tracks a selection drag across the whole editor.

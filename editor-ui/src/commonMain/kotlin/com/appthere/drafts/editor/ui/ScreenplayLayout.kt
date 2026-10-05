@@ -35,6 +35,48 @@ internal fun screenplayRoleOf(
         else -> if (block is Heading) Screenplay.Section else Screenplay.Action
     }
 
+/**
+ * Where a row's text sits: the width it is laid out in, how far it is inset from either side of
+ * that, and the space above and below it.
+ */
+@Immutable
+internal data class RowGeometry(
+    val width: Dp,
+    val insetStart: Dp,
+    val insetEnd: Dp,
+    val spaceBefore: Dp = 0.dp,
+    val spaceAfter: Dp = 0.dp,
+) {
+    companion object {
+        /** [role]'s insets, which are fractions of the column, in a column [width] wide. */
+        fun of(
+            width: Dp,
+            role: ProseRole,
+            spaceBefore: Dp,
+            spaceAfter: Dp,
+        ): RowGeometry = RowGeometry(width, width * role.insetStart, width * role.insetEnd, spaceBefore, spaceAfter)
+
+        /**
+         * [role] in one column of a dual pair, [half] wide, with no space around it: the speech is
+         * unbroken and the pair brings its own (`DualRow`).
+         *
+         * 5.4: "Dual dialogue is a two-column layout at the 16.7%/25% insets, splitting the
+         * available width." Each speech is set in its column as it would be in dialogue's band
+         * across the page: dialogue fills it, and a name or a parenthetical keeps its inset beyond
+         * dialogue's, in proportion to the narrower column.
+         */
+        fun inHalf(
+            half: Dp,
+            role: ProseRole,
+        ): RowGeometry {
+            val band = 1f - Screenplay.Dialogue.insetStart - Screenplay.Dialogue.insetEnd
+            val start = ((role.insetStart - Screenplay.Dialogue.insetStart) / band).coerceAtLeast(0f)
+            val end = ((role.insetEnd - Screenplay.Dialogue.insetEnd) / band).coerceAtLeast(0f)
+            return RowGeometry(half, half * start, half * end)
+        }
+    }
+}
+
 /** A screenplay's column and the one size its type is set in. */
 @Immutable
 internal data class ScreenplayMeasure(

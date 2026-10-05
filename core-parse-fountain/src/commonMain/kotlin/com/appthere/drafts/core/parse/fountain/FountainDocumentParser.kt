@@ -1,5 +1,6 @@
 package com.appthere.drafts.core.parse.fountain
 
+import com.appthere.drafts.core.fountain.DUAL_DIALOGUE_CLASS
 import com.appthere.drafts.core.fountain.Element
 import com.appthere.drafts.core.fountain.Forced
 import com.appthere.drafts.core.fountain.FountainKeywords
@@ -324,7 +325,7 @@ class FountainDocumentParser(
                 Paragraph(
                     inlines = inlinesIn(source, SourceSpan.of(name.start + marker, name.start + nameEnd)),
                     role = BlockRole.CHARACTER,
-                    attrs = if (dual) Attributes(classes = listOf(DUAL_CLASS)) else Attributes.EMPTY,
+                    attrs = if (dual) Attributes(classes = listOf(DUAL_DIALOGUE_CLASS)) else Attributes.EMPTY,
                     source = name.span,
                 ),
             )
@@ -340,7 +341,7 @@ class FountainDocumentParser(
         previous: BlockRole?,
         dual: Boolean = false,
     ): List<Block> {
-        val marks = if (dual) Attributes(classes = listOf(DUAL_CLASS)) else Attributes.EMPTY
+        val marks = if (dual) Attributes(classes = listOf(DUAL_DIALOGUE_CLASS)) else Attributes.EMPTY
         val blocks = mutableListOf<Block>()
         var said = mutableListOf<Line>()
         var last = previous
@@ -378,9 +379,6 @@ class FountainDocumentParser(
 
         /** Where a scene number lives, for a renderer that puts it in the margin. */
         const val SCENE_NUMBER = "scene"
-
-        /** 5.4's two-column layout, recorded where a layout decision belongs rather than as a role. */
-        const val DUAL_CLASS = "dual"
 
         const val MAX_HEADING_LEVEL = 6
     }

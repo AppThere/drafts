@@ -58,8 +58,10 @@ import com.appthere.drafts.editor.engine.DocumentSession
 import com.appthere.drafts.editor.ui.BlockEditor
 import com.appthere.drafts.editor.ui.EditorState
 import com.appthere.drafts.editor.ui.OutlineEntry
+import com.appthere.drafts.editor.ui.firstVisibleBlock
 import com.appthere.drafts.editor.ui.handleShortcut
 import com.appthere.drafts.editor.ui.outlineOf
+import com.appthere.drafts.editor.ui.scrollToBlock
 import com.appthere.drafts.platform.files.WriteOutcome
 import com.appthere.drafts.platform.intents.DocumentKind
 import com.appthere.drafts.platform.windows.currentFold
@@ -403,7 +405,7 @@ private fun DocumentPage(
         // cannot type is arriving next to the document rather than in it. Placing it also puts
         // keyboard focus in the block, which is the half of "navigable" a screen reader needs.
         editor.place(Caret(entry.id, 0))
-        scope.launch { scroll.scrollToItem(entry.index) }
+        scope.launch { scroll.scrollToBlock(editor, entry.index) }
         if (!twoPane) panels.closeOutline()
     }
 
@@ -509,13 +511,15 @@ private fun SessionEffects(
         SnapshotEffect(
             keeper = keeper,
             revision = document.editor.revision,
-            scrollOffset = { scroll.firstVisibleItemIndex * SCROLL_SCALE + scroll.firstVisibleItemScrollOffset },
+            scrollOffset = {
+                scroll.firstVisibleBlock(document.editor) * SCROLL_SCALE + scroll.firstVisibleItemScrollOffset
+            },
         )
     }
 
     LaunchedEffect(document) {
         document.scrollOffset?.let { offset ->
-            scroll.scrollToItem(offset / SCROLL_SCALE, offset % SCROLL_SCALE)
+            scroll.scrollToBlock(document.editor, offset / SCROLL_SCALE, offset % SCROLL_SCALE)
         }
     }
 }
@@ -524,7 +528,8 @@ private fun SessionEffects(
  * 7.3 stores `scrollOffset` as a single number, and a LazyColumn's position is an index plus an
  * offset within that item. Folding them together keeps the field one number, at the cost of
  * assuming no block is taller than this -- which restores to the right block and, for a very tall
- * one, somewhere inside it.
+ * one, somewhere inside it. The index stored is a block's rather than the list's, which differ where
+ * a screenplay's dual dialogue sets two speeches in one row.
  */
 private const val SCROLL_SCALE = 100_000
 

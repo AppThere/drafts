@@ -58,6 +58,12 @@
     <string name="block_raw">HTML</string>
     <string name="block_link_reference">Link reference</string>
     <!--
+      5.4's marker on the second of two speeches spoken at once (Fountain's dual dialogue), shown
+      beside its name where the two are stacked rather than side by side, and said before the name
+      wherever they are. The screenwriter's word for it.
+    -->
+    <string name="block_simultaneous">Simultaneous</string>
+    <!--
       A structural change, said as a sentence. The kind is the sentence; this is the full stop,
       which is a separate string because not every language ends a sentence with one.
     -->

@@ -9,6 +9,7 @@ kotlin {
             api(project(":design-system"))
             api(project(":i18n"))
             api(project(":a11y"))
+            implementation(project(":core-fountain"))
 
             implementation(compose.runtime)
             implementation(compose.foundation)

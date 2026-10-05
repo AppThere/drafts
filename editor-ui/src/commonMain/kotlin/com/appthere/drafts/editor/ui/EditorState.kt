@@ -2,6 +2,7 @@ package com.appthere.drafts.editor.ui
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -9,6 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import com.appthere.drafts.a11y.BlockName
 import com.appthere.drafts.a11y.BlockNames
+import com.appthere.drafts.core.fountain.DUAL_DIALOGUE_CLASS
 import com.appthere.drafts.core.model.Block
 import com.appthere.drafts.core.model.BlockQuote
 import com.appthere.drafts.core.model.BlockRole
@@ -40,6 +42,8 @@ import com.appthere.drafts.editor.engine.spanOf
 import com.appthere.drafts.editor.engine.split
 import com.appthere.drafts.editor.engine.textIn
 import com.appthere.drafts.editor.engine.undo
+import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.block_simultaneous
 
 /**
  * The editor's observable state: the block list, and where the caret is.
@@ -77,6 +81,22 @@ class EditorState(
     var screenplay: Boolean by mutableStateOf(session.screenplay)
         private set
 
+    /** A screenplay's dual dialogue, read from the blocks; none in anything else. */
+    internal val dualPairs: List<DualPair> by derivedStateOf { if (screenplay) dualPairsOf(blocks) else emptyList() }
+
+    /**
+     * The list's rows: every dual pair is one row, except the one the caret is in.
+     *
+     * That one is laid out a line to a row, stacked, because its lines are being written. The line
+     * with the caret is set full width until it is placed, as everywhere in a screenplay, and a pair
+     * set side by side is placed already. It goes back beside its partner when the caret leaves --
+     * and never while the caret is in it, so the row holding the field is never rebuilt under it.
+     */
+    internal val rows: EditorRows by derivedStateOf {
+        val at = caret?.block?.takeIf { dualPairs.isNotEmpty() }?.let { id -> blocks.indexOfFirst { it.id == id } }
+        EditorRows(blocks.size, dualPairs.filter { at == null || at !in it.blocks })
+    }
+
     /** The role 4.5 holds for the block the caret is in, from when the caret arrived. */
     private var held: HeldRole? = null
 
@@ -108,13 +128,13 @@ class EditorState(
     ): RowContent {
         val source = sourceOf(editorBlock.block)
         val role = settledRoleOf(editorBlock)
-        val cached = rows[editorBlock.id]
+        val cached = contents[editorBlock.id]
 
         if (cached != null && cached.isFor(source, muted, role)) return cached.content
 
         // Bounded: only blocks that have been on screen are in here, but a long session scrolling a
         // long document would still accumulate. Dropping the lot is fine -- it rebuilds on demand.
-        if (rows.size > ROW_CACHE_LIMIT) rows.clear()
+        if (contents.size > ROW_CACHE_LIMIT) contents.clear()
 
         val prose = proseRoleOf(editorBlock.block, role)
         val preview = previewOfBlock(editorBlock.block, muted).let { if (prose.caps) it.inCaps() else it }
@@ -127,7 +147,7 @@ class EditorState(
                 softWrapped = !screenplay && editorBlock.block is Paragraph,
                 spoken = spokenOf(editorBlock.block, preview),
             )
-        rows[editorBlock.id] = CachedRow(source, muted, role, content)
+        contents[editorBlock.id] = CachedRow(source, muted, role, content)
         return content
     }
 
@@ -207,7 +227,7 @@ class EditorState(
         revision++
     }
 
-    private val rows = mutableMapOf<BlockId, CachedRow>()
+    private val contents = mutableMapOf<BlockId, CachedRow>()
 
     fun place(caret: Caret) {
         this.caret = caret
@@ -407,6 +427,9 @@ internal data class Spoken(
  * shows its fences on purpose (see `appendCode`), and they map to real source, so nothing in the
  * preview can tell them from the code; read aloud they are "grave accent" three times over. The
  * code itself is the block's text, and the language is already in the prefix.
+ *
+ * And for the second of two speeches spoken at once, its name is said to be simultaneous: the marker
+ * that says so on screen appears only where the pair is stacked, and is silent (`SimultaneousMarker`).
  */
 internal fun spokenOf(
     block: Block,
@@ -414,9 +437,21 @@ internal fun spokenOf(
 ): Spoken =
     Spoken(
         heading = block is Heading,
-        prefix = BlockNames.prefixOf(block),
+        prefix =
+            if (isSimultaneous(
+                    block,
+                )
+            ) {
+                BlockName.Named(Res.string.block_simultaneous)
+            } else {
+                BlockNames.prefixOf(block)
+            },
         text = if (block is CodeBlock) block.text.trimEnd() else preview.spoken,
     )
+
+/** Whether [block] is the name of the second of two speeches spoken at once (5.4's dual dialogue). */
+internal fun isSimultaneous(block: Block): Boolean =
+    block.role == BlockRole.CHARACTER && block.attrs.hasClass(DUAL_DIALOGUE_CLASS)
 
 /**
  * Which role in the prose scale a block is set in.

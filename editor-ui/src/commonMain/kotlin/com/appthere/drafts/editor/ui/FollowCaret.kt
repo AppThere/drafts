@@ -37,9 +37,13 @@ internal fun FollowCaret(
     LaunchedEffect(focused, typewriter, scroll) {
         if (focused == null) return@LaunchedEffect
 
-        val index = state.blocks.indexOfFirst { it.id == focused }
+        val block = state.blocks.indexOfFirst { it.id == focused }
         val viewport = scroll.layoutInfo.viewportSize.height
-        if (index < 0 || viewport <= 0) return@LaunchedEffect
+        if (block < 0 || viewport <= 0) return@LaunchedEffect
+
+        // The list's index, which a dual pair set side by side above the caret makes a different
+        // number from the block's.
+        val index = state.rows.rowOf(block)
 
         if (typewriter) {
             scroll.scrollToItem(index, -(viewport * TYPEWRITER_LINE).toInt())

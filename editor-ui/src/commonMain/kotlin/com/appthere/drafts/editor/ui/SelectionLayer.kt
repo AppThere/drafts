@@ -62,8 +62,20 @@ internal class SelectionLayer {
                 .filter { it.value.coordinates.isAttached }
                 .map { it to container.localBoundingBoxOf(it.value.coordinates) }
 
+        // Two blocks share a height where a dual pair is set side by side, so among the blocks
+        // level with the point it is the nearer across that is meant.
         val hit =
-            boxes.firstOrNull { (_, box) -> point.y >= box.top && point.y <= box.bottom }
+            boxes
+                .filter { (_, box) -> point.y >= box.top && point.y <= box.bottom }
+                .minByOrNull { (_, box) ->
+                    if (point.x <
+                        box.left
+                    ) {
+                        box.left - point.x
+                    } else {
+                        maxOf(0f, point.x - box.right)
+                    }
+                }
                 ?: boxes.minByOrNull { (_, box) ->
                     minOf(abs(point.y - box.top), abs(point.y - box.bottom))
                 }

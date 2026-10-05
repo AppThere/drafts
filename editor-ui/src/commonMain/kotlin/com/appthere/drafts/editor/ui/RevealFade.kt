@@ -37,6 +37,9 @@ internal class RevealFade(
 ) {
     private val progress = Animatable(if (instant) 1f else 0f)
 
+    /** The block that holds the caret, which this fade was made for. */
+    val focused: BlockId? get() = gaining
+
     /** How far [id] is through its fade, or null if it is not fading at all. */
     fun of(id: BlockId): Animatable<Float, AnimationVector1D>? = progress.takeIf { id == gaining || id == losing }
 
