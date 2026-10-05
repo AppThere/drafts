@@ -1,7 +1,10 @@
 package com.appthere.drafts.editor.engine
 
 import com.appthere.drafts.core.fountain.FountainKeywords
+import com.appthere.drafts.core.fountain.isCharacter
 import com.appthere.drafts.core.model.Block
+import com.appthere.drafts.core.model.BlockRole
+import com.appthere.drafts.core.model.CodeBlock
 import com.appthere.drafts.core.model.SourceSpan
 import com.appthere.drafts.core.parse.fountain.FountainDocumentParser
 import com.appthere.drafts.core.parse.markdown.MarkdownDocumentParser
@@ -34,6 +37,13 @@ sealed interface BlockParser {
         above: Block?,
     ): List<Block>
 
+    /** What Enter inserts at document offset [at] of [text], which is in [block]. */
+    fun enterAt(
+        text: String,
+        block: Block,
+        at: Int,
+    ): Enter
+
     /** CommonMark with this application's extensions (`markdown-dialect.md`). */
     class Markdown : BlockParser {
         private val parser = MarkdownDocumentParser()
@@ -54,6 +64,17 @@ sealed interface BlockParser {
                 .parse(text.substring(window.start.value, window.endExclusive.value))
                 .blocks
                 .map { it.shiftedBy(window.start.value) }
+
+        /**
+         * A blank line ends a paragraph, but inside a fenced code block it does not end anything --
+         * the fence runs to its closing marker. Inserting one there would give the author two lines
+         * where they asked for one, every time they pressed Enter while writing code.
+         */
+        override fun enterAt(
+            text: String,
+            block: Block,
+            at: Int,
+        ): Enter = if (block is CodeBlock) Enter(LINE_BREAK) else Enter(BLOCK_SEPARATOR)
     }
 
     /** Fountain 1.1 (`fountain.md`), with the scene-heading and transition words of [keywords]. */
@@ -74,5 +95,68 @@ sealed interface BlockParser {
             window: SourceSpan,
             above: Block?,
         ): List<Block> = parser.parseWindow(text, window.start.value, window.endExclusive.value, above?.role)
+
+        /**
+         * A speech is written a line at a time with no blank line inside it: a blank line after a
+         * name ends the speech before it starts, and the name, with no one speaking under it, reads
+         * as action. So Enter at the end of a name -- or of a parenthetical -- with nothing under it
+         * yet breaks the line once and opens a dialogue line there to type into. Enter again on
+         * that empty line breaks it once more, which makes the blank line that ends the speech: the
+         * way to go from a name straight to action, as a screenwriting application does it.
+         *
+         * Everywhere else Enter is the blank line that separates two elements.
+         */
+        override fun enterAt(
+            text: String,
+            block: Block,
+            at: Int,
+        ): Enter =
+            when {
+                opensSpeech(text, block, at) -> Enter(LINE_BREAK, opens = BlockRole.DIALOGUE)
+                block.role == BlockRole.DIALOGUE && block.source?.length == 0 -> Enter(LINE_BREAK)
+                else -> Enter(BLOCK_SEPARATOR)
+            }
+
+        /** Whether [at] is the end of a name or parenthetical that has nothing under it yet. */
+        private fun opensSpeech(
+            text: String,
+            block: Block,
+            at: Int,
+        ): Boolean {
+            val span = block.source ?: return false
+            val line = text.substring(span.start.value, span.endExclusive.value)
+            val heading =
+                when (block.role) {
+                    BlockRole.CHARACTER, BlockRole.PARENTHETICAL -> true
+
+                    // A name typed and not yet spoken under is action until the dialogue arrives.
+                    BlockRole.ACTION -> '\n' !in line && isCharacter(line)
+
+                    else -> false
+                }
+
+            return heading && at == span.endExclusive.value && nothingUnder(text, at)
+        }
+
+        /** Whether the line after the one ending at [at] is empty, or there is none. */
+        private fun nothingUnder(
+            text: String,
+            at: Int,
+        ): Boolean = at == text.length || (text[at] == '\n' && (at + 1 == text.length || text[at + 1] == '\n'))
     }
 }
+
+/**
+ * What Enter inserts: [inserted] at the caret, and -- when the line it makes is outside every block,
+ * as the line under a character's name is -- the role of the empty line it [opens] for the caret.
+ */
+class Enter(
+    val inserted: String,
+    val opens: BlockRole? = null,
+)
+
+/** The blank line that separates two block-level constructs. */
+private const val BLOCK_SEPARATOR = "\n\n"
+
+/** One line break, which continues what it is in rather than ending it. */
+private const val LINE_BREAK = "\n"

@@ -1,7 +1,7 @@
 package com.appthere.drafts.editor.engine
 
 import com.appthere.drafts.core.model.Block
-import com.appthere.drafts.core.model.Paragraph
+import com.appthere.drafts.core.model.BlockRole
 import com.appthere.drafts.core.model.SourceSpan
 
 /**
@@ -51,7 +51,7 @@ class DocumentSession(
     private var parsed: List<EditorBlock> = parser.parse(initialText).map { EditorBlock(ids.next(), it) }
 
     /** The empty paragraphs in the blank lines between them; see [roomsIn]. */
-    private var rooms: List<EditorBlock> = roomsFor(emptyList(), inheriting = null)
+    private val rooms = Rooms(ids).apply { reset(initialText, parsed.map { it.block }) }
 
     /**
      * Every block the editor shows, in document order: [parsed] and [rooms] together.
@@ -82,7 +82,7 @@ class DocumentSession(
 
         // Typing into a room: the paragraph the parser now finds there takes the room's identity,
         // so the field the reader is typing into is not destroyed under them after one character.
-        val inheriting = rooms.firstOrNull { range.length == 0 && it.block.source?.start == range.start }?.id
+        val inheriting = rooms.at(range)
 
         var window = dirtyWindow(range)
         var reparseSpan = reparseSpan(window, range, replacement.length, delta, updated.length)
@@ -111,7 +111,7 @@ class DocumentSession(
 
         text = updated
         parsed = before + reconciled + after.map { EditorBlock(it.id, it.block.shiftedBy(delta)) }
-        rooms = roomsFor(rooms.shiftedPast(range, delta), inheriting)
+        rooms.edited(text, parsed.map { it.block }, range, delta, inheriting)
         blocks = merged()
 
         return EditOutcome(
@@ -246,7 +246,7 @@ class DocumentSession(
     fun reinterpretAs(parser: BlockParser) {
         this.parser = parser
         parsed = parser.parse(text).map { EditorBlock(ids.next(), it) }
-        rooms = roomsFor(emptyList(), inheriting = null)
+        rooms.reset(text, parsed.map { it.block })
         blocks = merged()
     }
 
@@ -285,50 +285,29 @@ class DocumentSession(
         SourceSpan.of(minOf(start.value, other.start.value), maxOf(endExclusive.value, other.endExclusive.value))
 
     /**
-     * The rooms in the text as it now stands, keeping the identity of any that were already there.
-     *
-     * [previous] are the rooms from before the edit, already moved by it; one at the same offset is
-     * the same room. [inheriting] has just become a paragraph and is not a room any more.
+     * Opens an empty line at [at] for the caret, laid out as [role]: what Enter does under a
+     * character's name ([Rooms.open]).
      */
-    private fun roomsFor(
-        previous: List<EditorBlock>,
-        inheriting: BlockId?,
-    ): List<EditorBlock> {
-        val kept =
-            previous.filter { it.id != inheriting }.associateBy {
-                it.block.source
-                    ?.start
-                    ?.value
-            }
-
-        return roomsIn(text, parsed.map { it.block }).map { at ->
-            kept[at] ?: EditorBlock(ids.next(), Paragraph(inlines = emptyList(), source = SourceSpan.of(at, at)))
-        }
+    internal fun openLine(
+        at: Int,
+        role: BlockRole,
+    ) {
+        rooms.open(at, role, text, parsed.map { it.block })
+        blocks = merged()
     }
+
+    /** What Enter inserts at document offset [at], in [block]: the grammar's decision. */
+    internal fun enterAt(
+        at: Int,
+        block: Block,
+    ): Enter = parser.enterAt(text, block, at)
 
     /** [parsed] and [rooms] in document order. A room is never at the start of a block. */
     private fun merged(): List<EditorBlock> =
-        (parsed + rooms).sortedBy {
+        (parsed + rooms.blocks).sortedBy {
             it.block.source
                 ?.start
                 ?.value ?: 0
-        }
-
-    private fun List<EditorBlock>.shiftedPast(
-        range: SourceSpan,
-        delta: Int,
-    ): List<EditorBlock> =
-        mapNotNull { room ->
-            val at =
-                room.block.source
-                    ?.start
-                    ?.value ?: return@mapNotNull null
-            when {
-                at < range.start.value -> room
-                at >= range.endExclusive.value && range.length > 0 -> EditorBlock(room.id, room.block.shiftedBy(delta))
-                at > range.start.value -> EditorBlock(room.id, room.block.shiftedBy(delta))
-                else -> room
-            }
         }
 
     private fun EditorBlock.endsAtOrBefore(offset: Int): Boolean = block.endsAtOrBefore(offset)

@@ -1,12 +1,15 @@
 package com.appthere.drafts.editor.ui
 
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SkikoComposeUiTest
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
 import androidx.compose.ui.unit.Dp
 import com.appthere.drafts.design.DraftsTheme
@@ -115,6 +118,30 @@ class ScreenplayLayoutTest {
 
             // No longer a name, the line and the speech under it are one paragraph of action.
             assertNear(leftOf(ACTION), leftOf("${CHARACTER}by\n$SPEECH", substring = true), "settled")
+        }
+
+    @Test
+    fun `a speech typed a line at a time lands at its indentation`() =
+        runSkikoComposeUiTest(size = WIDE) {
+            // The name, Enter, the speech: what a screenwriter types. Enter under the name opens a
+            // dialogue line, set as dialogue before a word of it is typed, so nothing moves under
+            // the caret.
+            val state = show("$ACTION\n\n")
+            state.place(Caret(state.blocks.last().id, 0))
+            waitForIdle()
+
+            onNode(isFocused()).performTextInput(CHARACTER)
+            onNode(isFocused()).performKeyInput { pressKey(Key.Enter) }
+            waitForIdle()
+            val opened = onNode(isFocused()).getBoundsInRoot().left
+            onNode(isFocused()).performTextInput(SPEECH)
+            waitForIdle()
+
+            assertEquals("$ACTION\n\n$CHARACTER\n$SPEECH", state.text)
+            val column = widthOf(ACTION)
+            assertNear(leftOf(ACTION) + column * Screenplay.Dialogue.insetStart, opened, "opened line")
+            assertNear(opened, leftOf(SPEECH), "speech")
+            assertNear(leftOf(ACTION) + column * Screenplay.Character.insetStart, leftOf(CHARACTER), "name")
         }
 
     private fun SkikoComposeUiTest.show(text: String): EditorState {

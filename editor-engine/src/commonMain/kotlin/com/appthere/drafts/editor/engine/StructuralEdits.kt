@@ -1,6 +1,5 @@
 package com.appthere.drafts.editor.engine
 
-import com.appthere.drafts.core.model.CodeBlock
 import com.appthere.drafts.core.model.SourceSpan
 
 // The two edits that change the *shape* of the document rather than its words.
@@ -23,12 +22,6 @@ import com.appthere.drafts.core.model.SourceSpan
 // parsed blocks directly would produce a block list that the source no longer implies, and the next
 // reparse would silently disagree with it.
 
-/** The blank line that separates two block-level constructs in Markdown. */
-private const val BLOCK_SEPARATOR = "\n\n"
-
-/** Inside a fence, a line break is a line break: a blank line would just be an empty line of code. */
-private const val LINE_BREAK = "\n"
-
 /**
  * Splits the block at [caret] in two, returning the caret at the head of the second half.
  *
@@ -36,31 +29,26 @@ private const val LINE_BREAK = "\n"
  * paragraph, because that is what the resulting source parses as. The engine deliberately does not
  * try to be cleverer than the text -- continuing a list on Enter means inserting the next marker,
  * which is a Fountain/Markdown authoring behaviour for Phase 4 rather than a caret concern.
+ *
+ * What Enter inserts is the grammar's to say ([BlockParser.enterAt]): a blank line in most places,
+ * one line break inside a code fence or under a character's name.
  */
 fun DocumentSession.split(
     caret: Caret,
     history: UndoHistory,
 ): Caret? {
-    val at = offsetIn(caret) ?: return null
-    val separator = separatorIn(caret)
+    val block = blocks.firstOrNull { it.id == caret.block }?.block
+    val at = offsetIn(caret)
+    if (block == null || at == null) return null
 
-    editRecording(history, SourceSpan.of(at, at), separator)
+    val enter = enterAt(at, block)
+    val next = at + enter.inserted.length
 
-    return caretAt(at + separator.length)
+    editRecording(history, SourceSpan.of(at, at), enter.inserted)
+    enter.opens?.let { openLine(next, it) }
+
+    return caretAt(next)
 }
-
-/**
- * What Enter inserts, which depends on where the caret is.
- *
- * A blank line ends a paragraph, but inside a fenced code block it does not end anything -- the
- * fence runs to its closing marker. Inserting one there would give the author two lines where they
- * asked for one, every time they pressed Enter while writing code.
- */
-private fun DocumentSession.separatorIn(caret: Caret): String =
-    when (blocks.firstOrNull { it.id == caret.block }?.block) {
-        is CodeBlock -> LINE_BREAK
-        else -> BLOCK_SEPARATOR
-    }
 
 /**
  * Merges the block at [caret] into the one above it, returning the caret at the join.
