@@ -39,11 +39,11 @@ import com.appthere.drafts.i18n.resources.open_reader_controls
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * The panels that open over a document -- the reader controls, the licences and the keyboard
- * shortcuts -- and which of them is showing.
+ * The panels that open over a document -- the reader controls, the licences, the keyboard
+ * shortcuts and a screenplay's scene-heading words -- and which of them is showing.
  *
- * One rule for closing, whatever asked: the one on top goes first. The licences and the shortcuts
- * open from the controls, so they are on top whenever the controls are showing too, and Escape or
+ * One rule for closing, whatever asked: the one on top goes first. The licences, the shortcuts and
+ * the scene headings open from the controls, so they are on top whenever the controls are showing too, and Escape or
  * Back takes them away and leaves the reader where they were. The shortcuts are drawn last, so they
  * go first.
  */
@@ -58,6 +58,10 @@ internal class Panels {
     var shortcuts by mutableStateOf(false)
         private set
 
+    /** 11.3's scene-heading words, opened from the controls of a screenplay. */
+    var headings by mutableStateOf(false)
+        private set
+
     /**
      * 10.1's outline. Unlike the other three it is not always over the document: on a window wide
      * enough for 6's two panes it sits beside it and the document narrows. Open is open either way.
@@ -65,7 +69,7 @@ internal class Panels {
     var outline by mutableStateOf(false)
         private set
 
-    val anyOpen: Boolean get() = controls || licences || shortcuts || outline
+    val anyOpen: Boolean get() = controls || licences || shortcuts || headings || outline
 
     fun toggleControls() {
         controls = !controls
@@ -85,6 +89,14 @@ internal class Panels {
 
     fun closeLicences() {
         licences = false
+    }
+
+    fun openHeadings() {
+        headings = true
+    }
+
+    fun closeHeadings() {
+        headings = false
     }
 
     fun toggleShortcuts() {
@@ -153,6 +165,11 @@ internal class Panels {
 
             licences -> {
                 licences = false
+                true
+            }
+
+            headings -> {
+                headings = false
                 true
             }
 

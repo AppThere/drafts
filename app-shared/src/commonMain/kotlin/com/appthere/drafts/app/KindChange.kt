@@ -29,7 +29,7 @@ class KindChange(
     ) {
         require(record.uri == null) { "A document with a file takes its kind from the file's extension" }
 
-        editor.reinterpretAs(blockParserFor(kind.id))
+        editor.reinterpretAs(blockParserFor(kind.id, settings.keywordsFor(record.identity())))
 
         val identity = record.identity().copy(kind = kind.id)
         keeper?.movedTo(identity)

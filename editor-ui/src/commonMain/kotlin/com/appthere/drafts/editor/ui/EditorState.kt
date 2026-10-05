@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.Color
 import com.appthere.drafts.a11y.BlockName
 import com.appthere.drafts.a11y.BlockNames
 import com.appthere.drafts.core.fountain.DUAL_DIALOGUE_CLASS
+import com.appthere.drafts.core.fountain.FountainKeywords
 import com.appthere.drafts.core.model.Block
 import com.appthere.drafts.core.model.BlockQuote
 import com.appthere.drafts.core.model.BlockRole
@@ -79,6 +80,10 @@ class EditorState(
 
     /** Whether this is a screenplay, which decides the layout of every block (5.4). */
     var screenplay: Boolean by mutableStateOf(session.screenplay)
+        private set
+
+    /** The words this screenplay is read with (11.3); null for anything else. */
+    var keywords: FountainKeywords? by mutableStateOf(session.keywords)
         private set
 
     /** A screenplay's dual dialogue, read from the blocks; none in anything else. */
@@ -224,6 +229,7 @@ class EditorState(
     private fun adopt() {
         blocks = session.blocks
         screenplay = session.screenplay
+        keywords = session.keywords
         revision++
     }
 

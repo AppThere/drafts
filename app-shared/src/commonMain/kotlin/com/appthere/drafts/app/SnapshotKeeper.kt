@@ -27,7 +27,8 @@ class SnapshotKeeper(
     private val schedule: SnapshotSchedule = SnapshotSchedule(),
 ) {
     /** Who the snapshots are for. Moves with the document on *Save As*; the id never does. */
-    private var identity: SessionIdentity = identity
+    var identity: SessionIdentity = identity
+        private set
 
     /**
      * 7.4's *Save As* has given the document a file, or a different one.

@@ -180,13 +180,13 @@ class DocumentActivity : ComponentActivity() {
             value = storage.settings.settingsFor(open.kind) ?: ReaderSettings()
         }
 
-        when (val opening = rememberSessionDocument(documents, storage.snapshots, open)) {
+        when (val opening = rememberSessionDocument(documents, storage.snapshots, open, storage.settings)) {
             is DocumentOpening.Opened -> {
                 val keeper =
                     remember(opening.document) {
                         SnapshotKeeper(opening.document, storage.snapshots, open.identity())
                     }
-                val saving = remember(storage) { SaveAs(storage.sessions) { onMove(it) } }
+                val saving = remember(storage) { SaveAs(storage.sessions, storage.settings) { onMove(it) } }
                 val kinds = remember(storage) { KindChange(storage.sessions, storage.settings) { onMove(it) } }
                 val choose = rememberSaveLocation()
                 val scope = rememberCoroutineScope()

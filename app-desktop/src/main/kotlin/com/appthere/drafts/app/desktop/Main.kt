@@ -388,9 +388,9 @@ private fun FileDocument(
     }
 
     // From the file, or -- untitled, or with a file that has vanished -- from its snapshot.
-    val opening = rememberSessionDocument(stores.files, stores.snapshots, record)
+    val opening = rememberSessionDocument(stores.files, stores.snapshots, record, stores.settings)
     val moved by rememberUpdatedState(onMove)
-    val saving = remember(stores) { SaveAs(stores.sessions) { moved(it) } }
+    val saving = remember(stores) { SaveAs(stores.sessions, stores.settings) { moved(it) } }
     val kinds = remember(stores) { KindChange(stores.sessions, stores.settings) { moved(it) } }
     val scope = rememberCoroutineScope()
 

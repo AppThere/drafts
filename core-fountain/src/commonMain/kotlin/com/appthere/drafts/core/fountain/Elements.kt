@@ -64,6 +64,21 @@ data class FountainKeywords(
         const val DEFAULT_TRANSITION_SUFFIX = "TO:"
 
         val ENGLISH = FountainKeywords()
+
+        /**
+         * Keywords from what a reader typed, or null if they cannot be used.
+         *
+         * Prefixes are trimmed and the empty ones dropped; a list left with none is allowed, and
+         * means every scene heading is forced with `.`. A blank suffix is not: every line ends in
+         * the empty string, so every uppercase line alone would become a transition.
+         */
+        fun of(
+            prefixes: List<String>,
+            suffix: String,
+        ): FountainKeywords? {
+            val words = prefixes.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+            return suffix.trim().takeIf { it.isNotEmpty() }?.let { FountainKeywords(words, it) }
+        }
     }
 }
 

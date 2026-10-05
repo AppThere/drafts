@@ -48,11 +48,13 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.appthere.drafts.design.DraftsTheme
 import com.appthere.drafts.design.Fold
+import com.appthere.drafts.design.FoldClearance
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.LocalWindowSize
 import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.design.WindowSize
 import com.appthere.drafts.design.clearanceWithin
+import com.appthere.drafts.editor.engine.BlockParser
 import com.appthere.drafts.editor.engine.Caret
 import com.appthere.drafts.editor.engine.DocumentSession
 import com.appthere.drafts.editor.ui.BlockEditor
@@ -208,6 +210,18 @@ fun DraftsApp(
                     )
                 },
                 prompts = { DocumentPrompts(document, keeper, saving, saveAs) },
+                // 11.3: the screenplay is read again with the new words, kept under its file.
+                keywordsChange = { words ->
+                    document.editor.reinterpretAs(BlockParser.Fountain(words))
+                    val identity = keeper?.identity
+                    if (identity == null ||
+                        settingsStore == null
+                    ) {
+                        true
+                    } else {
+                        settingsStore.rememberKeywords(identity, words)
+                    }
+                },
             ),
         modifier = modifier,
     )
@@ -310,34 +324,7 @@ private fun DraftsWindow(
                     // reader's text gone. While a panel is open, Back closes it instead.
                     BackHandler(enabled = panels.anyOpen) { panels.closeTopmost() }
 
-                    // 6: "On a book-posture fold, place the content column entirely on one side
-                    // ... never let the fold bisect the measure." Everything the reader reads or
-                    // reaches for goes on one side of the hinge -- the text, the status dot, the
-                    // panels -- so that the half with the document on it is the whole interface
-                    // rather than a document with its controls stranded across a crease.
-                    //
-                    // The background and the pointer and key handling stay on the box outside this
-                    // one. The other half is still screen: it should be page rather than a bar of
-                    // some other colour, and a pointer moved over there should still bring the
-                    // chrome back (12).
-                    //
-                    // On everything that does not fold this is zero on both sides.
-                    //
-                    // `safeDrawing` is the other thing the page has to keep clear of, and for the
-                    // same reason: an Android application targeting SDK 35 or later draws edge to
-                    // edge, so without this the status badge and the reader controls sit *behind*
-                    // the system status bar. Measured on a device: the top half of each was not
-                    // merely overlapped but untappable, because the system bar takes those touches.
-                    // It covers the keyboard too, which is what keeps the caret above it.
-                    //
-                    // On the page rather than the window, so the background still reaches the edges
-                    // of the glass: a document should not have a letterbox round it.
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .windowInsetsPadding(WindowInsets.safeDrawing)
-                            .padding(start = hinge.start, end = hinge.end),
-                    ) {
+                    Box(Modifier.fillMaxSize().pageInsets(hinge)) {
                         DocumentPage(
                             editor = editor,
                             scroll = scroll,
@@ -352,6 +339,8 @@ private fun DraftsWindow(
                                 host = host,
                                 onSettingsChange = onSettingsChange,
                                 refocused = refocused,
+                                keywords = editor.keywords,
+                                onKeywordsChange = chrome.keywordsChange,
                             )
                         }
                     }
@@ -543,3 +532,33 @@ private const val DEFAULT_KIND = "markdown"
 
 /** Far enough from the corner to read as a panel over the document rather than part of the frame. */
 internal val controlsInset = 16.dp
+
+/**
+ * 6: "On a book-posture fold, place the content column entirely on one side
+ * ... never let the fold bisect the measure." Everything the reader reads or
+ * reaches for goes on one side of the hinge -- the text, the status dot, the
+ * panels -- so that the half with the document on it is the whole interface
+ * rather than a document with its controls stranded across a crease.
+ *
+ * The space the page keeps clear: the fold, and the system's bars.
+ *
+ * The background and the pointer and key handling stay on the box outside the
+ * page. The other half is still screen: it should be page rather than a bar of
+ * some other colour, and a pointer moved over there should still bring the
+ * chrome back (12).
+ *
+ * On everything that does not fold this is zero on both sides.
+ *
+ * `safeDrawing` is the other thing the page has to keep clear of, and for the
+ * same reason: an Android application targeting SDK 35 or later draws edge to
+ * edge, so without this the status badge and the reader controls sit *behind*
+ * the system status bar. Measured on a device: the top half of each was not
+ * merely overlapped but untappable, because the system bar takes those touches.
+ * It covers the keyboard too, which is what keeps the caret above it.
+ *
+ * On the page rather than the window, so the background still reaches the edges
+ * of the glass: a document should not have a letterbox round it.
+ */
+@Composable
+private fun Modifier.pageInsets(hinge: FoldClearance): Modifier =
+    windowInsetsPadding(WindowInsets.safeDrawing).padding(start = hinge.start, end = hinge.end)

@@ -11,6 +11,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.appthere.drafts.core.fountain.FountainKeywords
 import com.appthere.drafts.design.LocalWindowSize
 import com.appthere.drafts.design.Lucide
 import com.appthere.drafts.design.ReaderSettings
@@ -21,6 +22,7 @@ import com.appthere.drafts.i18n.resources.licences
 import com.appthere.drafts.i18n.resources.new_document
 import com.appthere.drafts.i18n.resources.open_document
 import com.appthere.drafts.i18n.resources.open_outline
+import com.appthere.drafts.i18n.resources.scene_headings
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -75,7 +77,11 @@ internal fun BoxScope.WindowPanels(
     host: HostActions,
     onSettingsChange: suspend (ReaderSettings) -> Boolean,
     refocused: (() -> Unit) -> () -> Unit,
+    keywords: FountainKeywords? = null,
+    onKeywordsChange: (suspend (FountainKeywords) -> Boolean)? = null,
 ) {
+    // 11.3's panel, for a screenplay whose words can be changed: prose has no scene headings.
+    val headings = onKeywordsChange.takeIf { keywords != null }
     val scope = rememberCoroutineScope()
 
     if (panels.controls) {
@@ -110,6 +116,7 @@ internal fun BoxScope.WindowPanels(
                         },
                 )
             }
+            headings?.let { PanelLink(stringResource(Res.string.scene_headings), onClick = panels::openHeadings) }
             PanelLink(stringResource(Res.string.keyboard_shortcuts), onClick = panels::openShortcuts)
             PanelLink(stringResource(Res.string.licences), onClick = panels::openLicences)
         }
@@ -119,6 +126,15 @@ internal fun BoxScope.WindowPanels(
         Licences(
             onClose = refocused(panels::closeLicences),
             modifier = panelPlacement(Alignment.Center),
+        )
+    }
+
+    if (panels.headings && headings != null && keywords != null) {
+        SceneHeadings(
+            keywords = keywords,
+            onChange = headings,
+            onClose = refocused(panels::closeHeadings),
+            modifier = panelPlacement(Alignment.TopEnd),
         )
     }
 

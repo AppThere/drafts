@@ -25,10 +25,12 @@ import com.appthere.drafts.platform.windows.SessionList
  * The keeper moves too, or the next autosave would write the old location back over the new one;
  * and the record moves, so the next launch reopens the file rather than an untitled document.
  *
- * [onMoved] hands the updated record to whoever is showing it: the chrome's name is its name.
+ * [onMoved] hands the updated record to whoever is showing it: the chrome's name is its name. And
+ * [settings] carries the screenplay's scene-heading words (11.3) to the new file.
  */
 class SaveAs(
     private val sessions: SessionList,
+    private val settings: SettingsStore? = null,
     private val onMoved: (SessionRecord) -> Unit,
 ) {
     suspend fun to(
@@ -46,6 +48,9 @@ class SaveAs(
         if (outcome is WriteOutcome.Written) {
             keeper?.movedTo(moved)
             sessions.updated(moved)?.let(onMoved)
+            // A screenplay's own scene-heading words are kept under its file (11.3), so they go
+            // where it went. Failing that costs the choice on the next open, not any words.
+            settings?.keywordsMoved(record.identity(), moved)
         }
         return outcome
     }

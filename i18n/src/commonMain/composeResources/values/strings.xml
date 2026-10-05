@@ -178,6 +178,20 @@
     <string name="motion_system">Follow the system</string>
 
     <!--
+      11.3's scene-heading words for one screenplay: the panel, opened from the reader controls
+      when the document is one. "Words" rather than "prefixes" and "ending" rather than "suffix":
+      the reader's terms, not the grammar's.
+    -->
+    <string name="scene_headings">Scene headings</string>
+    <string name="scene_headings_explained">A line that begins with one of these words is a scene heading, and a line in capitals that ends with the transition ending is a transition. Separate the words with commas. They apply to this screenplay only.</string>
+    <string name="scene_headings_language">Language</string>
+    <string name="scene_headings_words">Heading words</string>
+    <string name="transition_ending">Transition ending</string>
+    <string name="apply">Apply</string>
+    <string name="transition_ending_needed">A transition ending is needed. Without one, every line in capitals on its own would be a transition.</string>
+    <string name="scene_headings_not_saved">These words could not be kept. They apply until this window closes, and will need choosing again next time.</string>
+
+    <!--
       A settings file that could not be written: what it means for the reader, not the disk.
     -->
     <string name="settings_not_saved">These settings could not be kept. They apply until this window closes, and will need choosing again next time.</string>

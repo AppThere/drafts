@@ -79,7 +79,8 @@ sealed interface BlockParser {
 
     /** Fountain 1.1 (`fountain.md`), with the scene-heading and transition words of [keywords]. */
     class Fountain(
-        keywords: FountainKeywords = FountainKeywords.ENGLISH,
+        /** The scene-heading words and transition ending this screenplay is read with (11.3). */
+        val keywords: FountainKeywords = FountainKeywords.ENGLISH,
     ) : BlockParser {
         private val parser = FountainDocumentParser(keywords)
 

@@ -5,7 +5,9 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import com.appthere.drafts.core.fountain.FountainKeywords
 import com.appthere.drafts.editor.engine.BlockParser
 import com.appthere.drafts.editor.engine.Caret
 import com.appthere.drafts.editor.engine.DocumentSession
@@ -181,8 +183,9 @@ fun openUntitled(
     store: DocumentStore,
     text: String = "",
     record: SessionRecord? = null,
+    keywords: FountainKeywords = FountainKeywords.ENGLISH,
 ): OpenDocument {
-    val editor = EditorState(DocumentSession(text, blockParserFor(record?.kind)))
+    val editor = EditorState(DocumentSession(text, blockParserFor(record?.kind, keywords)))
     record?.caret?.let { editor.placeAt(it) }
 
     // 7.4: "ready to type into", and "Nothing stands between launching the app and writing."
@@ -246,11 +249,15 @@ fun rememberOpenDocument(
     ref: DocumentRef,
     recover: (suspend (Digest) -> Recovery)? = null,
     kind: String? = null,
+    keywords: suspend () -> FountainKeywords = { FountainKeywords.ENGLISH },
 ): DocumentOpening {
+    // Not a key: a lambda is a new value on every composition, and opening the document again for
+    // each would throw away the reader's edits. The words are read once, as the document opens.
+    val words by rememberUpdatedState(keywords)
     val opening by produceState<DocumentOpening>(DocumentOpening.Opening, store, ref, recover, kind) {
         value =
             runCatching { store.read(ref) }
-                .map { contents -> DocumentOpening.Opened(openedWith(store, ref, contents, recover, kind)) }
+                .map { contents -> DocumentOpening.Opened(openedWith(store, ref, contents, recover, kind, words())) }
                 .getOrElse {
                     // Gone, or there and unreadable: the two need different answers.
                     val there = runCatching { store.exists(ref) }.getOrDefault(false)
@@ -276,8 +283,9 @@ fun openVanished(
     ref: DocumentRef,
     text: String,
     record: SessionRecord? = null,
+    keywords: FountainKeywords = FountainKeywords.ENGLISH,
 ): OpenDocument {
-    val editor = EditorState(DocumentSession(text, blockParserFor(record?.kind)))
+    val editor = EditorState(DocumentSession(text, blockParserFor(record?.kind, keywords)))
     record?.caret?.let { editor.placeAt(it) }
 
     return OpenDocument(
@@ -300,10 +308,12 @@ fun rememberUntitledDocument(
     store: DocumentStore,
     snapshots: SnapshotStore,
     documentId: String,
+    keywords: suspend () -> FountainKeywords = { FountainKeywords.ENGLISH },
 ): DocumentOpening {
+    val words by rememberUpdatedState(keywords)
     val opening by produceState<DocumentOpening>(DocumentOpening.Opening, store, snapshots, documentId) {
         val text = snapshots.textOf(documentId).orEmpty()
-        value = DocumentOpening.Opened(openUntitled(store, text, snapshots.recordOf(documentId)))
+        value = DocumentOpening.Opened(openUntitled(store, text, snapshots.recordOf(documentId), words()))
     }
     return opening
 }
@@ -321,10 +331,11 @@ private suspend fun openedWith(
     contents: DocumentContents,
     recover: (suspend (Digest) -> Recovery)?,
     kind: String?,
+    keywords: FountainKeywords,
 ): OpenDocument {
     val recovery = recover?.invoke(contents.facts.digest) ?: Recovery.NothingToRestore()
     val restored = recovery as? Recovery.UnsavedWork
-    val editor = EditorState(DocumentSession(restored?.text ?: contents.text, blockParserFor(kind)))
+    val editor = EditorState(DocumentSession(restored?.text ?: contents.text, blockParserFor(kind, keywords)))
 
     // 7.3's caret and scroll, whichever way the document opened. They used to come back only with
     // unsaved work, so a document that had been read and closed reopened at the top every time.
@@ -340,11 +351,15 @@ private suspend fun openedWith(
 
 /**
  * How a document of [kind] is read: 9.1's two grammars. Markdown when nothing says -- the sample
- * document, a file of no recognised extension, a buffer that never had a kind.
+ * document, a file of no recognised extension, a buffer that never had a kind. A screenplay is read
+ * with [keywords], its own scene-heading words (11.3).
  */
-fun blockParserFor(kind: String?): BlockParser =
+fun blockParserFor(
+    kind: String?,
+    keywords: FountainKeywords = FountainKeywords.ENGLISH,
+): BlockParser =
     when (kind?.let(::kindOf)) {
-        DocumentKind.Fountain -> BlockParser.Fountain()
+        DocumentKind.Fountain -> BlockParser.Fountain(keywords)
         else -> BlockParser.Markdown()
     }
 

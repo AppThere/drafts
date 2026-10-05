@@ -1,5 +1,6 @@
 package com.appthere.drafts.editor.engine
 
+import com.appthere.drafts.core.fountain.FountainKeywords
 import com.appthere.drafts.core.model.Block
 import com.appthere.drafts.core.model.BlockRole
 import com.appthere.drafts.core.model.SourceSpan
@@ -237,6 +238,9 @@ class DocumentSession(
 
     /** Whether this document is read as a screenplay, which is what decides how it is laid out (5.4). */
     val screenplay: Boolean get() = parser is BlockParser.Fountain
+
+    /** The words a screenplay is read with (11.3), or null for a document that is not one. */
+    val keywords: FountainKeywords? get() = (parser as? BlockParser.Fountain)?.keywords
 
     /** A new session over [text], read the way this one is: what reloading from disk starts from. */
     fun freshWith(text: String): DocumentSession = DocumentSession(text, parser)

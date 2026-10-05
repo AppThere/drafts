@@ -711,6 +711,12 @@ Fountain 1.1 set, with presets for common languages. Files remain valid Fountain
 characters (`.`, `>`, `@`) already provide an escape hatch, and the app should offer to insert
 them automatically when it detects an unrecognised heading pattern.
 
+The list is kept by the application, under the document's file, and not in the file: the file
+stays exactly the writer's, and other Fountain tools read it correctly once its headings are
+forced. The cost is that the choice stays on one machine, and a file moved or renamed outside the
+application leaves it behind. An untitled screenplay keeps its list under its own id until *Save As*
+carries it to the file. (Decided 2026-10-05.)
+
 ### 11.4 Input methods
 
 IME composition (CJK, Vietnamese, Indic) interacts with per-block fields. Composition is confined
