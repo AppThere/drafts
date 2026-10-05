@@ -44,7 +44,7 @@ internal class BlockPreview(
     fun inCaps(): BlockPreview =
         BlockPreview(
             AnnotatedString(
-                String(CharArray(text.length) { text[it].uppercaseChar() }),
+                CharArray(text.length) { text[it].uppercaseChar() }.concatToString(),
                 text.spanStyles,
                 text.paragraphStyles,
             ),
