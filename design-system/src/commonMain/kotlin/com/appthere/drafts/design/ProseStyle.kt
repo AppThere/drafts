@@ -51,7 +51,7 @@ fun proseStyleOf(
                 fontFamily = if (role.monospace) monoFontFamily() else proseFontFamily(),
                 lineHeight = size * (role.lineHeight * lineHeightFactorOf(settings)),
                 letterSpacing = (role.tracking + settings.letterSpacing).em,
-                textAlign = TextAlign.Unspecified,
+                textAlign = role.alignment,
             ),
         spaceBefore = spaceOf(size, role.spaceBefore * spacingFactorOf(settings)),
         spaceAfter = spaceOf(size, role.spaceAfter * spacingFactorOf(settings)),

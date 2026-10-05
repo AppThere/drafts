@@ -229,6 +229,9 @@ class DocumentSession(
         }
     }
 
+    /** Whether this document is read as a screenplay, which is what decides how it is laid out (5.4). */
+    val screenplay: Boolean get() = parser is BlockParser.Fountain
+
     /** A new session over [text], read the way this one is: what reloading from disk starts from. */
     fun freshWith(text: String): DocumentSession = DocumentSession(text, parser)
 

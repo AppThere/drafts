@@ -3,6 +3,7 @@ package com.appthere.drafts.design
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -18,6 +19,10 @@ import androidx.compose.ui.unit.sp
  *
  * [spaceBefore] and [spaceAfter] are in em of *this role's* size, as the spec's table gives them,
  * so a heading's air scales with the heading and not with the body around it.
+ *
+ * [insetStart] and [insetEnd] are fractions of the content column, and [alignment] where in what is
+ * left the text sits: 5.4's screenplay geometry, which places a character name a third of the way
+ * across and a transition at the right. Prose leaves all three at their defaults.
  */
 @Immutable
 data class ProseRole(
@@ -30,6 +35,9 @@ data class ProseRole(
     val monospace: Boolean = false,
     val tracking: Float = 0f,
     val caps: Boolean = false,
+    val insetStart: Float = 0f,
+    val insetEnd: Float = 0f,
+    val alignment: TextAlign = TextAlign.Unspecified,
 ) {
     val fontStyle: FontStyle get() = if (italic) FontStyle.Italic else FontStyle.Normal
 

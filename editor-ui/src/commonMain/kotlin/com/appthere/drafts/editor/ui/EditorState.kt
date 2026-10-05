@@ -11,6 +11,7 @@ import com.appthere.drafts.a11y.BlockName
 import com.appthere.drafts.a11y.BlockNames
 import com.appthere.drafts.core.model.Block
 import com.appthere.drafts.core.model.BlockQuote
+import com.appthere.drafts.core.model.BlockRole
 import com.appthere.drafts.core.model.CodeBlock
 import com.appthere.drafts.core.model.Heading
 import com.appthere.drafts.core.model.Paragraph
@@ -62,8 +63,22 @@ class EditorState(
         private set
 
     /** Null when nothing has focus, which is when every block is in preview state. */
-    var caret: Caret? by mutableStateOf(null)
+    var caret: Caret?
+        get() = caretState
+        private set(value) {
+            // Leaving a block lets its role settle (`settledRoleOf`); arriving holds the new one's.
+            if (value?.block != caretState?.block) held = null
+            caretState = value
+        }
+
+    private var caretState: Caret? by mutableStateOf(null)
+
+    /** Whether this is a screenplay, which decides the layout of every block (5.4). */
+    var screenplay: Boolean by mutableStateOf(session.screenplay)
         private set
+
+    /** The role 4.5 holds for the block the caret is in, from when the caret arrived. */
+    private var held: HeldRole? = null
 
     /**
      * What is selected, or null for nothing.
@@ -92,25 +107,56 @@ class EditorState(
         muted: Color,
     ): RowContent {
         val source = sourceOf(editorBlock.block)
+        val role = settledRoleOf(editorBlock)
         val cached = rows[editorBlock.id]
 
-        if (cached != null && cached.source == source && cached.muted == muted) return cached.content
+        if (cached != null && cached.isFor(source, muted, role)) return cached.content
 
         // Bounded: only blocks that have been on screen are in here, but a long session scrolling a
         // long document would still accumulate. Dropping the lot is fine -- it rebuilds on demand.
         if (rows.size > ROW_CACHE_LIMIT) rows.clear()
 
-        val preview = previewOfBlock(editorBlock.block, muted)
+        val prose = proseRoleOf(editorBlock.block, role)
+        val preview = previewOfBlock(editorBlock.block, muted).let { if (prose.caps) it.inCaps() else it }
         val content =
             RowContent(
                 preview = preview,
                 source = source,
-                role = roleOf(editorBlock.block),
-                softWrapped = editorBlock.block is Paragraph,
+                role = prose,
+                // A screenplay's line breaks are its own -- Fountain keeps them -- so they are obeyed.
+                softWrapped = !screenplay && editorBlock.block is Paragraph,
                 spoken = spokenOf(editorBlock.block, preview),
             )
-        rows[editorBlock.id] = CachedRow(source, muted, content)
+        rows[editorBlock.id] = CachedRow(source, muted, role, content)
         return content
+    }
+
+    /** The role [editorBlock] is set in: 5.4's for a screenplay, 5.2's for anything else. */
+    internal fun proseRoleOf(editorBlock: EditorBlock): ProseRole =
+        proseRoleOf(editorBlock.block, settledRoleOf(editorBlock))
+
+    private fun proseRoleOf(
+        block: Block,
+        role: BlockRole?,
+    ): ProseRole = if (screenplay) screenplayRoleOf(role, block) else roleOf(block)
+
+    /**
+     * The role a block is laid out in, which for the block being edited in a screenplay is the role
+     * it had when the caret arrived.
+     *
+     * 4.5: "Because Fountain block roles are driven by position and case, the indentation must not
+     * shift while a character name is being typed. Debounce role reclassification: hold the
+     * previous role until the user leaves the block or a blank line settles the ambiguity." A name
+     * that turns to action at its first lowercase letter, and back at the next capital, would move
+     * the line under the reader's hands on every keystroke. Leaving the block lets it settle; a
+     * blank line is Enter, which leaves it too.
+     */
+    private fun settledRoleOf(editorBlock: EditorBlock): BlockRole? {
+        val role = editorBlock.block.role
+        if (!screenplay || caret?.block != editorBlock.id) return role
+
+        val holding = held?.takeIf { it.block == editorBlock.id } ?: HeldRole(editorBlock.id, role).also { held = it }
+        return holding.role
     }
 
     /**
@@ -155,6 +201,7 @@ class EditorState(
      */
     private fun adopt() {
         blocks = session.blocks
+        screenplay = session.screenplay
         revision++
     }
 
@@ -388,7 +435,21 @@ internal fun roleOf(block: Block): ProseRole =
 private class CachedRow(
     val source: String,
     val muted: Color,
+    val role: BlockRole?,
     val content: RowContent,
+) {
+    /** Whether this row was built from exactly these, and so is still the row to show. */
+    fun isFor(
+        source: String,
+        muted: Color,
+        role: BlockRole?,
+    ): Boolean = this.source == source && this.muted == muted && this.role == role
+}
+
+/** A block's role as it was when the caret arrived in it (4.5). */
+private class HeldRole(
+    val block: BlockId,
+    val role: BlockRole?,
 )
 
 /** Enough for several screens of blocks; past that the cache is dropped rather than pruned. */

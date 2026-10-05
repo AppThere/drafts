@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -86,7 +87,11 @@ fun BlockEditor(
         // clamped to the window, with a gutter that is 4% of the window and never below 16dp.
         val settings = LocalReaderSettings.current
         val density = LocalDensity.current
-        val column = Measure.of(maxWidth, with(density) { settings.base.toDp() }, settings.characters)
+
+        // A screenplay is 5.4's instead: its own column, and one size of type set from the width.
+        val screenplay = if (state.screenplay) screenplayMeasureOf(maxWidth, settings.base) else null
+        val column =
+            screenplay?.column ?: Measure.of(maxWidth, with(density) { settings.base.toDp() }, settings.characters)
 
         val muted = LocalPalette.current.muted
         val focusMode = LocalReaderSettings.current.focusMode
@@ -100,63 +105,68 @@ fun BlockEditor(
         // and go as they scroll, and the thing speaking must not.
         StructureAnnouncer(state)
 
-        LazyColumn(
-            state = scroll,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .onGloballyPositioned { layer.onContainerPositioned(it) }
-                    .focusRequester(focus)
-                    .focusable()
-                    .pointerInput(layer) {
-                        trackSelectionDrag(
-                            onPress = { point ->
-                                // The editor takes focus on a press so the shortcuts below have
-                                // somewhere to arrive. A press that turns out to be a plain click
-                                // hands focus straight on to the block's field.
-                                focus.requestFocus()
-                                layer.caretAt(point)?.let(state::beginSelection)
-                            },
-                            onDrag = { point -> layer.caretAt(point)?.let(state::extendSelection) },
-                            onRelease = { state.endSelection() },
-                        )
-                    },
-            contentPadding =
-                PaddingValues(
-                    start = column.gutter,
-                    top = documentPadding + topInset,
-                    end = column.gutter,
-                    bottom = documentPadding,
-                ),
-            // 5.3: "centred with generous margins on a desktop window". The column stops at its
-            // measure and the leftover becomes margin on both sides rather than all on the right.
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            itemsIndexed(state.blocks, key = { _, block -> block.id.value }) { index, editorBlock ->
-                // Everything the row needs that a shift does not change. A block that only moved
-                // gets back the identical `RowContent`, so the row is skipped rather than composed
-                // again -- measured at one row composed per keystroke instead of every visible one.
-                val content = state.rowContentOf(editorBlock, muted)
-                val above = state.blocks.getOrNull(index - 1)?.let { roleOf(it.block) }
-
-                BlockRow(
-                    state = state,
-                    layer = layer,
-                    id = editorBlock.id,
-                    content = content,
-                    spaceBefore = collapsedSpace(above, content.role),
-                    spaceAfter =
-                        if (index ==
-                            state.blocks.lastIndex
-                        ) {
-                            proseStyleOf(content.role).spaceAfter
-                        } else {
-                            0.dp
+        // Every row's text styles read the base from the reader settings, so a screenplay's one
+        // size reaches them there rather than through every row's signature.
+        val rows = screenplay?.let { settings.copy(base = it.fontSize) } ?: settings
+        CompositionLocalProvider(LocalReaderSettings provides rows) {
+            LazyColumn(
+                state = scroll,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .onGloballyPositioned { layer.onContainerPositioned(it) }
+                        .focusRequester(focus)
+                        .focusable()
+                        .pointerInput(layer) {
+                            trackSelectionDrag(
+                                onPress = { point ->
+                                    // The editor takes focus on a press so the shortcuts below have
+                                    // somewhere to arrive. A press that turns out to be a plain click
+                                    // hands focus straight on to the block's field.
+                                    focus.requestFocus()
+                                    layer.caretAt(point)?.let(state::beginSelection)
+                                },
+                                onDrag = { point -> layer.caretAt(point)?.let(state::extendSelection) },
+                                onRelease = { state.endSelection() },
+                            )
                         },
-                    emphasis = emphasisOf(editorBlock.id, focused, focusMode),
-                    fade = fade.of(editorBlock.id),
-                    columnWidth = column.contentWidth,
-                )
+                contentPadding =
+                    PaddingValues(
+                        start = column.gutter,
+                        top = documentPadding + topInset,
+                        end = column.gutter,
+                        bottom = documentPadding,
+                    ),
+                // 5.3: "centred with generous margins on a desktop window". The column stops at its
+                // measure and the leftover becomes margin on both sides rather than all on the right.
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                itemsIndexed(state.blocks, key = { _, block -> block.id.value }) { index, editorBlock ->
+                    // Everything the row needs that a shift does not change. A block that only moved
+                    // gets back the identical `RowContent`, so the row is skipped rather than composed
+                    // again -- measured at one row composed per keystroke instead of every visible one.
+                    val content = state.rowContentOf(editorBlock, muted)
+                    val above = state.blocks.getOrNull(index - 1)?.let { state.proseRoleOf(it) }
+
+                    BlockRow(
+                        state = state,
+                        layer = layer,
+                        id = editorBlock.id,
+                        content = content,
+                        spaceBefore = collapsedSpace(above, content.role),
+                        spaceAfter =
+                            if (index ==
+                                state.blocks.lastIndex
+                            ) {
+                                proseStyleOf(content.role).spaceAfter
+                            } else {
+                                0.dp
+                            },
+                        emphasis = emphasisOf(editorBlock.id, focused, focusMode),
+                        fade = fade.of(editorBlock.id),
+                        columnWidth = column.contentWidth,
+                    )
+                }
             }
         }
     }
@@ -189,7 +199,12 @@ private fun BlockRow(
 ) {
     val prose = proseStyleOf(content.role)
     val revealed = emphasis == RowEmphasis.Focused
-    val textWidth = with(LocalDensity.current) { columnWidth.roundToPx() }
+
+    // 5.4's insets, fractions of the column: a character a third of the way across, dialogue in a
+    // narrower band. The text is laid out in what is left, and reserves its height at that width.
+    val insetStart = columnWidth * content.role.insetStart
+    val insetEnd = columnWidth * content.role.insetEnd
+    val textWidth = with(LocalDensity.current) { (columnWidth - insetStart - insetEnd).roundToPx() }
 
     Column(
         modifier
@@ -223,7 +238,7 @@ private fun BlockRow(
                 widthPx = textWidth,
             )
 
-        Box(Modifier.fillMaxWidth().heightIn(min = reserved)) {
+        Box(Modifier.fillMaxWidth().padding(start = insetStart, end = insetEnd).heightIn(min = reserved)) {
             // 4.2: "Cross-fade inline decoration over 120ms with no layout animation. Because block
             // metrics are identical in both states (4.1), nothing moves -- only glyph styling
             // changes. Respect `prefers-reduced-motion`: at reduced motion the switch is

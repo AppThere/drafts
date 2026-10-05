@@ -34,6 +34,23 @@ internal class BlockPreview(
     val text: AnnotatedString,
     private val runs: List<PreviewRun>,
 ) {
+    /**
+     * The same preview in capitals: 5.4's caps for a scene heading, a character and a transition.
+     *
+     * One character for one, so every offset into the preview still means what it meant -- the
+     * selection layer and the caret map through them. `uppercaseChar` keeps that; `uppercase` does
+     * not ("ß" becomes "SS").
+     */
+    fun inCaps(): BlockPreview =
+        BlockPreview(
+            AnnotatedString(
+                String(CharArray(text.length) { text[it].uppercaseChar() }),
+                text.spanStyles,
+                text.paragraphStyles,
+            ),
+            runs,
+        )
+
     /** How far into the block's source the character at [previewOffset] came from. */
     fun sourceOffsetAt(previewOffset: Int): Int? {
         if (runs.isEmpty()) return null
