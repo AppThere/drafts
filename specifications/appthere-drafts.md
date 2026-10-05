@@ -717,6 +717,12 @@ forced. The cost is that the choice stays on one machine, and a file moved or re
 application leaves it behind. An untitled screenplay keeps its list under its own id until *Save As*
 carries it to the file. (Decided 2026-10-05.)
 
+The offer comes when the caret leaves a line in capitals shaped like a heading -- a word, a place,
+` - ` and a time of day -- that the list does not make one. It offers both answers: force this line
+with `.`, which keeps the file right in every Fountain tool, or add the line's first word to the
+list, which fixes every line like it. *Not now* is not asked again for that line while the window
+is open. (Decided 2026-10-05.)
+
 ### 11.4 Input methods
 
 IME composition (CJK, Vietnamese, Indic) interacts with per-block fields. Composition is confined

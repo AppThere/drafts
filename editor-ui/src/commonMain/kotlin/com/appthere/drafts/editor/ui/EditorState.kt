@@ -288,29 +288,20 @@ class EditorState(
     }
 
     /**
-     * Replaces the focused block's source with what the field now holds.
+     * Replaces [span] of the document with [replacement], as one step undo takes back, and leaves
+     * the caret where it is.
      *
-     * The field reports its whole contents, but what is *recorded* is narrowed to the run that
-     * actually changed. Recording the whole block would make every keystroke a replacement of
-     * everything, which no amount of care in [UndoHistory] can coalesce -- undo would step back one
-     * character at a time. See [changeBetween].
+     * The edit every other one is made of where it is not a split or a merge: what the field
+     * reports (`replace`), and a change made from outside the text -- 11.3's offer to force a
+     * heading -- to a block the caret is not in. A caret in another block is unaffected, because
+     * its offset is the block's own.
      */
-    fun replace(
+    fun edit(
         span: SourceSpan,
         replacement: String,
-        offset: Int,
     ) {
-        val block = caret?.block ?: return
-        val existing = text.substring(span.start.value, span.endExclusive.value)
-        val change = changeBetween(existing, replacement) ?: return
-
-        session.editRecording(
-            history,
-            SourceSpan.of(span.start.value + change.start, span.start.value + change.endExclusive),
-            change.replacement,
-        )
+        session.editRecording(history, span, replacement)
         adopt()
-        caret = Caret(block, offset)
     }
 
     /** Enter. The caret follows to the head of the new block. */

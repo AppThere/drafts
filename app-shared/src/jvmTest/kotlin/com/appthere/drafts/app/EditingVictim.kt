@@ -3,6 +3,7 @@ package com.appthere.drafts.app
 import com.appthere.drafts.editor.engine.Caret
 import com.appthere.drafts.editor.engine.DocumentSession
 import com.appthere.drafts.editor.ui.EditorState
+import com.appthere.drafts.editor.ui.replace
 import com.appthere.drafts.platform.files.DocumentRef
 import com.appthere.drafts.platform.files.DocumentSessionState
 import com.appthere.drafts.platform.files.PathDocumentStore

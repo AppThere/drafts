@@ -178,6 +178,30 @@ fun isSceneHeading(
 }
 
 /**
+ * The word [line] opens with, if [line] looks like a scene heading that [keywords] do not make one:
+ * 11.3's "unrecognised heading pattern", for the offer to force it or to learn the word.
+ *
+ * A heading's shape, in any language: in capitals, a word, a place, and then ` - ` and the time of
+ * day -- `INTÉRIEUR CUISINE - JOUR`, `INNEN. KÜCHE - TAG`. The first word is the one that was meant
+ * as the prefix, without its full stop. Anything already a heading, forced, or a transition is not
+ * offered, and neither is a line whose first word is not a word.
+ */
+fun unrecognisedHeadingWord(
+    line: String,
+    keywords: FountainKeywords,
+): String? {
+    val trimmed = line.trim()
+    val known = isSceneHeading(trimmed, keywords) || isTransition(trimmed, keywords) || forcingOf(trimmed) != null
+    val dash = trimmed.indexOf(TIME_OF_DAY_SEPARATOR)
+    val shaped =
+        isUppercase(trimmed) && dash > 0 && trimmed.indexOf(' ') < dash &&
+            trimmed.substring(dash + TIME_OF_DAY_SEPARATOR.length).isNotBlank()
+
+    val word = trimmed.substringBefore(' ').trimEnd('.')
+    return word.takeIf { !known && shaped && it.length >= HEADING_WORD_MINIMUM && it.all(Char::isLetter) }
+}
+
+/**
  * Whether [line] is a transition: uppercase, ending in the suffix, with nothing after it.
  *
  * "Adding a space after the colon (`CUT TO: `) makes the line parse as Action -- a documented
@@ -233,6 +257,12 @@ private fun leadingSpaceAfter(
     line: String,
     marker: Int,
 ): Int = line.drop(marker).takeWhile { it == ' ' }.length
+
+/** Between a heading's place and its time of day: `CUISINE - JOUR`. */
+private const val TIME_OF_DAY_SEPARATOR = " - "
+
+/** Shorter than this is an initial or an abbreviation nobody would add as a heading word. */
+private const val HEADING_WORD_MINIMUM = 2
 
 /** What may follow a scene prefix: a full stop, a space, or the slash of `INT/EXT`. */
 private const val SCENE_PREFIX_BOUNDARY = ". /"

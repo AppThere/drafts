@@ -57,4 +57,28 @@ class FountainKeywordsTest {
                 .size,
         )
     }
+
+    @Test
+    fun `a heading in a language the words do not know is offered by its first word`() {
+        assertEquals("INTÉRIEUR", unrecognisedHeadingWord("INTÉRIEUR CUISINE - JOUR", FountainKeywords.ENGLISH))
+        assertEquals("INNEN", unrecognisedHeadingWord("INNEN. KÜCHE - TAG", FountainKeywords.ENGLISH))
+    }
+
+    @Test
+    fun `nothing is offered for a heading that already reads as one`() {
+        assertNull(unrecognisedHeadingWord("INT. KITCHEN - DAY", FountainKeywords.ENGLISH))
+        assertNull(unrecognisedHeadingWord(".INTÉRIEUR CUISINE - JOUR", FountainKeywords.ENGLISH))
+    }
+
+    @Test
+    fun `nothing is offered for lines without a heading's shape`() {
+        listOf(
+            "She leaves - quickly.",
+            "BANG - BANG",
+            "CUT TO:",
+            "THE DOOR SLAMS.",
+            "INTÉRIEUR - JOUR",
+            "1984 KITCHEN - DAY",
+        ).forEach { line -> assertNull(unrecognisedHeadingWord(line, FountainKeywords.ENGLISH), line) }
+    }
 }

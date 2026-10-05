@@ -24,8 +24,11 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
+import com.appthere.drafts.core.model.SourceSpan
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.editor.engine.BlockId
+import com.appthere.drafts.editor.engine.Caret
+import com.appthere.drafts.editor.engine.changeBetween
 
 /**
  * Reveal: the raw source, markup visible, in the block's own type.
@@ -202,4 +205,25 @@ private fun EditorState.moveAcrossBoundary(
         Key.DirectionDown -> onLastLine && moveToNext()
         else -> false
     }
+}
+
+/**
+ * Replaces the focused block's source with what the field now holds.
+ *
+ * The field reports its whole contents, but what is *recorded* is narrowed to the run that
+ * actually changed. Recording the whole block would make every keystroke a replacement of
+ * everything, which no amount of care in [UndoHistory] can coalesce -- undo would step back one
+ * character at a time. See [changeBetween].
+ */
+fun EditorState.replace(
+    span: SourceSpan,
+    replacement: String,
+    offset: Int,
+) {
+    val block = caret?.block ?: return
+    val existing = text.substring(span.start.value, span.endExclusive.value)
+    val change = changeBetween(existing, replacement) ?: return
+
+    edit(SourceSpan.of(span.start.value + change.start, span.start.value + change.endExclusive), change.replacement)
+    place(Caret(block, offset))
 }

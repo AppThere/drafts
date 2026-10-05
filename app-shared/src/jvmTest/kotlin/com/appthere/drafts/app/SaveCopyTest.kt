@@ -14,6 +14,7 @@ import androidx.compose.ui.test.v2.runSkikoComposeUiTest
 import com.appthere.drafts.editor.engine.Caret
 import com.appthere.drafts.editor.engine.DocumentSession
 import com.appthere.drafts.editor.ui.EditorState
+import com.appthere.drafts.editor.ui.replace
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.conflict
 import com.appthere.drafts.i18n.resources.save_copy

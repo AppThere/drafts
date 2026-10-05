@@ -4,7 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
@@ -27,9 +28,14 @@ import com.appthere.drafts.i18n.resources.close
 import com.appthere.drafts.i18n.resources.could_not_save
 import com.appthere.drafts.i18n.resources.discard
 import com.appthere.drafts.i18n.resources.file_gone
+import com.appthere.drafts.i18n.resources.heading_offer
+import com.appthere.drafts.i18n.resources.heading_offer_add
+import com.appthere.drafts.i18n.resources.heading_offer_mark
+import com.appthere.drafts.i18n.resources.heading_offer_not_now
 import com.appthere.drafts.i18n.resources.keep
 import com.appthere.drafts.i18n.resources.restored
 import com.appthere.drafts.i18n.resources.save_as_choice
+import com.appthere.drafts.i18n.resources.scene_headings_not_saved
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -43,6 +49,7 @@ import org.jetbrains.compose.resources.stringResource
  * [announce] makes it a polite live region, for a message that arrives while the reader is doing
  * something else and would otherwise reach a screen reader only if its user went looking.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun Banner(
     message: String,
@@ -52,7 +59,9 @@ private fun Banner(
 ) {
     val palette = LocalPalette.current
 
-    Row(
+    // Wraps, so a banner with three answers on a phone at 200% puts them on a second row rather
+    // than pushing the last one off the edge.
+    FlowRow(
         modifier
             .widthIn(max = maxWidth)
             .background(palette.background)
@@ -63,7 +72,8 @@ private fun Banner(
                 if (announce) liveRegion = LiveRegionMode.Polite
             },
         horizontalArrangement = Arrangement.spacedBy(gap),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(gap),
+        itemVerticalAlignment = Alignment.CenterVertically,
     ) {
         BasicText(
             text = message,
@@ -135,6 +145,48 @@ fun SaveFailedBanner(
 ) {
     Banner(
         message = stringResource(Res.string.could_not_save),
+        choices = listOf(stringResource(Res.string.close) to onDismiss),
+        modifier = modifier,
+        announce = true,
+    )
+}
+
+/**
+ * 11.3's offer for a line that looks like a scene heading the screenplay's words do not make one:
+ * force it, teach the screenplay its first word, or leave it be.
+ *
+ * Announced: it arrives as the caret leaves a line, while the writer's attention is on the next
+ * one, and a screen reader would otherwise not hear of it.
+ */
+@Composable
+internal fun HeadingOfferBanner(
+    word: String,
+    onMark: () -> Unit,
+    onAdd: () -> Unit,
+    onNotNow: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Banner(
+        message = stringResource(Res.string.heading_offer),
+        choices =
+            listOf(
+                stringResource(Res.string.heading_offer_mark) to onMark,
+                stringResource(Res.string.heading_offer_add, word) to onAdd,
+                stringResource(Res.string.heading_offer_not_now) to onNotNow,
+            ),
+        modifier = modifier,
+        announce = true,
+    )
+}
+
+/** A heading word that applies but could not be kept for the next time the screenplay opens. */
+@Composable
+internal fun WordsNotKeptBanner(
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Banner(
+        message = stringResource(Res.string.scene_headings_not_saved),
         choices = listOf(stringResource(Res.string.close) to onDismiss),
         modifier = modifier,
         announce = true,

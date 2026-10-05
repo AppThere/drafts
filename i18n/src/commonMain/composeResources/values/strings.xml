@@ -189,6 +189,15 @@
     <string name="transition_ending">Transition ending</string>
     <string name="apply">Apply</string>
     <string name="transition_ending_needed">A transition ending is needed. Without one, every line in capitals on its own would be a transition.</string>
+    <!--
+      11.3's offer, when the caret leaves a line that looks like a scene heading the screenplay's
+      words do not make one. Marking it puts Fountain's "." in front of that line; adding the word
+      teaches it to the whole screenplay. %1$s is the word, as the reader wrote it.
+    -->
+    <string name="heading_offer">This line looks like a scene heading.</string>
+    <string name="heading_offer_mark">Mark it</string>
+    <string name="heading_offer_add">Add “%1$s”</string>
+    <string name="heading_offer_not_now">Not now</string>
     <string name="scene_headings_not_saved">These words could not be kept. They apply until this window closes, and will need choosing again next time.</string>
 
     <!--

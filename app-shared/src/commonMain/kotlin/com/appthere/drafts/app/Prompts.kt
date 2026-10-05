@@ -1,6 +1,8 @@
 package com.appthere.drafts.app
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -11,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.appthere.drafts.core.fountain.FountainKeywords
 import com.appthere.drafts.platform.files.WriteOutcome
 import kotlinx.coroutines.launch
 
@@ -28,6 +31,7 @@ internal fun BoxScope.DocumentPrompts(
     keeper: SnapshotKeeper?,
     saving: Saving,
     saveAs: (suspend () -> WriteOutcome?)?,
+    keywordsChange: (suspend (FountainKeywords) -> Boolean)? = null,
 ) {
     val scope = rememberCoroutineScope()
 
@@ -35,30 +39,38 @@ internal fun BoxScope.DocumentPrompts(
     // document opened and does not stop being true once the reader has answered.
     var announceRestored by remember(document) { mutableStateOf(document.restoredFromSnapshot) }
 
-    if (announceRestored) {
-        RestoredBanner(
-            onKeep = { announceRestored = false },
-            onDiscard = {
-                // Back to the file, and the snapshot goes with it. Reloading without discarding
-                // would leave the snapshot to be restored again on the next launch, which is the
-                // reader being asked the same question until they answer it differently.
-                scope.launch {
-                    document.reload()
-                    keeper?.discard()
-                    announceRestored = false
-                }
-            },
-            modifier = Modifier.align(Alignment.BottomCenter).padding(inset),
-        )
-    }
+    // At the foot, one above another: more than one can be showing at once.
+    Column(
+        Modifier.align(Alignment.BottomCenter).padding(inset),
+        verticalArrangement = Arrangement.spacedBy(inset),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        if (announceRestored) {
+            RestoredBanner(
+                onKeep = { announceRestored = false },
+                onDiscard = {
+                    // Back to the file, and the snapshot goes with it. Reloading without discarding
+                    // would leave the snapshot to be restored again on the next launch, which is the
+                    // reader being asked the same question until they answer it differently.
+                    scope.launch {
+                        document.reload()
+                        keeper?.discard()
+                        announceRestored = false
+                    }
+                },
+            )
+        }
 
-    // 7.3: "A document whose file has vanished opens ... from its snapshot with a clear banner
-    // offering *Save As*." Gone once Save As has given it a file again.
-    if (document.needsSaveAs && !document.isUntitled && saveAs != null) {
-        FileGoneBanner(
-            onSaveAs = { scope.launch { saving.saveAs(saveAs) } },
-            modifier = Modifier.align(Alignment.BottomCenter).padding(inset),
-        )
+        // 7.3: "A document whose file has vanished opens ... from its snapshot with a clear banner
+        // offering *Save As*." Gone once Save As has given it a file again.
+        if (document.needsSaveAs && !document.isUntitled && saveAs != null) {
+            FileGoneBanner(
+                onSaveAs = { scope.launch { saving.saveAs(saveAs) } },
+            )
+        }
+
+        // 11.3's offer for the line the caret just left.
+        keywordsChange?.let { HeadingOfferPrompt(document.editor, it) }
     }
 
     if (saving.refusal != null) {

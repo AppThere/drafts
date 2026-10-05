@@ -46,6 +46,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import com.appthere.drafts.core.fountain.FountainKeywords
 import com.appthere.drafts.design.DraftsTheme
 import com.appthere.drafts.design.Fold
 import com.appthere.drafts.design.FoldClearance
@@ -148,6 +149,13 @@ fun DraftsApp(
     // still conflicted afterwards, so the dialog would come straight back.
     val saving = remember(document, keeper) { Saving(document, keeper) }
 
+    // 11.3: the screenplay is read again with the new words, which are kept under its file.
+    val keywordsChange: suspend (FountainKeywords) -> Boolean = { words ->
+        document.editor.reinterpretAs(BlockParser.Fountain(words))
+        val kept = keeper?.identity?.let { identity -> settingsStore?.rememberKeywords(identity, words) }
+        kept ?: true
+    }
+
     DraftsWindow(
         editor = document.editor,
         initialSettings = initialSettings,
@@ -209,19 +217,8 @@ fun DraftsApp(
                         onSave = { scope.launch { saving.save(saveAs) } },
                     )
                 },
-                prompts = { DocumentPrompts(document, keeper, saving, saveAs) },
-                // 11.3: the screenplay is read again with the new words, kept under its file.
-                keywordsChange = { words ->
-                    document.editor.reinterpretAs(BlockParser.Fountain(words))
-                    val identity = keeper?.identity
-                    if (identity == null ||
-                        settingsStore == null
-                    ) {
-                        true
-                    } else {
-                        settingsStore.rememberKeywords(identity, words)
-                    }
-                },
+                prompts = { DocumentPrompts(document, keeper, saving, saveAs, keywordsChange) },
+                keywordsChange = keywordsChange,
             ),
         modifier = modifier,
     )
