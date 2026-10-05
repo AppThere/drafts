@@ -87,29 +87,23 @@ class ScreenplayLayoutTest {
         }
 
     @Test
-    fun `a character name keeps its indentation while lowercase is typed into it`() =
+    fun `the line being edited is set full width`() =
         runSkikoComposeUiTest(size = WIDE) {
-            // Typed lowercase, the line stops being a character name and the parser makes it
-            // action. 4.5 holds the role until the caret leaves, so the line stays where it was.
+            // A screenplay's roles turn on what is typed, so the line being written is not placed
+            // until the caret leaves it: no inset to jump from as the parser changes its mind.
             val state = show(DOCUMENT)
-            val before = leftOf(CHARACTER)
-            val name = state.blocks.first { state.sourceOf(it.block) == CHARACTER }
-            state.place(Caret(name.id, CHARACTER.length))
-            waitForIdle()
+            edit(state, CHARACTER)
 
-            onNode(isFocused()).performTextInput("by")
-            waitForIdle()
-
-            assertNear(before, leftOf("${CHARACTER}by", substring = true), "held character")
+            val field = onNode(isFocused()).getBoundsInRoot()
+            assertNear(leftOf(ACTION), field.left, "start")
+            assertNear(widthOf(ACTION), field.right - field.left, "width")
         }
 
     @Test
     fun `the role settles once the caret leaves`() =
         runSkikoComposeUiTest(size = WIDE) {
             val state = show(DOCUMENT)
-            val name = state.blocks.first { state.sourceOf(it.block) == CHARACTER }
-            state.place(Caret(name.id, CHARACTER.length))
-            waitForIdle()
+            edit(state, CHARACTER)
             onNode(isFocused()).performTextInput("by")
             waitForIdle()
 
@@ -121,11 +115,28 @@ class ScreenplayLayoutTest {
         }
 
     @Test
-    fun `a speech typed a line at a time lands at its indentation`() =
+    fun `editing a wrapped speech full width does not move the page below it`() =
         runSkikoComposeUiTest(size = WIDE) {
-            // The name, Enter, the speech: what a screenwriter types. Enter under the name opens a
-            // dialogue line, set as dialogue before a word of it is typed, so nothing moves under
-            // the caret.
+            // Two lines in the dialogue's band, one at full width: the row keeps its two lines while
+            // it is edited, so nothing under it moves, now or when the caret leaves.
+            val state = show(LONG_SPEECH_DOCUMENT)
+            val before = onNodeWithText(ACTION_AFTER).getBoundsInRoot().top
+
+            edit(state, LONG_SPEECH)
+            val during = onNodeWithText(ACTION_AFTER).getBoundsInRoot().top
+            state.place(Caret(state.blocks.first().id, 0))
+            waitForIdle()
+            val after = onNodeWithText(ACTION_AFTER).getBoundsInRoot().top
+
+            assertEquals(before, during, "The page moved when the speech was revealed")
+            assertEquals(before, after, "The page moved when the speech was placed again")
+        }
+
+    @Test
+    fun `a speech typed a line at a time is placed when the caret leaves`() =
+        runSkikoComposeUiTest(size = WIDE) {
+            // The name, Enter, the speech: what a screenwriter types. Each line is written full
+            // width, and both land at their insets once the caret moves on.
             val state = show("$ACTION\n\n")
             state.place(Caret(state.blocks.last().id, 0))
             waitForIdle()
@@ -136,13 +147,25 @@ class ScreenplayLayoutTest {
             val opened = onNode(isFocused()).getBoundsInRoot().left
             onNode(isFocused()).performTextInput(SPEECH)
             waitForIdle()
+            state.place(Caret(state.blocks.first().id, 0))
+            waitForIdle()
 
             assertEquals("$ACTION\n\n$CHARACTER\n$SPEECH", state.text)
             val column = widthOf(ACTION)
-            assertNear(leftOf(ACTION) + column * Screenplay.Dialogue.insetStart, opened, "opened line")
-            assertNear(opened, leftOf(SPEECH), "speech")
+            assertNear(leftOf(ACTION), opened, "opened line")
+            assertNear(leftOf(ACTION) + column * Screenplay.Dialogue.insetStart, leftOf(SPEECH), "speech")
             assertNear(leftOf(ACTION) + column * Screenplay.Character.insetStart, leftOf(CHARACTER), "name")
         }
+
+    /** The caret at the end of the block whose source is [source]. */
+    private fun SkikoComposeUiTest.edit(
+        state: EditorState,
+        source: String,
+    ) {
+        val block = state.blocks.first { state.sourceOf(it.block) == source }
+        state.place(Caret(block.id, source.length))
+        waitForIdle()
+    }
 
     private fun SkikoComposeUiTest.show(text: String): EditorState {
         val state = EditorState(DocumentSession(text, BlockParser.Fountain()))
@@ -180,6 +203,9 @@ class ScreenplayLayoutTest {
         const val SPEECH = "Hello there."
         const val DIALOGUE = SPEECH
         const val ASIDE = "(quietly)"
+        const val LONG_SPEECH = "I have told you twice already, and I will not do it again."
+        const val ACTION_AFTER = "She leaves."
+        const val LONG_SPEECH_DOCUMENT = "$ACTION\n\n$CHARACTER\n$LONG_SPEECH\n\n$ACTION_AFTER\n"
         const val SPEECH_DOCUMENT = "$ACTION\n\n$CHARACTER\n$ASIDE\n$SPEECH\n"
         const val DOCUMENT = "INT. HOUSE - DAY\n\n$ACTION\n\n$CHARACTER\n$SPEECH\n\nCUT TO:\n"
     }

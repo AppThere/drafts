@@ -146,10 +146,12 @@ class EditorState(
      *
      * 4.5: "Because Fountain block roles are driven by position and case, the indentation must not
      * shift while a character name is being typed. Debounce role reclassification: hold the
-     * previous role until the user leaves the block or a blank line settles the ambiguity." A name
-     * that turns to action at its first lowercase letter, and back at the next capital, would move
-     * the line under the reader's hands on every keystroke. Leaving the block lets it settle; a
-     * blank line is Enter, which leaves it too.
+     * previous role until the user leaves the block or a blank line settles the ambiguity."
+     *
+     * The line being edited is set full width, so its indentation cannot shift (`BlockRow`). What a
+     * role still decides for it is the space above it and its weight: typing `INT. ` would otherwise
+     * push the line down to a scene heading's spacing and embolden it mid-word. Leaving the block
+     * lets it settle; a blank line is Enter, which leaves it too.
      */
     private fun settledRoleOf(editorBlock: EditorBlock): BlockRole? {
         val role = editorBlock.block.role

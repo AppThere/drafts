@@ -64,6 +64,30 @@ class PaletteTest {
     }
 
     @Test
+    fun `every text colour is readable on the editing tint`() {
+        Palettes.all.forEach { palette ->
+            val text = listOf("ink" to palette.ink, "muted" to palette.muted, "accent" to palette.accent)
+            text.forEach { (name, colour) ->
+                val ratio = Contrast.ratio(colour, palette.editing)
+                assertTrue(
+                    ratio >= palette.minimumContrast,
+                    "${palette.id}: $name on the editing tint is ${round(ratio)}:1, below ${palette.minimumContrast}:1",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `the editing tint can be told from the ground`() {
+        // Its one job is to be seen. Too close to the ground and the line being edited looks like
+        // any other, and its reflow on leaving comes as a surprise.
+        Palettes.all.forEach { palette ->
+            val ratio = Contrast.ratio(palette.editing, palette.background)
+            assertTrue(ratio >= VISIBLE_TINT, "${palette.id}: the editing tint is ${round(ratio)}:1 from the ground")
+        }
+    }
+
+    @Test
     fun `muted is quieter than ink without being unreadable`() {
         // The point of the colour: it has to read as decoration beside the text, which means less
         // contrast than the ink. A palette where the two are the same would pass every threshold
@@ -112,5 +136,8 @@ class PaletteTest {
     private companion object {
         const val TOLERANCE = 0.01
         const val ROUNDING = 100.0
+
+        /** Enough to see on any of the four grounds without drawing the eye from the text. */
+        const val VISIBLE_TINT = 1.1
     }
 }

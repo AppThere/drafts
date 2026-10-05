@@ -12,6 +12,30 @@ Each entry says what the spec asks for, what the code does, why, and what would 
 
 ---
 
+## 4.5 — The screenplay line being edited is set full width
+
+**Spec:** "the indentation must not shift while a character name is being typed. Debounce role
+reclassification: hold the previous role until the user leaves the block or a blank line settles
+the ambiguity." The 4.5 table gives each element the same indentation in reveal as in preview.
+
+**Code:** the role is held as the spec asks, but the line with the caret is not indented by it. It
+is set full width, start-aligned, on a tint (`Palette.editing`), and moves to its role's insets
+when the caret leaves. The rest of the script keeps its layout throughout.
+
+**Why:** holding the role keeps the line still, but in the wrong place. A name is action until
+someone speaks under it, so a speech typed a line at a time was written at whatever the parser last
+said, then everything around it moved when it settled. Writing the line in a neutral place and
+marking it as unplaced reads as deliberate; the reflow on leaving is expected rather than a jump.
+Chosen by the product owner after trying the held role, 2026-10-04. The held role still keeps the
+line's spacing and weight steady while it is typed.
+
+**What holds anyway:** nothing moves vertically. The row reserves the larger of its placed and
+full-width heights, so the page below stays put on the way in and out (4.2).
+
+**Closes when:** the spec adopts this, or a better treatment replaces it.
+
+---
+
 ## 8.2 — The conflict dialog offers three of four choices
 
 **Spec:** "[ Save a copy… ] [ Reload and lose my changes ] [ Show differences ] [ Cancel ]"

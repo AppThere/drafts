@@ -44,6 +44,10 @@ import androidx.compose.ui.unit.Dp
  * is remembered against the text and the width, and [androidx.compose.ui.text.TextMeasurer] keeps
  * its own cache behind that.
  *
+ * The hidden state is measured at its own width, [hiddenWidthPx]. In a document that is the width of
+ * the shown one too; a screenplay line is the exception, edited full width and placed at its role's
+ * insets only once the caret leaves it.
+ *
  * A block whose two states are the same shape reserves nothing, which is why code blocks show their
  * fences rather than hiding them -- see `appendCode`.
  */
@@ -53,14 +57,14 @@ internal fun reservedHeightOf(
     source: String,
     revealed: Boolean,
     style: TextStyle,
-    widthPx: Int,
+    hiddenWidthPx: Int,
 ): Dp {
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
 
-    return remember(preview, source, revealed, style, widthPx) {
+    return remember(preview, source, revealed, style, hiddenWidthPx) {
         val hidden = if (revealed) preview else AnnotatedString(source)
-        val layout = measurer.measure(hidden, style = style, constraints = Constraints(maxWidth = widthPx))
+        val layout = measurer.measure(hidden, style = style, constraints = Constraints(maxWidth = hiddenWidthPx))
 
         with(density) { layout.size.height.toDp() }
     }

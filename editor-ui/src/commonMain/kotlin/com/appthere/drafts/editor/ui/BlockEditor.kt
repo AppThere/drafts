@@ -29,6 +29,9 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -41,6 +44,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.appthere.drafts.design.FocusMode
@@ -201,10 +205,15 @@ private fun BlockRow(
     val revealed = emphasis == RowEmphasis.Focused
 
     // 5.4's insets, fractions of the column: a character a third of the way across, dialogue in a
-    // narrower band. The text is laid out in what is left, and reserves its height at that width.
+    // narrower band. The preview is laid out in what is left. The line being edited is not: a
+    // screenplay's roles turn on what is typed -- a name is action until someone speaks under it --
+    // so it is written full width, on a tint that says it will be placed when the caret leaves.
     val insetStart = columnWidth * content.role.insetStart
     val insetEnd = columnWidth * content.role.insetEnd
-    val textWidth = with(LocalDensity.current) { (columnWidth - insetStart - insetEnd).roundToPx() }
+    val insets = PaddingValues(start = insetStart, end = insetEnd)
+    val editing = revealed && state.screenplay
+    val previewWidth = with(LocalDensity.current) { (columnWidth - insetStart - insetEnd).roundToPx() }
+    val revealWidth = if (state.screenplay) with(LocalDensity.current) { columnWidth.roundToPx() } else previewWidth
 
     Column(
         modifier
@@ -224,7 +233,7 @@ private fun BlockRow(
             // gave a document with visibly more air between every pair of blocks than 5.2 asks for.
             .padding(top = spaceBefore, bottom = spaceAfter),
     ) {
-        // `textWidth` is the width the text itself will be laid out under, which is what makes the
+        // The hidden state at the width it would be laid out under, which is what makes the
         // reserved height the right one.
         // Measured against the source *as reveal draws it*: newlines are marked rather than
         // obeyed, so the two states differ only by the markup characters -- which is the case 4.2
@@ -235,10 +244,10 @@ private fun BlockRow(
                 source = if (content.softWrapped) reflowedForDisplay(content.source) else content.source,
                 revealed = revealed,
                 style = prose.textStyle,
-                widthPx = textWidth,
+                hiddenWidthPx = if (revealed) previewWidth else revealWidth,
             )
 
-        Box(Modifier.fillMaxWidth().padding(start = insetStart, end = insetEnd).heightIn(min = reserved)) {
+        Box(Modifier.fillMaxWidth().heightIn(min = reserved).then(if (editing) Modifier.editingTint() else Modifier)) {
             // 4.2: "Cross-fade inline decoration over 120ms with no layout animation. Because block
             // metrics are identical in both states (4.1), nothing moves -- only glyph styling
             // changes. Respect `prefers-reduced-motion`: at reduced motion the switch is
@@ -257,7 +266,7 @@ private fun BlockRow(
                         id = id,
                         preview = content.preview,
                         style = prose.textStyle,
-                        modifier = Modifier.spoken(content.spoken),
+                        modifier = Modifier.padding(insets).spoken(content.spoken),
                     )
                 },
                 reveal = {
@@ -265,14 +274,45 @@ private fun BlockRow(
                         state = state,
                         id = id,
                         source = content.source,
-                        style = prose.textStyle,
+                        style =
+                            if (state.screenplay) {
+                                prose.textStyle.copy(
+                                    textAlign = TextAlign.Start,
+                                )
+                            } else {
+                                prose.textStyle
+                            },
                         softWrapped = content.softWrapped,
+                        modifier = if (state.screenplay) Modifier else Modifier.padding(insets),
                     )
                 },
             )
         }
     }
 }
+
+/**
+ * The tint behind the screenplay line being edited ([com.appthere.drafts.design.Palette.editing]).
+ *
+ * Drawn a little past the text on either side, into the margin, so the line does not sit flush
+ * against the edge of its band; nothing is laid out differently for it.
+ */
+@Composable
+private fun Modifier.editingTint(): Modifier {
+    val colour = LocalPalette.current.editing
+    return drawBehind {
+        val bleed = tintBleed.toPx()
+        drawRoundRect(
+            color = colour,
+            topLeft = Offset(-bleed, 0f),
+            size = Size(size.width + bleed * 2, size.height),
+            cornerRadius = CornerRadius(bleed / 2),
+        )
+    }
+}
+
+/** How far the editing tint reaches past the text into the margin. The gutter is never under 16dp. */
+private val tintBleed = 8.dp
 
 /**
  * The gap above a block: the larger of its own space-before and the space-after of the block above.
