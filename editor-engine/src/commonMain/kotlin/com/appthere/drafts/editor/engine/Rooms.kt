@@ -121,11 +121,32 @@ internal class Rooms(
         role: BlockRole,
         text: String,
         parsed: List<Block>,
+    ) = place(EditorBlock(ids.next(), roomAt(at, role)), text, parsed)
+
+    /**
+     * [emptied] -- a block whose every character was just deleted -- as the room left where it was.
+     *
+     * The reverse of typing into a room. The reader deleted the words, not the paragraph, and the
+     * caret is still in it: with no block of that identity left, the field closed under them, and a
+     * document of one paragraph had nowhere left to type. Usually the text leaves a room there and
+     * this gives it the block's identity; under a character's name it leaves none, and this opens one
+     * as Enter would.
+     */
+    fun keep(
+        emptied: EditorBlock,
+        at: Int,
+        text: String,
+        parsed: List<Block>,
+    ) = place(EditorBlock(emptied.id, roomAt(at, emptied.block.role)), text, parsed)
+
+    /** [room], in place of any room already at its offset, for as long as the text has room for it. */
+    private fun place(
+        room: EditorBlock,
+        text: String,
+        parsed: List<Block>,
     ) {
-        val room =
-            EditorBlock(ids.next(), Paragraph(inlines = emptyList(), role = role, source = SourceSpan.of(at, at)))
         opened = room.id
-        blocks = found(text, parsed, blocks + room, inheriting = null)
+        blocks = found(text, parsed, blocks.filter { it.offset() != room.offset() } + room, inheriting = null)
     }
 
     /**
@@ -157,6 +178,11 @@ internal class Rooms(
 }
 
 private fun emptyRoomAt(at: Int) = Paragraph(inlines = emptyList(), source = SourceSpan.of(at, at))
+
+private fun roomAt(
+    at: Int,
+    role: BlockRole,
+) = Paragraph(inlines = emptyList(), role = role, source = SourceSpan.of(at, at))
 
 private fun EditorBlock.offset(): Int = block.source?.start?.value ?: 0
 

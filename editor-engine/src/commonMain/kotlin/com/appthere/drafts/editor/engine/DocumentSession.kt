@@ -84,6 +84,9 @@ class DocumentSession(
         // so the field the reader is typing into is not destroyed under them after one character.
         val inheriting = rooms.at(range)
 
+        // Deleting every character of a block: the reader is still in it (`Rooms.keep`).
+        val emptied = parsed.firstOrNull { replacement.isEmpty() && range.length > 0 && it.block.source == range }
+
         var window = dirtyWindow(range)
         var reparseSpan = reparseSpan(window, range, replacement.length, delta, updated.length)
 
@@ -112,6 +115,9 @@ class DocumentSession(
         text = updated
         parsed = before + reconciled + after.map { EditorBlock(it.id, it.block.shiftedBy(delta)) }
         rooms.edited(text, parsed.map { it.block }, range, delta, inheriting)
+        emptied?.takeIf { gone -> parsed.none { it.id == gone.id } }?.let {
+            rooms.keep(it, range.start.value, text, parsed.map { block -> block.block })
+        }
         blocks = merged()
 
         return EditOutcome(
