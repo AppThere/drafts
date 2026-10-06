@@ -79,6 +79,9 @@ include(":platform-files")
 include(":platform-windows")
 include(":platform-intents")
 
+// projects.md: a folder as a binder. Common logic over :platform-files.
+include(":project-model")
+
 // --- app ------------------------------------------------------------------------------------
 include(":app-shared")
 include(":app-android")

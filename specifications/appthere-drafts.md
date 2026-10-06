@@ -87,6 +87,9 @@ Constraints to respect:
 :platform-windows        Multi-window and session restoration
 :platform-intents        OS document-open handling, type identification, single instance
 
+:project-model           Projects (projects.md): a folder as a binder, its order, metadata and
+                         reconciliation -- common logic over :platform-files' folder listing
+
 :app-shared              Navigation, settings, composition root
 :app-android             Activity, manifest, intent filters
 :app-android-xr          Spatial layer (optional)
