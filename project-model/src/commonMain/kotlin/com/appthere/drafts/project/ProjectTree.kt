@@ -2,6 +2,7 @@ package com.appthere.drafts.project
 
 import com.appthere.drafts.platform.files.DocumentRef
 import com.appthere.drafts.platform.intents.DocumentKind
+import kotlin.jvm.JvmInline
 
 /**
  * A project: `projects.md` 1's "ordinary folder of ordinary files with their real names and
