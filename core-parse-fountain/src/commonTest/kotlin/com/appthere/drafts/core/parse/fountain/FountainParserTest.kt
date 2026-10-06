@@ -274,6 +274,61 @@ class FountainParserTest {
         }
     }
 
+    @Test
+    fun `every line of a chunk is in some block's words`() {
+        // A heading with a line under it used to keep the line in its source and out of its words:
+        // in the file, and missing from the screen.
+        listOf(
+            "INT. HOUSE - DAY\nShe enters.\n",
+            ".SNIPER POV\nShe aims.\n",
+            "CUT TO:\nSomething happens.\n",
+            "~Just a lyric\nsung without a tilde\n",
+        ).forEach { source ->
+            val words = parse(source).blocks.joinToString(" ") { it.words() }
+            source.lines().filter { it.isNotBlank() }.forEach { line ->
+                assertTrue(line.trimStart('.', '~') in words, "'$line' is in no block of $source")
+            }
+        }
+    }
+
+    @Test
+    fun `a heading prefix with a line under it is not a heading`() {
+        // "A line preceded by a blank line, followed by a blank line."
+        val roles = parse("INT. HOUSE - DAY\nShe enters.\n").blocks.map { it.role }
+
+        assertTrue(BlockRole.SCENE_HEADING !in roles, "Read as $roles")
+    }
+
+    @Test
+    fun `a forced heading with a line under it is a heading and then action`() {
+        val blocks = parse(".SNIPER POV\nShe aims.\n").blocks
+
+        assertEquals(listOf(BlockRole.SCENE_HEADING, BlockRole.ACTION), blocks.map { it.role })
+        assertEquals("She aims.", blocks[1].words())
+    }
+
+    @Test
+    fun `a line ending in TO with a line under it is not a character`() {
+        // "A character line may not consist solely of uppercase if it ends in `TO:`."
+        assertEquals(listOf(BlockRole.ACTION), parse("CUT TO:\nSomething happens.\n").blocks.map { it.role })
+    }
+
+    @Test
+    fun `a lyric may be sung in the middle of a speech`() {
+        // "Lyrics may appear in dialogue."
+        val blocks = parse("STEEL\n~Sing a little song\nAnd then he speaks.\n").blocks
+
+        assertEquals(listOf(BlockRole.CHARACTER, BlockRole.LYRIC, BlockRole.DIALOGUE), blocks.map { it.role })
+        assertEquals("Sing a little song", blocks[1].words())
+    }
+
+    @Test
+    fun `only lines with a tilde are lyrics`() {
+        val blocks = parse("~Just a lyric\nsung without a tilde\n").blocks
+
+        assertEquals(listOf(BlockRole.LYRIC, BlockRole.ACTION), blocks.map { it.role })
+    }
+
     private fun parse(source: String) = FountainDocumentParser().parse(source)
 
     private fun roleOf(source: String) = parse(source).blocks.single().role

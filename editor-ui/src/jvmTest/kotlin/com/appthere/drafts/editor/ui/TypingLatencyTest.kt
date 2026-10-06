@@ -11,6 +11,8 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
+import com.appthere.drafts.design.DraftsTheme
+import com.appthere.drafts.editor.engine.BlockParser
 import com.appthere.drafts.editor.engine.Caret
 import com.appthere.drafts.editor.engine.DocumentSession
 import com.appthere.drafts.editor.engine.sourceOf
@@ -59,25 +61,44 @@ class TypingLatencyTest {
 
     @Test
     fun `typing into a ten thousand word document stays within a frame`() =
-        runSkikoComposeUiTest(size = Size(WIDTH, HEIGHT)) {
-            val document = gateDocument()
-            val state = EditorState(DocumentSession(document))
-            setContent { BlockEditor(state = state) }
+        reportTyping("Phase 2 gate -- typing latency through the composition", DocumentSession(gateDocument()))
 
-            state.place(Caret(state.blocks.first().id, 0))
-            waitForIdle()
+    @Test
+    fun `typing into a ten thousand word screenplay stays within a frame`() =
+        reportTyping(
+            "Phase 7 gate -- typing latency in a screenplay",
+            DocumentSession(gateScreenplay(), BlockParser.Fountain()),
+        )
 
-            val typed = measureTyping(state)
-            val idle = measureIdle(state)
-            val stateOnly = measureStateEdits(state)
-            val floor = harnessFloor()
-            val attributable = typed[typed.size / 2] - floor
+    @Test
+    fun `the screenplay fixture really is ten thousand words`() {
+        val words = gateScreenplay().split(Regex("\\s+")).count { it.isNotBlank() }
 
-            println(
-                """
+        assertTrue(words >= TEN_THOUSAND, "The screenplay fixture is only $words words")
+    }
+
+    /** Types into the first block of [session] and prints the measurements under [title]. */
+    private fun reportTyping(
+        title: String,
+        session: DocumentSession,
+    ) = runSkikoComposeUiTest(size = Size(WIDTH, HEIGHT)) {
+        val state = EditorState(session)
+        setContent { DraftsTheme { BlockEditor(state = state) } }
+
+        state.place(Caret(state.blocks.first().id, 0))
+        waitForIdle()
+
+        val typed = measureTyping(state)
+        val idle = measureIdle(state)
+        val stateOnly = measureStateEdits(state)
+        val floor = harnessFloor()
+        val attributable = typed[typed.size / 2] - floor
+
+        println(
+            """
                 |
-                |Phase 2 gate -- typing latency through the composition
-                |  document:        ${document.length} code units, ${state.blocks.size} blocks
+                |$title
+                |  document:        ${state.text.length} code units, ${state.blocks.size} blocks
                 |  keystrokes:      ${typed.size}
                 |  median:          ${typed[typed.size / 2]} microseconds
                 |  slowest:         ${typed.last()} microseconds
@@ -86,17 +107,17 @@ class TypingLatencyTest {
                 |  harness floor:   $floor microseconds (one trivial recomposition)
                 |  attributable:    $attributable microseconds above the floor
                 |  frame budget:    $FRAME_BUDGET microseconds at 120Hz
-                """.trimMargin(),
-            )
+            """.trimMargin(),
+        )
 
-            println(
-                if (attributable < FRAME_BUDGET) {
-                    "  verdict:         within budget on the median, by ${FRAME_BUDGET - attributable}us"
-                } else {
-                    "  verdict:         OVER by ${attributable - FRAME_BUDGET}us on the median"
-                },
-            )
-        }
+        println(
+            if (attributable < FRAME_BUDGET) {
+                "  verdict:         within budget on the median, by ${FRAME_BUDGET - attributable}us"
+            } else {
+                "  verdict:         OVER by ${attributable - FRAME_BUDGET}us on the median"
+            },
+        )
+    }
 
     @Test
     fun `typing into a long document does not disturb the rest of it`() {

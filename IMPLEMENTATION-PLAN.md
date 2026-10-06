@@ -315,7 +315,8 @@ they constrain the project model in phase 8.
 - Role reclassification debounce (§4.5) so indentation doesn't shift mid-typing.
 - Configurable scene-heading prefixes and transition suffix (§11.3) — Fountain 1.1's keywords are
   English.
-- Notes, boneyard, sections, synopses: dimmed and collapsible in preview, full source in reveal.
+- Notes and boneyard dimmed and collapsible, sections and synopses dimmed, in preview; full source
+  in reveal (`appthere-drafts.md` §4.5's table).
 
 **Acceptance**
 - Round-trip byte-identical on a corpus of real `.fountain` files.

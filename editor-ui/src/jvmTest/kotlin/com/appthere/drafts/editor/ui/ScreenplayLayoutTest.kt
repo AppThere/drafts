@@ -157,6 +157,26 @@ class ScreenplayLayoutTest {
             assertNear(leftOf(ACTION) + column * Screenplay.Character.insetStart, leftOf(CHARACTER), "name")
         }
 
+    @Test
+    fun `typing a character name a letter at a time moves nothing`() =
+        runSkikoComposeUiTest(size = WIDE) {
+            // Phase 7's acceptance: "Typing a character name doesn't cause indentation to jump." A
+            // name is action until it is all capitals with someone speaking under it, so each
+            // letter can change what the parser makes of the line.
+            val state = show("$ACTION\n\n\n\n$ACTION_AFTER\n")
+            state.place(Caret(state.blocks[1].id, 0))
+            waitForIdle()
+            val start = onNode(isFocused()).getBoundsInRoot().left
+            val below = onNodeWithText(ACTION_AFTER).getBoundsInRoot().top
+
+            "BOB".forEach { letter ->
+                onNode(isFocused()).performTextInput(letter.toString())
+                waitForIdle()
+                assertNear(start, onNode(isFocused()).getBoundsInRoot().left, "the line after '$letter'")
+                assertNear(below, onNodeWithText(ACTION_AFTER).getBoundsInRoot().top, "the line below after '$letter'")
+            }
+        }
+
     /** The caret at the end of the block whose source is [source]. */
     private fun SkikoComposeUiTest.edit(
         state: EditorState,

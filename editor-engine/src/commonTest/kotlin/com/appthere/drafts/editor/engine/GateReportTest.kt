@@ -12,9 +12,21 @@ import kotlin.time.TimeSource
  */
 class GateReportTest {
     @Test
-    fun `report bounded reparse on the gate fixture`() {
-        val text = GateFixture.tenThousandWords()
-        val session = DocumentSession(text)
+    fun `report bounded reparse on the gate fixture`() =
+        report("Phase 2 gate -- engine measurements", GateFixture.tenThousandWords()) { BlockParser.Markdown() }
+
+    @Test
+    fun `report bounded reparse on the gate screenplay`() =
+        report("Phase 7 gate -- engine measurements in a screenplay", GateFixture.tenThousandWordScreenplay()) {
+            BlockParser.Fountain()
+        }
+
+    private fun report(
+        title: String,
+        text: String,
+        parser: () -> BlockParser,
+    ) {
+        val session = DocumentSession(text, parser())
         val blocks = session.blocks.size
 
         val target = session.blocks[blocks / 2].block.source!!
@@ -23,7 +35,7 @@ class GateReportTest {
         println(
             """
             |
-            |Phase 2 gate -- engine measurements
+            |$title
             |  document:        ${text.length} code units, $blocks blocks
             |  reparsed:        ${outcome.reparsed.length} code units (${percent(
                 outcome.reparsed.length,
@@ -32,7 +44,7 @@ class GateReportTest {
             |  blocks rebuilt:  ${outcome.blocksReplaced}
             |  identities kept: ${outcome.blocksReused} of ${outcome.blocksReplaced} in the window
             |  blocks shifted:  ${outcome.blocksShifted}
-            |  per-edit median: ${medianEditMicros(text)} microseconds
+            |  per-edit median: ${medianEditMicros(text, parser)} microseconds
             |  frame budget:    8333 microseconds at 120Hz
             """.trimMargin(),
         )
@@ -45,11 +57,14 @@ class GateReportTest {
      * unlucky garbage collection should not decide that. This measures the engine alone -- no
      * layout, no draw -- so it is a floor on the real cost, not an estimate of it.
      */
-    private fun medianEditMicros(text: String): Long {
+    private fun medianEditMicros(
+        text: String,
+        parser: () -> BlockParser,
+    ): Long {
         val timings = mutableListOf<Long>()
 
         repeat(SAMPLES + WARMUP) { iteration ->
-            val session = DocumentSession(text)
+            val session = DocumentSession(text, parser())
             val target = session.blocks[session.blocks.size / 2].block.source!!
             val at = SourceSpan.of(target.start.value, target.start.value)
 

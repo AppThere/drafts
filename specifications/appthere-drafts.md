@@ -154,6 +154,12 @@ slack at the bottom. *Every* block, not only the focused one: the growth is the 
 slack that arrived with focus would arrive too late. The cost is bounded by the viewport, since
 only composed blocks are measured, and it buys a completely still page.
 
+Two exceptions, both in a screenplay and both chosen with the product owner (2026-10-04/05). The
+line being edited is set full width (§4.5), and reserves the larger of its placed and full-width
+heights, so it still moves nothing vertically. A row whose notes are collapsed (§4.5) reserves only
+its preview's height: reserving the source's would keep the room a collapsed boneyard took and show
+one line in it. The page below that row moves when the caret goes into it.
+
 ### 4.3 Implementation approach
 
 Three options were considered:
@@ -213,17 +219,22 @@ follows it), so the reveal/preview distinction differs:
 | Element | Preview | Reveal |
 |---|---|---|
 | Scene heading | `INT. KITCHEN - DAY` in caps, bold, full width | same, plus a leading `.` if forced |
-| Character | Indented 36.7%, caps | same, plus `@` if forced |
-| Dialogue | Indented 16.7%, 25% right inset | same |
-| Parenthetical | Indented 26.7% | same |
+| Character | Indented 36.7%, caps | full width, plus `@` if forced |
+| Dialogue | Indented 16.7%, 25% right inset | full width |
+| Parenthetical | Indented 26.7% | full width |
 | Transition | Right-aligned, caps | same, plus `>` if forced |
 | Emphasis | `*italic*` rendered | markers visible |
-| Notes `[[ ]]`, Boneyard `/* */` | Dimmed, collapsible | Full source |
-| Sections `#`, Synopses `=` | Dimmed, outline-only styling | Full source |
+| Notes `[[ ]]`, Boneyard `/* */` | Dimmed; collapsed to `[[…]]` and `/* … */` when the reader chooses | Full source |
+| Sections `#`, Synopses `=` | Dimmed; a synopsis in italic | Full source |
 
 Because Fountain block roles are driven by position and case, the indentation must not shift
-while a character name is being typed. Debounce role reclassification: hold the previous role
-until the user leaves the block or a blank line settles the ambiguity.
+while a character name is being typed. So the line being edited is set **full width**, start-aligned,
+on a tint that says it is not yet placed, and moves to its role's insets when the caret leaves.
+Role reclassification is still debounced -- the previous role is held until the user leaves the
+block -- for what a role decides about the line being typed: its spacing and its weight.
+
+Collapsing notes and boneyard is one reader choice for a screenplay, *Notes: shown / collapsed*,
+kept with the other reader settings for the type (§5.5).
 
 ---
 
@@ -314,13 +325,19 @@ Within that:
 **Set the mono size so exactly 61 monospace characters fit the content column.** Screenplay
 action at 12pt Courier and 10 characters per inch gives ~60 characters per line, so matching that
 count means on-screen line breaks approximate what a printed page would do — without implementing
-pagination, which is explicitly out of scope.
+pagination, which is explicitly out of scope. The size never drops below the reader's base size
+(§5.5): on a phone, 61 characters would set the script around 10sp, which §10.2's legibility does
+not allow, so there a line carries fewer.
 
 The content column additionally carries a **US Letter width ceiling**: however wide the window,
 the screenplay body never exceeds the width a printed page would give it.
 
 Dual dialogue is a two-column layout at the 16.7%/25% insets, splitting the available width. On a
-compact window it stacks vertically with a connecting rule and a "simultaneous" marker.
+compact window it stacks vertically with a connecting rule and a "simultaneous" marker. A pair with
+the caret in either speech is stacked whatever the window, and goes back side by side when the caret
+leaves: its lines are being written, and a pair side by side is placed already. Within its column
+each speech is set as it would be in dialogue's band across the page, the columns two characters
+apart.
 
 ### 5.5 Reader controls
 

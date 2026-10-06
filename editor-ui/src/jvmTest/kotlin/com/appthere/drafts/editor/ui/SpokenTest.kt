@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
+import com.appthere.drafts.editor.engine.BlockParser
 import com.appthere.drafts.editor.engine.Caret
 import com.appthere.drafts.editor.engine.DocumentSession
 import kotlin.test.Test
@@ -51,6 +52,21 @@ class SpokenTest {
             show("```kotlin\nfun main() {}\n```\n\n$PARAGRAPH\n")
 
             onNodeWithContentDescription("Code block, Kotlin, fun main() {}").assertExists()
+        }
+
+    @Test
+    fun `a screenplay's elements are named`() =
+        runSkikoComposeUiTest(size = SIZE) {
+            // 10.1: "a `contentDescription` prefix naming the type: 'Scene heading', ...". Action
+            // goes unnamed, as a paragraph does.
+            val state = EditorState(DocumentSession(SCRIPT, BlockParser.Fountain()))
+            setContent { BlockEditor(state = state) }
+            waitForIdle()
+
+            onNodeWithContentDescription("Scene heading, INT. HOUSE - DAY").assertExists()
+            onNodeWithContentDescription("Character, BOB").assertExists()
+            onNodeWithContentDescription("Dialogue, Hello there.").assertExists()
+            onNodeWithContentDescription("She waits.", substring = true).assertDoesNotExist()
         }
 
     @Test
@@ -142,6 +158,7 @@ class SpokenTest {
 
     private companion object {
         val SIZE = Size(1200f, 900f)
+        const val SCRIPT = "INT. HOUSE - DAY\n\nShe waits.\n\nBOB\nHello there.\n"
         const val QUOTE = "Salt gets into everything."
         const val TITLE = "The Salt Road"
         const val PARAGRAPH = "The road ran along the shore."

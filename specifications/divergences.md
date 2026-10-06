@@ -12,83 +12,6 @@ Each entry says what the spec asks for, what the code does, why, and what would 
 
 ---
 
-## 4.5 — The screenplay line being edited is set full width
-
-**Spec:** "the indentation must not shift while a character name is being typed. Debounce role
-reclassification: hold the previous role until the user leaves the block or a blank line settles
-the ambiguity." The 4.5 table gives each element the same indentation in reveal as in preview.
-
-**Code:** the role is held as the spec asks, but the line with the caret is not indented by it. It
-is set full width, start-aligned, on a tint (`Palette.editing`), and moves to its role's insets
-when the caret leaves. The rest of the script keeps its layout throughout.
-
-**Why:** holding the role keeps the line still, but in the wrong place. A name is action until
-someone speaks under it, so a speech typed a line at a time was written at whatever the parser last
-said, then everything around it moved when it settled. Writing the line in a neutral place and
-marking it as unplaced reads as deliberate; the reflow on leaving is expected rather than a jump.
-Chosen by the product owner after trying the held role, 2026-10-04. The held role still keeps the
-line's spacing and weight steady while it is typed.
-
-**What holds anyway:** nothing moves vertically. The row reserves the larger of its placed and
-full-width heights, so the page below stays put on the way in and out (4.2).
-
-**Closes when:** the spec adopts this, or a better treatment replaces it.
-
----
-
-## 5.4 — A dual-dialogue pair being written is stacked
-
-**Spec:** "Dual dialogue is a two-column layout at the 16.7%/25% insets, splitting the available
-width. On a compact window it stacks vertically with a connecting rule and a 'simultaneous'
-marker."
-
-**Code:** as the spec says, except while the caret is in either speech of the pair. Then the pair is
-stacked, with the rule and marker, whatever the window: each line its own row, and the line with the
-caret set full width as 4.5's entry above describes. When the caret leaves, the pair goes back side
-by side.
-
-**Why:** the same reason as 4.5's entry. A line being written is not placed yet, and a pair set side
-by side is placed already. It also keeps the field holding the caret out of a regrouping: side by
-side, the pair is one row of the list, and typing or deleting the `^` would otherwise rebuild the
-row around the field. Chosen by the product owner, 2026-10-04, over editing inside the narrow column.
-
-**The cost:** clicking into a side-by-side pair on a wide window moves the page below it, by the
-difference between the pair's height side by side and stacked. 4.2's reserved heights cover one
-block's two states, not a pair's two layouts.
-
-**Also, where the spec says nothing:** within its column each speech is set as it would be in
-dialogue's band across the page (a name keeps its inset beyond dialogue's, scaled to the narrower
-column), and the columns are two characters apart. The marker sits in the margin before the second
-name, so it takes no height, and is silent to a screen reader: the name itself is announced
-"Simultaneous, STEEL", side by side or stacked.
-
-**Closes when:** the spec adopts this, or a better treatment replaces it.
-
----
-
-## 4.2 — A row with collapsed notes does not reserve its source's height
-
-**Spec:** 4.2 has every block reserve the taller of its two states, so that nothing moves when the
-caret goes into one; 4.5 makes Fountain's notes `[[ ]]` and boneyard `/* */` "dimmed, collapsible"
-in preview, with "full source" in reveal.
-
-**Code:** collapsing is one choice in a screenplay's reader controls, *Notes: shown / collapsed*,
-kept with the other per-type settings. Collapsed, a note is drawn as `[[…]]` and a whole boneyard
-as `/* … */`, dimmed. A row that has collapsed something reserves only its preview's height. When
-the caret goes into it, its full source is shown and the page below moves down to make room.
-
-**Why:** the two rules cannot both hold. Reserving the source's height would keep the room a
-twenty-line boneyard took and show one line in it: collapsing would hide the words and save none
-of the page. Chosen by the product owner, 2026-10-05, over collapsing element by element.
-
-**Also, where the spec says nothing:** "outline-only styling" for sections and synopses is dimmed,
-with a synopsis set in italic. A screen reader hears a collapsed boneyard as "Boneyard" and a line
-with a collapsed note as "Notes collapsed" before its words; the folded markers are not read out.
-
-**Closes when:** the spec adopts this, or 4.2's reservation learns to tell a collapse from a reveal.
-
----
-
 ## 8.2 — The conflict dialog offers three of four choices
 
 **Spec:** "[ Save a copy… ] [ Reload and lose my changes ] [ Show differences ] [ Cancel ]"
@@ -227,7 +150,8 @@ right-hand column is a character name.
 
 The two roles are therefore unused. 5.4's renderer has now been built and did not want them: it
 finds a pair from the marked name's class and the speech before it (`dualPairsOf`), and every block
-keeps the role that decides its insets. Nothing reads or writes either role.
+keeps the role that decides its insets. No parse produces either role; the serialiser and the
+screenplay layout still have branches for them, which cannot run and go with the roles.
 
 **Also:** a Fountain title page has no role at all -- neither 5.4's inset table nor the enum has
 one -- so it is a `BODY` paragraph holding its own source, with its `Title:` and `Author:` lifted
@@ -244,7 +168,7 @@ look of its own.
 **Spec:** "Compose Multiplatform Resources with `stringResource` and **per-locale directories**. No
 string concatenation; use positional parameters. Pluralisation via plural resources."
 
-**Code:** all 110 strings are in `values/strings.xml` in `:i18n`, read with `stringResource` in a
+**Code:** all 139 strings are in `values/strings.xml` in `:i18n`, read with `stringResource` in a
 composition and `getString` outside one. Everything user-facing that was a joined string is a
 positional-parameter resource: the "Document, Saved" pattern behind every content description, the
 units in the reader controls, and the mark between a number and its fraction.
@@ -418,11 +342,51 @@ the parser; it is a fact about the format that the parser also happens to use.
 
 ---
 
+## 7 (Fountain) — A note with a blank line in it is two halves of a note
+
+**Spec:** `fountain.md`: "A note containing a blank line is still a single note."
+
+**Code:** notes are read inline, within a block, and blocks are split on blank lines first. A note
+with a blank line in it is cut in two, and neither half has both its brackets, so each shows its
+characters as written. Nothing is lost: the file is untouched and round-trips byte for byte, and the
+reveal shows the source either way.
+
+**Why:** a boneyard, which can also span blank lines, is lifted out before the split; a note cannot
+be, because "notes can appear inside any element" and lifting one out of an action line would cut
+the line in half. Reading a note across blocks touches the chunking and the reparse window, which
+are the things the window tests hold equal to a whole parse.
+
+**Closes when:** a note that crosses a blank line is read as one, with the window widened to it the
+way it is widened to a chunk.
+
+---
+
+## 10.1 — Dialogue is announced without its speaker
+
+**Spec:** 10.1 gives a screenplay's announcements as "'Scene heading', 'Dialogue, Marla'".
+
+**Code:** a screenplay's elements are named -- "Scene heading", "Character", "Dialogue" and the rest,
+with action unnamed as a paragraph is in prose -- but dialogue is "Dialogue" and then its words,
+without the name of who says them.
+
+**Why:** a row's description is built from its own block and cached against that block's text, so
+that a row which merely moved is not composed again. The speaker is in the block above; naming it
+would key every line of dialogue on another block's text as well. The name is read on the line just
+before, which is where a reader moving through the script meets it.
+
+**Closes when:** the speaker is carried with the speech in the model, or the cache learns a second key.
+
+---
+
 ## 7 (Fountain) — What the canonical path cannot express
 
 **Spec:** `fountain.md`'s round-trip claim is about untouched regions, and the code delivers it:
 every block that still holds its source span is re-emitted byte for byte. This entry is about the
-other path — a block the user edited, which has to be written from the IR.
+other path — a block that has to be written from the IR.
+
+**Not the editor's path.** The editor edits the text itself and saves those bytes; nothing in the
+application calls `FountainSerialiser` yet. It is the path export and compile (Phase 10) will take
+from the IR, and the gaps below are recorded for them.
 
 **Code:** three places where the IR holds something Fountain has no way to write down.
 

@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import com.appthere.drafts.core.model.Block
 import com.appthere.drafts.core.model.BlockQuote
+import com.appthere.drafts.core.model.BlockRole
 import com.appthere.drafts.core.model.CodeBlock
 import com.appthere.drafts.core.model.DefinitionList
 import com.appthere.drafts.core.model.Figure
@@ -16,18 +17,25 @@ import com.appthere.drafts.core.model.Table
 import com.appthere.drafts.core.model.ThematicBreak
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.block_bulleted_list
+import com.appthere.drafts.i18n.resources.block_character
 import com.appthere.drafts.i18n.resources.block_code
 import com.appthere.drafts.i18n.resources.block_code_in
 import com.appthere.drafts.i18n.resources.block_definition_list
+import com.appthere.drafts.i18n.resources.block_dialogue
 import com.appthere.drafts.i18n.resources.block_figure
 import com.appthere.drafts.i18n.resources.block_heading_level
 import com.appthere.drafts.i18n.resources.block_link_reference
+import com.appthere.drafts.i18n.resources.block_lyric
 import com.appthere.drafts.i18n.resources.block_numbered_list
 import com.appthere.drafts.i18n.resources.block_paragraph
+import com.appthere.drafts.i18n.resources.block_parenthetical
 import com.appthere.drafts.i18n.resources.block_quote
 import com.appthere.drafts.i18n.resources.block_raw
+import com.appthere.drafts.i18n.resources.block_scene_heading
 import com.appthere.drafts.i18n.resources.block_section_break
+import com.appthere.drafts.i18n.resources.block_synopsis
 import com.appthere.drafts.i18n.resources.block_table
+import com.appthere.drafts.i18n.resources.block_transition
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -121,14 +129,36 @@ object BlockNames {
      * The prefix 10.1 puts before a block's text, or null where it would only add noise.
      *
      * A paragraph is what a reader assumes a block is, so naming every one would put "Paragraph"
-     * before most of the document. A heading says what it is through its role instead -- `heading()`
-     * is what lets a screen reader jump between them -- and a prefix as well would say it twice.
+     * before most of the document -- unless it is one of a screenplay's elements, which are named.
+     * A heading says what it is through its role instead -- `heading()` is what lets a screen reader
+     * jump between them -- and a prefix as well would say it twice.
      */
     fun prefixOf(block: Block): BlockName? =
         when (block) {
-            is Paragraph, is Heading -> null
+            is Paragraph -> screenplayRoles[block.role]?.let(BlockName::Named)
+            is Heading -> null
             else -> kindOf(block)
         }
+
+    /**
+     * A screenplay's elements, named as 10.1 names them -- "Scene heading", "Dialogue" -- since in a
+     * screenplay a paragraph is never just a paragraph. Action is what a reader assumes, as a
+     * paragraph is in prose, and goes unnamed.
+     *
+     * Only the prefix, not the kind: [changed] announces a change of kind, and a screenplay line
+     * changes role as it is typed -- a name is action until someone speaks under it -- which would
+     * be an announcement a keystroke.
+     */
+    private val screenplayRoles =
+        mapOf(
+            BlockRole.SCENE_HEADING to Res.string.block_scene_heading,
+            BlockRole.CHARACTER to Res.string.block_character,
+            BlockRole.PARENTHETICAL to Res.string.block_parenthetical,
+            BlockRole.DIALOGUE to Res.string.block_dialogue,
+            BlockRole.TRANSITION to Res.string.block_transition,
+            BlockRole.LYRIC to Res.string.block_lyric,
+            BlockRole.SYNOPSIS to Res.string.block_synopsis,
+        )
 
     /**
      * 10.1's announcement for a structural edit -- "Structural edits (block promoted to heading,

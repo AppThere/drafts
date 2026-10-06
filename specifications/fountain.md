@@ -71,7 +71,8 @@ Title page values may contain emphasis markup.
 
 A line preceded by a blank line, followed by a blank line, that begins with one of:
 `INT`, `EXT`, `EST`, `INT./EXT`, `INT/EXT`, `I/E` — case-insensitive per the spec, though
-convention is uppercase.
+convention is uppercase. Drafts also accepts `EXT./INT` and `EXT/INT`, which writers use for the
+same thing, and a screenplay may have its own list (`appthere-drafts.md` §11.3).
 
 ```
 EXT. BRICK'S POOL - DAY
@@ -265,7 +266,8 @@ Ambiguity resolution has a natural precedence. A practical implementation:
 1. Strip Boneyards (`/* */`) — they can span everything else.
 2. Extract and strip Notes (`[[ ]]`) if you want them out of the token stream, or tokenize
    them in place.
-3. Extract the Title Page if the file begins with a `Key:` line.
+3. Extract the Title Page if the file begins with one of the recognised keys above. Any `Key:`
+   line would read a script that opens `FADE IN:` as a title page.
 4. Split the body into blocks on blank lines, retaining "blank lines with whitespace" as
    non-separators inside dialogue.
 5. For each block, in order:
@@ -287,9 +289,9 @@ one line of lookahead — or block-splitting first, as above.
 Not part of the Fountain syntax spec. Renderers implement standard US screenplay layout:
 12pt Courier, 1" margins (1.5" left), ~55 lines per page, with element-specific indentation
 (dialogue ~2.5" from left, character ~3.7", parenthetical ~3.1", transitions right-aligned).
-One page ≈ one minute of screen time. If Loki or the writing app is doing WYSIWYG paging,
-this layout metric is the thing to replicate, and `fountain-mode`'s pagination logic is a good
-reference for edge cases (widow/orphan handling, dialogue splitting with MORE/CONT'D).
+One page ≈ one minute of screen time. Drafts does not paginate (`appthere-drafts.md` §5.4); an
+export that does should replicate this layout metric, and `fountain-mode`'s pagination logic is a
+good reference for edge cases (widow/orphan handling, dialogue splitting with MORE/CONT'D).
 
 ## Ecosystem
 
@@ -307,13 +309,13 @@ Note that several editors have added non-standard extensions (Beat's `[[note typ
 Highland's `{{...}}` templating, revision marks). None are part of 1.1. If you're targeting
 interop, stick to 1.1 and treat unknown constructs as Action.
 
-## Implementation guidance for a Rust writing app
+## Implementation guidance
 
 - The whole parser is a few hundred lines. Don't reach for a parser generator; hand-written
   line matching is clearer and faster.
 - Retain source byte ranges per element for editor cursor mapping and incremental reparse.
-- Represent the document as `Vec<Element>` where `Element` carries type, text, source range,
-  and type-specific metadata (scene number, dual-dialogue flag, section depth).
+- Represent the document as a list of elements, each carrying type, text, source range, and
+  type-specific metadata (scene number, dual-dialogue flag, section depth).
 - Blank-line-with-whitespace inside dialogue is the one rule that breaks naive `split("\n\n")`.
 - Round-tripping is exact: Fountain is its own canonical serialization. Preserve the source
   verbatim for untouched regions and you get perfect fidelity for free — a genuine advantage

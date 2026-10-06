@@ -33,6 +33,38 @@ internal object GateFixture {
             }
         }
 
+    /**
+     * The same size of screenplay, for Phase 7: scenes, speeches, a dual pair and a note in each, so
+     * that Fountain's chunk-widened window has its positional cases to get wrong.
+     */
+    fun tenThousandWordScreenplay(): String =
+        buildString {
+            repeat(SCENES) { scene ->
+                appendLine("INT. APARTMENT $scene - DAY")
+                appendLine()
+                appendLine(
+                    "Rain against the window. MARA crosses the room with a cup of coffee she will " +
+                        "not drink, and stops at the table where the letters are. [[Is this too slow?]]",
+                )
+                appendLine()
+                appendLine("MARA")
+                appendLine("(quietly)")
+                appendLine("You kept every one of them. I thought you had thrown them away years ago.")
+                appendLine()
+                appendLine("JONAH")
+                appendLine("I meant to. I kept meaning to, and then it was easier to leave them where they were.")
+                appendLine()
+                appendLine("MARA ^")
+                appendLine("Easier for you, maybe.")
+                appendLine()
+                appendLine("She sets the cup down. He does not look up from the window.")
+                appendLine()
+                appendLine("CUT TO:")
+                appendLine()
+            }
+        }
+
+    private const val SCENES = 112
     private const val SECTIONS = 64
     private const val PARAGRAPHS_PER_SECTION = 5
 }

@@ -17,6 +17,9 @@ comparison possible.
 ./gradlew :editor-ui:jvmTest -i --tests '*ScrollLatencyTest*'       # scroll
 ```
 
+From Phase 7 each of the three also runs on a ten-thousand-word screenplay (`gateScreenplay()`,
+`GateFixture.tenThousandWordScreenplay()`), printed under its own "Phase 7 gate" heading.
+
 Each prints its own measurements. The numbers below are copied from those runs.
 
 ### On a device
@@ -241,3 +244,36 @@ percentile around 93ms), so the lag a reader notices in a development build is m
 
 Not yet tried: a render layer per row, so a scroll moves recorded rows rather than re-issuing their
 text. And ARC's virtualised GPU is not a phone; the slowest supported device has still not run this.
+
+### Phase 7 — 2026-10-05
+
+The same Chromebook as the section above, so comparable with it and with nothing earlier. A fresh
+Gradle daemon for each set of runs.
+
+**Reparse bounds** hold in a screenplay as they do in prose. Fountain's window is widened to whole
+chunks, and stays a few blocks wide:
+
+| Fixture | Blocks | Reparsed | Blocks rebuilt | Engine per edit |
+|---|---|---|---|---|
+| Markdown | 513 | 216 code units (0.3%) | 3 | 2,163 us |
+| Screenplay | 1,233 | 190 code units (0.3%) | 3 | 1,727 us |
+
+**Typing**, one run each, attributable above the harness floor: Markdown 15,108 us (median 17,180,
+slowest 59,079); screenplay 17,797 us (median 20,154, slowest 61,266). Within what this machine
+varies by between runs of one build -- about 3,000 us, measured in this session while dual dialogue
+was being built -- so neither number says more than that a screenplay costs about what prose does.
+
+**Scrolling**, Markdown, attributable per screen. Phase 7 against the commit before its rendering
+work (`106d110`), alternating, four runs each:
+
+| | Runs | Median |
+|---|---|---|
+| Before Phase 7 | 18,284 / 15,692 / 18,087 / 15,460 | ~16,900 us |
+| After | 20,198 / 68,397 / 9,694 / 14,745 | ~17,500 us |
+
+No regression the runs can show, with one unexplained outlier (68,397) after. The screenplay,
+scrolled once: 10,537 us per screen above the floor, across 1,234 blocks folded into fewer rows by
+its dual pairs.
+
+All of it is over the 8,333 us frame budget, as everything on this machine has been since it became
+the machine; see the section above. Not yet measured: a screenplay on a device.

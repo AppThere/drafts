@@ -62,6 +62,17 @@
       screenwriters know it by; and a line whose notes the reader has collapsed, said before its
       words, since the folded marker on screen is not read out.
     -->
+    <!--
+      10.1's names for a screenplay's elements: "Scene heading", "Dialogue". Action goes unnamed,
+      as a paragraph does in prose.
+    -->
+    <string name="block_scene_heading">Scene heading</string>
+    <string name="block_character">Character</string>
+    <string name="block_parenthetical">Parenthetical</string>
+    <string name="block_dialogue">Dialogue</string>
+    <string name="block_transition">Transition</string>
+    <string name="block_lyric">Lyric</string>
+    <string name="block_synopsis">Synopsis</string>
     <string name="block_boneyard">Boneyard</string>
     <string name="block_notes_collapsed">Notes collapsed</string>
     <!--

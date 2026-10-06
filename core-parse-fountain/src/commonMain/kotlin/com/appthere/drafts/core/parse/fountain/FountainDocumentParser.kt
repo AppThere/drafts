@@ -39,10 +39,8 @@ import com.appthere.drafts.core.model.Text
  * 3. Blank-line splitting into chunks.
  * 4. Each chunk: page break, forcing characters, then inference, then action as the fallback.
  *
- * **Inline markup is not applied yet.** Each block's text is one [Text] carrying its whole span, so
- * emphasis, notes and inline boneyards read as the characters they are written with. That is the
- * next piece of this phase; the block structure, the roles and the spans -- which everything else
- * depends on -- are what is here.
+ * Inline markup -- emphasis, notes and boneyards inside a line -- is read by [inlinesIn] as each
+ * block is made.
  */
 class FountainDocumentParser(
     private val keywords: FountainKeywords = FountainKeywords.ENGLISH,
@@ -172,7 +170,7 @@ class FountainDocumentParser(
         chunk: Chunk,
         previous: BlockRole?,
     ): List<Block> {
-        if (chunk.separatedByWhitespace && previous in SPEECH) {
+        if (chunk.separatedByWhitespace && previous in speechRoles) {
             return speechIn(source, chunk.lines, previous)
         }
 
@@ -197,9 +195,16 @@ class FountainDocumentParser(
         val alone = chunk.lines.size == 1
 
         return when {
-            isSceneHeading(first, keywords) -> listOf(sceneHeading(source, chunk, 0))
+            // "A line preceded by a blank line, followed by a blank line": with a line under it, the
+            // prefix alone does not make one. It used to, and the lines under it were in no block's
+            // words -- in the file, and missing from the screen.
+            alone && isSceneHeading(first, keywords) -> listOf(sceneHeading(source, chunk, 0))
+
             alone && isTransition(first, keywords) -> listOf(paragraph(source, chunk.source, BlockRole.TRANSITION))
-            !alone && isCharacter(first) -> characterBlocks(source, chunk.lines)
+
+            // "A character line may not consist solely of uppercase if it ends in `TO:`."
+            !alone && isCharacter(first) && !isTransition(first, keywords) -> characterBlocks(source, chunk.lines)
+
             else -> listOf(paragraph(source, chunk.source, BlockRole.ACTION))
         }
     }
@@ -230,9 +235,10 @@ class FountainDocumentParser(
                 )
             }
 
-            // Each lyric line is its own element: "Each line is its own lyric element."
+            // "Lines prefixed with `~`. Each line is its own lyric element." Only those: a line
+            // without its tilde is the action it was written as.
             Element.LYRIC -> {
-                chunk.lines.map { line -> lyric(source, line) }
+                lyricsIn(source, chunk.lines)
             }
 
             Element.CENTERED -> {
@@ -243,8 +249,10 @@ class FountainDocumentParser(
                 listOf(paragraph(source, chunk.source, BlockRole.PAGE_BREAK))
             }
 
+            // Forced, a heading is one whatever follows it; what does is action, rather than words
+            // that are in the file and in no block.
             Element.SCENE_HEADING -> {
-                listOf(sceneHeading(source, chunk, forced.markerLength))
+                listOf(sceneHeading(source, chunk, forced.markerLength)) + actionUnder(source, chunk)
             }
 
             else -> {
@@ -284,99 +292,47 @@ class FountainDocumentParser(
             inlines = inlinesIn(source, words),
             role = BlockRole.SCENE_HEADING,
             attrs = numbered?.let { Attributes(keyValues = mapOf(SCENE_NUMBER to it.first)) } ?: Attributes.EMPTY,
-            source = chunk.source,
+            source = if (chunk.lines.size == 1) chunk.source else line.span,
         )
     }
 
-    /**
-     * A character line and the speech under it.
-     *
-     * "Any text on the line immediately following a Character line or a Parenthetical" is dialogue,
-     * and a line wrapped in parentheses in the same position is a parenthetical. Consecutive
-     * dialogue lines are one block, which is what makes a speech one thing to edit.
-     *
-     * A `^` at the end of the character line is dual dialogue. The marker is dropped from the name
-     * and recorded as a class, because what it decides is a two-column *layout* (5.4) rather than
-     * what the element is.
-     */
-    private fun characterBlocks(
+    /** The lines of [chunk] below its first, as one block of action, or nothing if there are none. */
+    private fun actionUnder(
         source: String,
-        lines: List<Line>,
-        marker: Int = 0,
+        chunk: Chunk,
     ): List<Block> {
-        val name = lines.first()
-        val dual = name.text.trimEnd().endsWith(DUAL_MARKER)
-
-        // "Whitespace before `^` is permitted and ignored", so the name ends at its last letter
-        // rather than at the marker: `STEEL ^` is STEEL, not "STEEL ".
-        val nameEnd =
-            if (dual) {
-                name.text
-                    .trimEnd()
-                    .dropLast(DUAL_MARKER.length)
-                    .trimEnd()
-                    .length
-            } else {
-                name.text.length
-            }
-
-        val blocks =
-            mutableListOf<Block>(
-                Paragraph(
-                    inlines = inlinesIn(source, SourceSpan.of(name.start + marker, name.start + nameEnd)),
-                    role = BlockRole.CHARACTER,
-                    attrs = if (dual) Attributes(classes = listOf(DUAL_DIALOGUE_CLASS)) else Attributes.EMPTY,
-                    source = name.span,
-                ),
-            )
-
-        blocks += speechIn(source, lines.drop(1), BlockRole.CHARACTER, dual)
-        return blocks
+        val below = chunk.lines.drop(1).takeIf { it.isNotEmpty() } ?: return emptyList()
+        val span = SourceSpan.of(below.first().start, chunk.source.endExclusive.value)
+        return listOf(paragraph(source, span, BlockRole.ACTION))
     }
 
-    /** The parentheticals and dialogue of one speech, from [lines]. */
-    private fun speechIn(
+    /** Each `~` line of a lyric chunk a lyric, and each run of lines between them action. */
+    private fun lyricsIn(
         source: String,
         lines: List<Line>,
-        previous: BlockRole?,
-        dual: Boolean = false,
     ): List<Block> {
-        val marks = if (dual) Attributes(classes = listOf(DUAL_DIALOGUE_CLASS)) else Attributes.EMPTY
         val blocks = mutableListOf<Block>()
-        var said = mutableListOf<Line>()
-        var last = previous
+        var plain = mutableListOf<Line>()
 
         fun flush() {
-            if (said.isEmpty()) return
-
-            blocks +=
-                spoken(source, SourceSpan.of(said.first().start, said.last().endExclusive), BlockRole.DIALOGUE, marks)
-            said = mutableListOf()
-            last = BlockRole.DIALOGUE
+            if (plain.isEmpty()) return
+            blocks += paragraph(source, SourceSpan.of(plain.first().start, plain.last().endExclusive), BlockRole.ACTION)
+            plain = mutableListOf()
         }
 
         lines.forEach { line ->
-            // A parenthetical only counts where one may appear: "immediately following a Character
-            // line or a Dialogue line". Anywhere else the parentheses are just parentheses.
-            if (isParenthetical(line.text) && last in SPEECH) {
+            if (forcingOf(line.text)?.element == Element.LYRIC) {
                 flush()
-                blocks += spoken(source, line.span, BlockRole.PARENTHETICAL, marks)
-                last = BlockRole.PARENTHETICAL
+                blocks += lyric(source, line)
             } else {
-                said += line
+                plain += line
             }
         }
-
         flush()
         return blocks
     }
 
     private companion object {
-        /** The roles a blank-line-with-a-space may continue, and a parenthetical may follow. */
-        val SPEECH = setOf(BlockRole.CHARACTER, BlockRole.DIALOGUE, BlockRole.PARENTHETICAL)
-
-        const val DUAL_MARKER = "^"
-
         /** Where a scene number lives, for a renderer that puts it in the margin. */
         const val SCENE_NUMBER = "scene"
 

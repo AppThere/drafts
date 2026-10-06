@@ -11,6 +11,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SkikoComposeUiTest
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
 import com.appthere.drafts.design.DraftsTheme
+import com.appthere.drafts.editor.engine.BlockParser
 import com.appthere.drafts.editor.engine.DocumentSession
 import kotlinx.coroutines.runBlocking
 import kotlin.system.measureNanoTime
@@ -42,22 +43,36 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalTestApi::class)
 class ScrollLatencyTest {
     @Test
-    fun `scrolling a ten thousand word document does not cost an order more than an empty list`() {
+    fun `scrolling a ten thousand word document does not cost an order more than an empty list`() =
+        reportScroll("Recurring gate -- scroll through the fixture", DocumentSession(gateDocument()))
+
+    @Test
+    fun `scrolling a ten thousand word screenplay does not cost an order more than an empty list`() =
+        reportScroll(
+            "Phase 7 gate -- scroll through a screenplay",
+            DocumentSession(gateScreenplay(), BlockParser.Fountain()),
+        )
+
+    /** Sweeps [session] a screen at a time and prints the measurements under [title]. */
+    private fun reportScroll(
+        title: String,
+        session: DocumentSession,
+    ) {
         runSkikoComposeUiTest(size = Size(WIDTH, HEIGHT)) {
-            val state = EditorState(DocumentSession(gateDocument()))
+            val state = EditorState(session)
             val scroll = LazyListState()
             setContent { DraftsTheme { BlockEditor(state = state, scroll = scroll) } }
             waitForIdle()
 
-            repeat(WARMUP_SWEEPS) { sweep(scroll, state.blocks.size) }
-            val steps = sweep(scroll, state.blocks.size)
+            repeat(WARMUP_SWEEPS) { sweep(scroll, state.rows.size) }
+            val steps = sweep(scroll, state.rows.size)
             val median = steps.sorted()[steps.size / 2]
             val floor = floor()
             val attributable = median - floor
 
             println(
                 """
-                |Recurring gate -- scroll through the fixture
+                |$title
                 |  document:        ${state.blocks.size} blocks
                 |  screens:         ${steps.size}
                 |  median:          $median microseconds per screen
