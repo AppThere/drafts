@@ -92,6 +92,11 @@ A file that appears in the folder but not in the manifest is **never hidden**. I
 of its folder and shows a subtle "new" marker until the user places it. This is what makes
 external additions — a `git pull`, a file dropped in from Finder, a Dropbox sync — safe.
 
+A numeric prefix is digits followed by a hyphen, an underscore, a space, or a full stop and a space
+(`01-cold-open`, `2 The Dock`, `3. The End`). Digits that run into the extension or a word
+(`1984.md`) are a title, not a prefix. "New" is relative to an order the writer has made: in a folder
+they have never ordered, nothing is new — everything is simply in tiers two and three.
+
 **Filename prefixes are a user preference, not the default.** Offer them per-project:
 
 | Mode | Behaviour |

@@ -51,6 +51,12 @@ sealed interface ProjectNode {
     val ref: DocumentRef
 
     /**
+     * In a folder the writer has ordered, and not placed in that order: `projects.md` 3's "new"
+     * marker, for a file added from outside -- a pull, a sync, a drop from a file manager.
+     */
+    val unplaced: Boolean
+
+    /**
      * A folder, and what is in it.
      *
      * [unreadable] is a folder the listing could not open -- not permitted, or gone mid-walk. It is
@@ -64,6 +70,7 @@ sealed interface ProjectNode {
         val children: List<ProjectNode>,
         val nestedProject: Boolean = false,
         val unreadable: Boolean = false,
+        override val unplaced: Boolean = false,
     ) : ProjectNode
 
     /** A Markdown or Fountain file: something Drafts opens and edits (`projects.md` 5). */
@@ -72,6 +79,7 @@ sealed interface ProjectNode {
         override val path: ProjectPath,
         override val ref: DocumentRef,
         val kind: DocumentKind,
+        override val unplaced: Boolean = false,
     ) : ProjectNode
 
     /**
@@ -82,6 +90,7 @@ sealed interface ProjectNode {
         override val name: String,
         override val path: ProjectPath,
         override val ref: DocumentRef,
+        override val unplaced: Boolean = false,
     ) : ProjectNode
 }
 
