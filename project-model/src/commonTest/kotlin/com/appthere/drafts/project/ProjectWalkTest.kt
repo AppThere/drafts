@@ -127,6 +127,11 @@ class ProjectWalkTest {
     ) : FolderListing {
         private val paths = files.map { "$ROOT/$it" }
 
+        override fun childOf(
+            folder: DocumentRef,
+            name: String,
+        ): DocumentRef = DocumentRef("${folder.token}/$name")
+
         override suspend fun entriesOf(folder: DocumentRef): List<FolderEntry>? {
             val prefix = folder.token + "/"
             val under = paths.filter { it.startsWith(prefix) }.map { it.removePrefix(prefix) }

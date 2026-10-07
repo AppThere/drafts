@@ -133,22 +133,39 @@ schema = 1
 orderMode = "manifest"        # or "prefix"
 defaultKind = "markdown"
 
-[project.order]
-"/"                = ["Notes", "Characters", "Treatment", "Screenplay"]
-"/Screenplay"      = ["01-cold-open.fountain", "02-the-dock.fountain", "03-marla-arrives.fountain"]
-"/Characters"      = ["marla.md", "ezra.md"]
+[[project.order]]
+folder = "/"
+entries = ["Notes", "Characters", "Treatment", "Screenplay"]
+
+[[project.order]]
+folder = "/Screenplay"
+entries = ["01-cold-open.fountain", "02-the-dock.fountain", "03-marla-arrives.fountain"]
+
+[[project.order]]
+folder = "/Characters"
+entries = ["marla.md", "ezra.md"]
 
 [[labels]]
-id = "revise"; name = "Needs revision"; color = "#C1554D"
+id = "revise"
+name = "Needs revision"
+color = "#C1554D"
+
 [[labels]]
-id = "locked";  name = "Locked";         color = "#4D7EA8"
+id = "locked"
+name = "Locked"
+color = "#4D7EA8"
 
 [[statuses]]
-id = "todo";    name = "To do"
+id = "todo"
+name = "To do"
+
 [[statuses]]
-id = "draft";   name = "First draft"
+id = "draft"
+name = "First draft"
+
 [[statuses]]
-id = "done";    name = "Done"
+id = "done"
+name = "Done"
 
 [targets]
 project = 90000               # words
@@ -160,9 +177,20 @@ type  = "saved-search"
 query = "status:todo OR label:revise"
 ```
 
-One line per entry in `[project.order]` keeps the file diffable and mergeable — important, because
-this is the only file in the project that two devices can contend over. Keep it small and keep
-entry ordering stable on write.
+One line of entries per folder keeps the file diffable and mergeable — important, because this is
+the only file in the project that two devices can contend over. Keep it small and keep entry
+ordering stable on write.
+
+The order is one `[[project.order]]` table per folder rather than a table keyed by path, and each
+label and status has one key per line. Both are what the TOML library this is read with can read
+and write back faithfully (ktoml, chosen 2026-10-06); a path used as a key does not survive it.
+
+**What the application writes.** The file is written from its model in one fixed layout, which is
+what keeps it line-stable; comments in it are not kept. A file holding anything the application
+does not model — a later schema, a compile target added by hand before compile exists — is read
+and never written over, since writing the model back would drop the rest. A write is checked
+against the file as it was read (the app spec's §8.2), so one changed meanwhile by a pull or a sync
+is not overwritten.
 
 ### Per-document metadata
 

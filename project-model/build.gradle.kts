@@ -3,6 +3,7 @@
 // thing that looks at the disk.
 plugins {
     id("drafts.kmp")
+    alias(libs.plugins.kotlinSerialization)
 }
 
 kotlin {
@@ -11,6 +12,9 @@ kotlin {
             api(project(":platform-files"))
             // A document's kind is its extension's (projects.md 5), decided once in 9.1's terms.
             api(project(":platform-intents"))
+            implementation(libs.ktoml.core)
+            // project.toml's model is @Serializable and public, so its runtime is part of the API.
+            api(libs.kotlinx.serialization.core)
         }
         commonTest.dependencies {
             implementation(libs.kotlinx.coroutines.test)

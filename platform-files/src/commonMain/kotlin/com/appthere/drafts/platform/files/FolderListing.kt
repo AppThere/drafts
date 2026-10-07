@@ -18,6 +18,16 @@ interface FolderListing {
      * not mistake the second for every file in it having been deleted.
      */
     suspend fun entriesOf(folder: DocumentRef): List<FolderEntry>?
+
+    /**
+     * Where a thing called [name] inside [folder] is, or would be: a name, not a check that it
+     * exists. For the files a project keeps in its sidecar, which have to be written before they
+     * can be listed.
+     */
+    fun childOf(
+        folder: DocumentRef,
+        name: String,
+    ): DocumentRef
 }
 
 /** One thing in a folder: its name, how to reach it, and whether it is a folder in turn. */

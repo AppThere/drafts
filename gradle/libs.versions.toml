@@ -46,6 +46,10 @@ ktlint = "1.8.0"
 kotlinx-coroutines = "1.11.0"
 # Tied to the Kotlin version: the compiler plugin and the runtime are released together.
 kotlinx-serialization = "1.9.0"
+# project.toml (projects.md 4), read and written through kotlinx.serialization. Chosen 2026-10-06
+# over a hand-written subset. Publishes for jvm, iosArm64 and iosSimulatorArm64; Android resolves
+# the jvm artifact, as there is no android one.
+ktoml = "0.7.1"
 androidxTestRunner = "1.6.2"
 
 # JetBrains/markdown (intellij-markdown). markdown-dialect.md's "Recommendation" section picks
@@ -86,6 +90,8 @@ kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-t
 # or a control character is exactly the case a hand-written writer gets wrong, and the file that
 # results is the one holding somebody's unsaved work.
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+ktoml-core = { module = "com.akuleshov7:ktoml-core", version.ref = "ktoml" }
+kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinx-serialization" }
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidxTestRunner" }
 
 compose-ui-backhandler = { module = "org.jetbrains.compose.ui:ui-backhandler", version.ref = "composeMultiplatform" }

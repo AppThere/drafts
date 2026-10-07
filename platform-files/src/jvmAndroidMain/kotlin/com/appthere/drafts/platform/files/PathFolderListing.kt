@@ -35,6 +35,11 @@ class PathFolderListing(
             }
         }
 
+    override fun childOf(
+        folder: DocumentRef,
+        name: String,
+    ): DocumentRef = DocumentRef(Paths.get(folder.token).resolve(name).toString())
+
     /** One entry, or null for one that vanished between being listed and being looked at. */
     private fun entryFor(path: Path): FolderEntry? =
         try {
