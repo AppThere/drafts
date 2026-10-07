@@ -109,6 +109,14 @@ who care about the order being legible in a file manager. It costs renaming chur
 reorder, which matters under version control. Say so in the setting's description rather than
 picking for them.
 
+A `prefix` reorder numbers every entry of the folder, files and folders alike, at least two digits
+wide and wide enough for the folder, replacing any prefix an entry had; an entry whose name does
+not change is not renamed. It is all or nothing: if a rename fails, those already made are undone,
+so a folder is never left half in one order. A rename never replaces a file — a name already taken
+by something outside the reorder fails it instead — and entries trading names go through temporary
+names first. Anything that follows a file (an open window, its sidecar, its entry in
+`project.toml`) follows the renames.
+
 ---
 
 ## 4. Sidecar layout

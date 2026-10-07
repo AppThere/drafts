@@ -81,3 +81,28 @@ fun ProjectFile.reordered(
         }
     return copy(project = project.copy(order = order))
 }
+
+/**
+ * The project file after a `prefix` reorder renamed [folder]'s entries: any order kept for the
+ * folder names them by their new names, in place, so the entries stay placed rather than turning
+ * up as new.
+ */
+fun ProjectFile.renamed(
+    folder: ProjectPath,
+    renames: Map<String, String>,
+): ProjectFile =
+    copy(
+        project =
+            project.copy(
+                order =
+                    project.order.map { entry ->
+                        if (entry.folder ==
+                            folder.value
+                        ) {
+                            entry.copy(entries = entry.entries.map { renames[it] ?: it })
+                        } else {
+                            entry
+                        }
+                    },
+            ),
+    )
