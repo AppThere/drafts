@@ -2,18 +2,18 @@ package com.appthere.drafts.app
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -22,6 +22,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.appthere.drafts.design.Corners
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.Lucide
 import com.appthere.drafts.i18n.resources.Res
@@ -50,8 +51,14 @@ internal fun KindSwitch(
     onChange: (DocumentKind) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // One pill holding both options, the chosen one filled: a segmented control rather than two
+    // separate buttons, since only one of them can be true at once.
     Row(
-        modifier.selectableGroup(),
+        modifier
+            .selectableGroup()
+            .clip(Corners.Pill)
+            .background(LocalPalette.current.control)
+            .padding(gap),
         horizontalArrangement = Arrangement.spacedBy(gap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -69,7 +76,6 @@ private fun KindOption(
     onChoose: () -> Unit,
 ) {
     val palette = LocalPalette.current
-    val shape = RoundedCornerShape(corner)
 
     // Read here rather than inside `semantics`, which is not a composition. The kind's name is
     // what a screen reader hears; the icon is what everyone else sees.
@@ -80,8 +86,8 @@ private fun KindOption(
         modifier =
             Modifier
                 .sizeIn(minWidth = target, minHeight = target)
-                .background(if (selected) palette.accent else Color.Transparent, shape)
-                .border(hairline, palette.muted, shape)
+                .clip(Corners.Pill)
+                .background(if (selected) palette.accent else Color.Transparent)
                 .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onChoose)
                 .semantics { contentDescription = described },
     ) {
@@ -110,6 +116,4 @@ private fun iconOf(kind: DocumentKind): ImageVector =
 
 /** 10.2: "Touch targets >= 48dp." */
 private val target = 48.dp
-private val gap = 6.dp
-private val corner = 6.dp
-private val hairline = 1.dp
+private val gap = 4.dp

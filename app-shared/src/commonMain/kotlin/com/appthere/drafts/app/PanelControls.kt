@@ -1,7 +1,6 @@
 package com.appthere.drafts.app
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -13,25 +12,30 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.appthere.drafts.design.Corners
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.Palette
 import com.appthere.drafts.design.Prose
 import com.appthere.drafts.design.interfaceTextStyle
+import com.appthere.drafts.design.panelSurface
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.decrease
 import com.appthere.drafts.i18n.resources.increase
@@ -47,7 +51,7 @@ import org.jetbrains.compose.resources.stringResource
  */
 
 /**
- * A panel's frame: a pane titled [title], capped in width, bordered, and scrolling.
+ * A panel's frame: a pane titled [title], capped in width, raised over the page, and scrolling.
  *
  * A ceiling, not a width. 6 makes Compact windows -- under 600dp -- a first-class case, and a panel
  * that insisted on its natural width would hang off the side of a phone, or off the side of any
@@ -65,16 +69,13 @@ import org.jetbrains.compose.resources.stringResource
  * someone at 200% is more likely to need than most.
  */
 @Composable
-internal fun Modifier.panelFrame(title: String): Modifier {
-    val palette = LocalPalette.current
-    return semantics { paneTitle = title }
+internal fun Modifier.panelFrame(title: String): Modifier =
+    semantics { paneTitle = title }
         .widthIn(max = panelMetrics().panel)
         .fillMaxWidth()
-        .background(palette.background)
-        .border(hairline, palette.muted, RoundedCornerShape(corner))
+        .panelSurface()
         .padding(panelPadding)
         .verticalScroll(rememberScrollState())
-}
 
 /**
  * A label, the current value, and a button either side of it.
@@ -156,17 +157,22 @@ internal fun <T> Choice(
                 val chosen = option.value == selected
                 val described = stringResource(Res.string.said_after, label, option.label)
 
+                // Chosen is said three ways: the accent fill, the weight of the word, and to a screen
+                // reader as a selected radio button. Never the colour alone (10.2).
                 BasicText(
                     text = option.label,
-                    style = body(palette).copy(color = if (chosen) palette.background else palette.ink),
+                    style =
+                        if (chosen) {
+                            body(palette).copy(color = palette.background, fontWeight = FontWeight.SemiBold)
+                        } else {
+                            body(palette)
+                        },
                     modifier =
                         Modifier
                             .sizeIn(minWidth = target, minHeight = target)
-                            .background(
-                                if (chosen) palette.accent else palette.background,
-                                RoundedCornerShape(corner),
-                            ).border(hairline, palette.muted, RoundedCornerShape(corner))
-                            .clickable { onSelect(option.value) }
+                            .clip(Corners.Pill)
+                            .background(if (chosen) palette.accent else palette.control)
+                            .selectable(selected = chosen, role = Role.RadioButton) { onSelect(option.value) }
                             .padding(horizontal = optionPadding, vertical = optionPadding)
                             .semantics { contentDescription = described },
                 )
@@ -190,7 +196,8 @@ private fun StepButton(
         modifier =
             Modifier
                 .sizeIn(minWidth = target, minHeight = target)
-                .border(hairline, palette.muted, RoundedCornerShape(corner))
+                .clip(Corners.Pill)
+                .background(palette.control)
                 .clickable { onClick() }
                 .padding(buttonPadding)
                 .semantics { contentDescription = description },
@@ -237,12 +244,10 @@ private const val PANEL_LABELS = 30f
 private const val LABEL_LABELS = 9f
 private const val VALUE_LABELS = 5f
 
-private val panelPadding = 16.dp
-private val optionGap = 6.dp
-private val optionPadding = 10.dp
+private val panelPadding = 20.dp
+private val optionGap = 8.dp
+private val optionPadding = 12.dp
 private val buttonPadding = 12.dp
-private val corner = 6.dp
-private val hairline = 1.dp
 private val target = 48.dp
 private val labelSize = 14.sp
 private val headingSize = 18.sp

@@ -55,6 +55,7 @@ import com.appthere.drafts.design.LocalWindowSize
 import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.design.WindowSize
 import com.appthere.drafts.design.clearanceWithin
+import com.appthere.drafts.design.pageSurface
 import com.appthere.drafts.editor.engine.BlockParser
 import com.appthere.drafts.editor.engine.Caret
 import com.appthere.drafts.editor.engine.DocumentSession
@@ -303,7 +304,8 @@ private fun DraftsWindow(
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .background(LocalPalette.current.background)
+                        // The desk: what the page rests on, showing round it on a wide window.
+                        .background(LocalPalette.current.desk)
                         // The panels first, then the host's other windows, then whatever depends
                         // on there being a file -- saving, and answering 8.2's refusal, which the
                         // window cannot know about and so asks -- and then the editor.
@@ -402,10 +404,11 @@ private fun DocumentPage(
                 onGo = go,
                 onClose = refocused(panels::closeOutline),
                 modifier = Modifier.width(outlinePane).fillMaxHeight(),
+                floating = false,
             )
         }
 
-        Box(Modifier.weight(1f).fillMaxHeight()) {
+        Box(Modifier.weight(1f).fillMaxHeight().pageSurface()) {
             BlockEditor(state = editor, scroll = scroll, topInset = barHeight)
 
             ChromeBar(
@@ -432,6 +435,7 @@ private fun DocumentPage(
                     onGo = go,
                     onClose = refocused(panels::closeOutline),
                     modifier = panelPlacement(Alignment.TopStart),
+                    floating = true,
                 )
             }
         }

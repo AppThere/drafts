@@ -6,6 +6,8 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SkikoComposeUiTest
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -58,6 +60,26 @@ class OutlinePanelTest {
                 "The document started at $after, under a pane ending at ${pane.right}",
             )
             assertTrue(after > before, "The document did not give up any width: $before then $after")
+        }
+    }
+
+    @Test
+    fun `the outline button says whether the outline is open`() {
+        // Beside the document the outline stays open while the reader writes, and the same button
+        // closes it -- so the button has to say which it will do. Filled for the eye; selected for
+        // a screen reader, which cannot see the fill.
+        runSkikoComposeUiTest(size = DESKTOP) {
+            setContent { DraftsApp(initialText = DOCUMENT) }
+            waitForIdle()
+            val button = onNodeWithContentDescription(words(Res.string.open_outline))
+
+            button.assertIsNotSelected()
+            button.performClick()
+            waitForIdle()
+            button.assertIsSelected()
+            button.performClick()
+            waitForIdle()
+            button.assertIsNotSelected()
         }
     }
 

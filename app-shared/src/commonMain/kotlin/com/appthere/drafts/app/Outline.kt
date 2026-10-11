@@ -1,7 +1,5 @@
 package com.appthere.drafts.app
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,10 +8,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.paneTitle
@@ -22,9 +20,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.appthere.drafts.design.Corners
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.Prose
 import com.appthere.drafts.design.interfaceTextStyle
+import com.appthere.drafts.design.panelSurface
 import com.appthere.drafts.editor.ui.OutlineEntry
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.block_heading_level
@@ -47,12 +47,16 @@ import org.jetbrains.compose.resources.stringResource
  *
  * [onGo] is handed the entry the reader chose. What going there means belongs to the window, which
  * owns the scroll position and the caret.
+ *
+ * [floating] is which of its two shapes it is in: a panel raised over the page, or a pane laid on
+ * the desk beside it -- where a raised frame would be a second page competing with the real one.
  */
 @Composable
 internal fun Outline(
     entries: List<OutlineEntry>,
     onGo: (OutlineEntry) -> Unit,
     onClose: () -> Unit,
+    floating: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val palette = LocalPalette.current
@@ -65,8 +69,7 @@ internal fun Outline(
     Column(
         modifier
             .semantics { paneTitle = title }
-            .background(palette.background)
-            .border(hairline, palette.muted, RoundedCornerShape(corner))
+            .then(if (floating) Modifier.panelSurface() else Modifier)
             .padding(panelPadding),
         verticalArrangement = Arrangement.spacedBy(rowGap),
     ) {
@@ -123,8 +126,10 @@ private fun Entry(
             Modifier
                 .fillMaxWidth()
                 .sizeIn(minHeight = target)
+                .clip(Corners.Pill)
                 .clickable { onGo(entry) }
-                .padding(start = indent * (entry.level - 1), top = textPadding, bottom = textPadding)
+                .padding(start = entryInset + indent * (entry.level - 1), end = entryInset)
+                .padding(vertical = textPadding)
                 .semantics {
                     contentDescription = described
                     role = Role.Button
@@ -134,11 +139,12 @@ private fun Entry(
 
 /** 10.2: "Touch targets >= 48dp." */
 private val target = 48.dp
-private val hairline = 1.dp
-private val corner = 6.dp
 private val panelPadding = 16.dp
 private val rowGap = 4.dp
 private val textPadding = 12.dp
+
+/** Inside the pill a pressed entry shows, so the words do not touch its rounded ends. */
+private val entryInset = 16.dp
 
 /** One step of indentation per heading level, enough to read as a hierarchy and no more. */
 private val indent = 12.dp

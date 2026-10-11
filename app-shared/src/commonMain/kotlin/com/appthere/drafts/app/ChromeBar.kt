@@ -13,7 +13,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.appthere.drafts.design.Corners
+import com.appthere.drafts.design.Elevation
 import com.appthere.drafts.design.LocalPalette
+import com.appthere.drafts.design.raised
 import com.appthere.drafts.platform.intents.DocumentKind
 import kotlin.math.max
 
@@ -130,5 +133,30 @@ internal fun StatusChrome(
     }
 }
 
+/**
+ * The chrome bar's icon buttons, together in one pill raised over the page.
+ *
+ * Raised so that text scrolling up beneath the bar passes *under* them, and they read as controls
+ * resting on the page rather than marks printed on it. Wraps rather than overflowing, for a phone
+ * at 200% text.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun ChromeButtons(content: @Composable () -> Unit) {
+    FlowRow(
+        modifier =
+            Modifier
+                .raised(LocalPalette.current.panel, Corners.Pill, Elevation.Floating)
+                .padding(groupPadding),
+        horizontalArrangement = Arrangement.spacedBy(groupPadding, Alignment.End),
+        verticalArrangement = Arrangement.spacedBy(groupPadding),
+    ) {
+        content()
+    }
+}
+
 /** Between the things in the bar, and between its lines when it wraps. */
 private val barGap = 12.dp
+
+/** Around and between the buttons in the chrome's pill. */
+private val groupPadding = 4.dp

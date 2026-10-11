@@ -1,7 +1,7 @@
 package com.appthere.drafts.app
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
@@ -18,6 +17,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
@@ -25,10 +26,12 @@ import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.appthere.drafts.design.Corners
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.Lucide
 import com.appthere.drafts.design.Prose
@@ -271,7 +274,13 @@ fun PanelLink(
     )
 }
 
-/** A bordered text button at 10.2's 48dp target, the one shape of button the panels use. */
+/**
+ * A filled pill at 10.2's 48dp target: the one shape of text button the interface uses, in panels,
+ * banners and 8.2's dialog alike.
+ *
+ * Filled in the palette's control tone rather than outlined: a button is a thing on the panel, not
+ * a box drawn on it. Every button is drawn the same, so none is presented as the one to press.
+ */
 @Composable
 internal fun PanelButton(
     text: String,
@@ -288,9 +297,10 @@ internal fun PanelButton(
         modifier =
             modifier
                 .sizeIn(minWidth = target, minHeight = target)
-                .border(hairline, palette.muted, RoundedCornerShape(corner))
+                .clip(Corners.Pill)
+                .background(palette.control)
                 .clickable(enabled = enabled, onClick = onClick)
-                .padding(buttonPadding)
+                .padding(horizontal = buttonPaddingAcross, vertical = buttonPadding)
                 .semantics {
                     contentDescription = description
                     role = Role.Button
@@ -299,11 +309,15 @@ internal fun PanelButton(
 }
 
 /**
- * [PanelButton]'s shape with an icon in place of the word, for the chrome bar, where a phone has
- * room for four of these and not for four words.
+ * An icon in place of the word, for the chrome bar, where a phone has room for four of these and
+ * not for four words.
  *
  * The word is not lost: it is the [description], which is what a screen reader announces and what
  * the button is found by. The icon takes the ink colour, so it follows the reader's theme (5.6).
+ *
+ * No fill of its own: these sit together in the chrome bar's raised pill, and a fill on each would
+ * be a row of buttons in a box. [selected] is for a button that stands for a panel which is open --
+ * the outline beside the text -- and fills it with the accent, and says so to a screen reader.
  */
 @Composable
 internal fun PanelIconButton(
@@ -312,6 +326,7 @@ internal fun PanelIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    selected: Boolean = false,
 ) {
     val palette = LocalPalette.current
 
@@ -320,17 +335,19 @@ internal fun PanelIconButton(
         modifier =
             modifier
                 .sizeIn(minWidth = target, minHeight = target)
-                .border(hairline, palette.muted, RoundedCornerShape(corner))
+                .clip(Corners.Pill)
+                .background(if (selected) palette.accent else Color.Transparent)
                 .clickable(enabled = enabled, onClick = onClick)
                 .semantics {
                     contentDescription = description
                     role = Role.Button
+                    this.selected = selected
                 },
     ) {
         Image(
             painter = rememberVectorPainter(icon),
             contentDescription = null,
-            colorFilter = ColorFilter.tint(palette.ink),
+            colorFilter = ColorFilter.tint(if (selected) palette.background else palette.ink),
             modifier = Modifier.size(iconSize),
         )
     }
@@ -341,9 +358,8 @@ internal val iconSize = 24.dp
 
 /** 10.2: "Touch targets >= 48dp." */
 private val target = 48.dp
-private val hairline = 1.dp
-private val corner = 6.dp
 private val buttonPadding = 12.dp
+private val buttonPaddingAcross = 20.dp
 private val labelSize = 14.sp
 private val headingSize = 18.sp
 private val linkPadding = 10.dp
