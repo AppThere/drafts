@@ -119,6 +119,29 @@
         </activity>
 
         <!--
+          projects-core: one project, in a task of its own. documentLaunchMode keys the task on the
+          folder's URI, as DocumentActivity's is keyed on the document's, so a project that is open
+          is brought forward rather than opened twice. Not exported: only this application opens
+          one, with the folder grant it holds.
+        -->
+        <activity
+            android:name=".ProjectActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|density|uiMode|fontScale|layoutDirection"
+            android:documentLaunchMode="intoExisting"
+            android:exported="false"
+            android:launchMode="standard"
+            android:resizeableActivity="true"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- The writer's projects: recent ones, a folder to open, a new one from a template. -->
+        <activity
+            android:name=".ProjectsActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|density|uiMode|fontScale|layoutDirection"
+            android:exported="false"
+            android:resizeableActivity="true"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!--
           7.4's launcher entry, and the two app shortcuts beside it.
 
           It shows nothing and finishes immediately: it decides what this launch opens and starts a

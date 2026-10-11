@@ -3,6 +3,7 @@ package com.appthere.drafts.platform.files
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
+import javax.swing.JFileChooser
 
 /**
  * 7.4's *Save As* on the desktop: "through the platform's own picker ... a save dialog on desktop".
@@ -70,4 +71,50 @@ private fun defaultFolder(): String {
     val home = File(System.getProperty("user.home"))
     val documents = File(home, "Documents")
     return if (documents.isDirectory) documents.path else home.path
+}
+
+/**
+ * Choosing a folder to open as a project (`projects/project-windows`, "A folder can be opened as a
+ * project").
+ *
+ * On macOS, the platform's own panel, which `FileDialog` turns into a folder chooser when asked by
+ * a system property. Nowhere else has that: GTK's and Windows' native dialogs cannot be asked for a
+ * folder through AWT, so there it is Swing's chooser, limited to folders. Modal, like the others.
+ * Returns the chosen folder's path, or null if the reader cancelled.
+ */
+fun chooseFolder(
+    parent: Frame?,
+    title: String,
+    near: String? = null,
+): String? =
+    if (System.getProperty("os.name").orEmpty().startsWith("Mac", ignoreCase = true)) {
+        chooseFolderOnMac(parent, title, near)
+    } else {
+        val chooser =
+            JFileChooser(near?.let { File(it).parentFile } ?: File(defaultFolder())).apply {
+                dialogTitle = title
+                fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
+                isAcceptAllFileFilterUsed = false
+            }
+        if (chooser.showOpenDialog(parent) == JFileChooser.APPROVE_OPTION) chooser.selectedFile.path else null
+    }
+
+private fun chooseFolderOnMac(
+    parent: Frame?,
+    title: String,
+    near: String?,
+): String? {
+    val property = "apple.awt.fileDialogForDirectories"
+    System.setProperty(property, "true")
+    val dialog =
+        FileDialog(parent, title, FileDialog.LOAD).apply {
+            directory =
+                near?.let { File(it).parent } ?: defaultFolder()
+        }
+    try {
+        dialog.isVisible = true
+    } finally {
+        System.setProperty(property, "false")
+    }
+    return dialog.file?.let { File(dialog.directory, it).path }
 }

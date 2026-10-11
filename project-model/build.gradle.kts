@@ -15,6 +15,8 @@ kotlin {
             implementation(libs.ktoml.core)
             // project.toml's model is @Serializable and public, so its runtime is part of the API.
             api(libs.kotlinx.serialization.core)
+            // The cache's index (projects.md 9): derived data, disposable, so JSON like the sessions.
+            implementation(libs.kotlinx.serialization.json)
         }
         commonTest.dependencies {
             implementation(libs.kotlinx.coroutines.test)

@@ -2,6 +2,7 @@ package com.appthere.drafts.project
 
 import com.appthere.drafts.platform.files.DocumentRef
 import com.appthere.drafts.platform.files.PathDocumentStore
+import com.appthere.drafts.platform.files.PathFolderEditing
 import com.appthere.drafts.platform.files.PathFolderListing
 import kotlinx.coroutines.test.runTest
 import java.nio.file.Path
@@ -26,7 +27,7 @@ class ProjectManifestTest {
     private val directory: Path = createTempDirectory("drafts-project")
     private val root = DocumentRef(directory.toString())
     private val file = directory.resolve(".drafts/project.toml")
-    private val manifest = ProjectManifest(PathFolderListing(), PathDocumentStore())
+    private val manifest = ProjectManifest(PathFolderListing(), PathFolderEditing(), PathDocumentStore())
 
     @AfterTest
     fun cleanUp() {

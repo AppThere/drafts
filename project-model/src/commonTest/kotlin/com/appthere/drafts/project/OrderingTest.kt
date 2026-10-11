@@ -80,6 +80,15 @@ class OrderingTest {
     }
 
     @Test
+    fun `a name in the order that the folder no longer has keeps its place as missing`() {
+        // 9: "keep the entry, mark missing, never silently drop it."
+        val ordered = project("a.md", "c.md").ordered(order("/" to listOf("a.md", "b.md", "c.md")))
+
+        assertEquals(listOf("a.md", "b.md", "c.md"), ordered.names())
+        assertTrue(ordered.root.children[1] is ProjectNode.Missing)
+    }
+
+    @Test
     fun `nothing is new in a folder that has never been ordered`() {
         val ordered = project("a.md", "b.md").ordered(ProjectFile())
 

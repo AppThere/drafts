@@ -28,6 +28,10 @@ import com.appthere.drafts.platform.windows.SessionList
  * [showing] is whether this application already has documents on screen. On Android that is a
  * question about tasks rather than windows, which is why it is asked outside and answered here.
  *
+ * [projects] says whether projects are coming back -- something restored too, so no untitled
+ * document joins them -- and which documents they show in their editors, which come back there and
+ * not as tasks of their own.
+ *
  * Separate from the Activity because it is the part worth testing, and an Activity is the part that
  * is not. The desktop's equivalent is `Launch.kt` in `:app-desktop`, which has the same three rules
  * and two more besides -- it can be asked to open a file by path, which on Android arrives as an
@@ -39,17 +43,32 @@ internal suspend fun documentsAtLaunch(
     showing: Boolean,
     untitledName: String,
     lastKind: DocumentKind,
+    projects: ProjectsAtLaunch = ProjectsAtLaunch(),
 ): List<SessionRecord> {
     // Already showing means everything restorable is already on screen; restoring it again would
     // only shuffle Recents.
-    val open = if (showing) mutableListOf() else sessions.restorable().toMutableList()
+    val open =
+        if (showing) {
+            mutableListOf()
+        } else {
+            sessions
+                .restorable()
+                .filterNot { it.documentId in projects.held }
+                .toMutableList()
+        }
 
     // 7.4's "the kind the reader last created -- Markdown on first launch", unless a shortcut said.
-    val kind = requested ?: lastKind.takeIf { showing || open.isEmpty() }
+    val kind = requested ?: lastKind.takeIf { showing || (open.isEmpty() && !projects.restored) }
     kind?.let { open += sessions.opened(SessionIdentity.untitled(kind = it.id, displayName = untitledName)) }
 
     return open
 }
+
+/** The projects a launch restores, as far as [documentsAtLaunch] needs to know. */
+internal data class ProjectsAtLaunch(
+    val restored: Boolean = false,
+    val held: Set<String> = emptySet(),
+)
 
 /**
  * Marks closed every open session whose document no longer has a task: its window was closed.

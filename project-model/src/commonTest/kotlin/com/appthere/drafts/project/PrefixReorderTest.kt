@@ -1,8 +1,8 @@
 package com.appthere.drafts.project
 
 import com.appthere.drafts.platform.files.DocumentRef
+import com.appthere.drafts.platform.files.FolderOutcome
 import com.appthere.drafts.platform.files.FolderRenaming
-import com.appthere.drafts.platform.files.RenameOutcome
 import com.appthere.drafts.platform.intents.DocumentKind
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -163,21 +163,21 @@ class PrefixReorderTest {
         override suspend fun rename(
             ref: DocumentRef,
             name: String,
-        ): RenameOutcome =
+        ): FolderOutcome =
             when {
                 ++calls == failAt || (failed && failUndo) -> {
                     failed = true
-                    RenameOutcome.Failed("refused")
+                    FolderOutcome.Failed("refused")
                 }
 
                 name in contents -> {
-                    RenameOutcome.Taken
+                    FolderOutcome.Taken
                 }
 
                 else -> {
-                    contents[name] = contents.remove(ref.token) ?: return RenameOutcome.Failed("gone")
+                    contents[name] = contents.remove(ref.token) ?: return FolderOutcome.Failed("gone")
                     renames++
-                    RenameOutcome.Renamed(DocumentRef(name))
+                    FolderOutcome.Done(DocumentRef(name))
                 }
             }
 

@@ -21,7 +21,11 @@ private fun ProjectNode.Folder.ordered(orders: Map<String, List<String>>): Proje
     val listed = orders[path.value]
     val children = children.map { if (it is ProjectNode.Folder) it.ordered(orders) else it }
 
-    val placed = listed.orEmpty().mapNotNull { name -> children.firstOrNull { it.name == name } }
+    // A name the order lists and the folder no longer has is kept in its place, as missing (9).
+    val placed =
+        listed.orEmpty().map { name ->
+            children.firstOrNull { it.name == name } ?: ProjectNode.Missing(name, path.child(name))
+        }
     val rest = children - placed.toSet()
     val prefixed = rest.filter { numericPrefixOf(it.name) != null }.sortedBy { numericPrefixOf(it.name) }
     val alphabetical = rest - prefixed.toSet()
@@ -40,6 +44,7 @@ private fun ProjectNode.markedUnplaced(): ProjectNode =
         is ProjectNode.Folder -> copy(unplaced = true)
         is ProjectNode.Document -> copy(unplaced = true)
         is ProjectNode.Attachment -> copy(unplaced = true)
+        is ProjectNode.Missing -> this
     }
 
 /**
@@ -106,3 +111,121 @@ fun ProjectFile.renamed(
                     },
             ),
     )
+
+/**
+ * The project file after [from] became [to] -- a rename, a move to another folder, or both
+ * (`projects/binder`, "SHALL take its order entry").
+ *
+ * In the same folder the name is changed in place, keeping its position. Into another folder it
+ * leaves the old folder's order and, if the new folder has one, joins it at the end ("SHALL arrive
+ * at the end of the destination's order"). A folder takes its own order, and every order inside it,
+ * to its new path.
+ */
+fun ProjectFile.moved(
+    from: ProjectPath,
+    to: ProjectPath,
+): ProjectFile {
+    val sameFolder = from.parent == to.parent
+    val order =
+        project.order.map { entry ->
+            when {
+                sameFolder && entry.folder == from.parent.value -> {
+                    entry.copy(entries = entry.entries.map { if (it == from.name) to.name else it })
+                }
+
+                entry.folder == from.parent.value -> {
+                    entry.copy(entries = entry.entries - from.name)
+                }
+
+                entry.folder == to.parent.value && to.name !in entry.entries -> {
+                    entry.copy(entries = entry.entries + to.name)
+                }
+
+                entry.folder == from.value || entry.folder.startsWith(from.value + "/") -> {
+                    entry.copy(folder = to.value + entry.folder.removePrefix(from.value))
+                }
+
+                else -> {
+                    entry
+                }
+            }
+        }
+    return copy(project = project.copy(order = order))
+}
+
+/** The project file without [path] in its folder's order: the writer's *Remove from order*. */
+fun ProjectFile.withoutEntry(path: ProjectPath): ProjectFile =
+    copy(
+        project =
+            project.copy(
+                order =
+                    project.order.map {
+                        if (it.folder ==
+                            path.parent.value
+                        ) {
+                            it.copy(entries = it.entries - path.name)
+                        } else {
+                            it
+                        }
+                    },
+            ),
+    )
+
+/**
+ * The project file with [name] placed in [folder]'s order at [index] -- a new item, put where the
+ * writer made it. A folder with no order is left without one: alphabetical is where it belongs.
+ */
+fun ProjectFile.inserted(
+    folder: ProjectPath,
+    name: String,
+    index: Int,
+): ProjectFile =
+    copy(
+        project =
+            project.copy(
+                order =
+                    project.order.map { entry ->
+                        if (entry.folder != folder.value) {
+                            entry
+                        } else {
+                            val entries = entry.entries - name
+                            entry.copy(entries = entries.take(index) + name + entries.drop(index))
+                        }
+                    },
+            ),
+    )
+
+/**
+ * The project file after the writer relinked [from], which is missing, to [to]
+ * (`projects/reconciliation`, "Accepting a relink"). In one folder, [to] takes [from]'s place in the
+ * order and leaves any other; in different folders [from]'s place goes and [to] stays where it is,
+ * since an order belongs to one folder. A folder relinked takes its orders, and those inside it,
+ * to its new path.
+ */
+fun ProjectFile.relinked(
+    from: ProjectPath,
+    to: ProjectPath,
+): ProjectFile {
+    val sameFolder = from.parent == to.parent
+    val order =
+        project.order.map { entry ->
+            when {
+                entry.folder == from.parent.value && sameFolder -> {
+                    entry.copy(entries = (entry.entries - to.name).map { if (it == from.name) to.name else it })
+                }
+
+                entry.folder == from.parent.value -> {
+                    entry.copy(entries = entry.entries - from.name)
+                }
+
+                entry.folder == from.value || entry.folder.startsWith(from.value + "/") -> {
+                    entry.copy(folder = to.value + entry.folder.removePrefix(from.value))
+                }
+
+                else -> {
+                    entry
+                }
+            }
+        }
+    return copy(project = project.copy(order = order))
+}

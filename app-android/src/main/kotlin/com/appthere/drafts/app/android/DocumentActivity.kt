@@ -1,6 +1,7 @@
 package com.appthere.drafts.app.android
 
 import android.app.ActivityManager
+import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -23,6 +24,7 @@ import com.appthere.drafts.app.DraftsApp
 import com.appthere.drafts.app.HostActions
 import com.appthere.drafts.app.KindChange
 import com.appthere.drafts.app.Notice
+import com.appthere.drafts.app.ProjectActions
 import com.appthere.drafts.app.SaveAs
 import com.appthere.drafts.app.SnapshotKeeper
 import com.appthere.drafts.app.kindOf
@@ -31,18 +33,25 @@ import com.appthere.drafts.app.rememberSessionDocument
 import com.appthere.drafts.app.suggestedSaveName
 import com.appthere.drafts.design.ReaderSettings
 import com.appthere.drafts.i18n.resources.Res
+import com.appthere.drafts.i18n.resources.breadcrumb
+import com.appthere.drafts.i18n.resources.cancel
 import com.appthere.drafts.i18n.resources.document_gone
+import com.appthere.drafts.i18n.resources.document_in_project
+import com.appthere.drafts.i18n.resources.document_in_project_title
 import com.appthere.drafts.i18n.resources.my_version
 import com.appthere.drafts.i18n.resources.no_document
 import com.appthere.drafts.i18n.resources.not_a_text_document
+import com.appthere.drafts.i18n.resources.open_project
 import com.appthere.drafts.i18n.resources.opening
 import com.appthere.drafts.i18n.resources.untitled
+import com.appthere.drafts.platform.files.DocumentRef
 import com.appthere.drafts.platform.files.SafDocumentStore
 import com.appthere.drafts.platform.files.SessionIdentity
 import com.appthere.drafts.platform.files.SessionRecord
 import com.appthere.drafts.platform.files.androidIdentity
 import com.appthere.drafts.platform.files.displayNameOf
 import com.appthere.drafts.platform.intents.DocumentKind
+import com.appthere.drafts.project.ProjectLocation
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
@@ -158,97 +167,22 @@ class DocumentActivity : ComponentActivity() {
         }
 
         when (val open = record) {
-            null -> Notice(message = if (looked) nothingToShow(intent) else stringResource(Res.string.opening))
-            else -> Session(open, storage, documents) { moved -> record = moved }
-        }
-    }
-
-    /** One open session: its settings, its document, and the two things that can move it. */
-    @Composable
-    private fun Session(
-        open: SessionRecord,
-        storage: Storage,
-        documents: SafDocumentStore,
-        onMove: (SessionRecord) -> Unit,
-    ) {
-        // Recents shows one entry per document, named for the document.
-        LaunchedEffect(open.displayName) { describeTask(open.displayName) }
-
-        // 5.5's settings for this document's type, read before the document is drawn so the reader
-        // never sees the defaults flash up and be replaced by their own typography.
-        val saved by produceState<ReaderSettings?>(null, storage.settings, open.kind) {
-            value = storage.settings.settingsFor(open.kind) ?: ReaderSettings()
-        }
-
-        when (val opening = rememberSessionDocument(documents, storage.snapshots, open, storage.settings)) {
-            is DocumentOpening.Opened -> {
-                val keeper =
-                    remember(opening.document) {
-                        SnapshotKeeper(opening.document, storage.snapshots, open.identity())
-                    }
-                val saving = remember(storage) { SaveAs(storage.sessions, storage.settings) { onMove(it) } }
-                val kinds = remember(storage) { KindChange(storage.sessions, storage.settings) { onMove(it) } }
-                val choose = rememberSaveLocation()
-                val scope = rememberCoroutineScope()
-                val openFile =
-                    rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { chosen ->
-                        chosen?.let(::openInItsOwnWindow)
-                    }
-
-                // Handed over rather than called: 8.1's closing snapshot happens after the window
-                // has gone, and the composition is the only thing that knows what to snapshot.
-                DisposableEffect(keeper, open.documentId) {
-                    closing = { closeDocument(storage.sessions, keeper, open.documentId) }
-                    onDispose { closing = null }
-                }
-
-                saved?.let { initial ->
-                    DraftsApp(
-                        document = opening.document,
-                        initialSettings = initial,
-                        keeper = keeper,
-                        settingsStore = storage.settings,
-                        kind = open.kind,
-                        saveAs = {
-                            // 7.4 while untitled, 8.2's "Save a copy..." while conflicted, the
-                            // file's own name otherwise -- all decided in `:app-shared`, because
-                            // none of it is about Android.
-                            val suggested =
-                                opening.document.suggestedSaveName(
-                                    open,
-                                    untitled = getString(Res.string.untitled),
-                                    myVersion = getString(Res.string.my_version),
-                                )
-                            val where = SaveLocation(mimeFor(open.kind), suggested)
-
-                            choose(where)?.let { chosen ->
-                                saving.to(destinationFor(chosen, open), opening.document, open, keeper)
-                            }
-                        },
-                        // 7.4's kind, while there is no file whose extension already says.
-                        onKindChange =
-                            if (open.uri == null) {
-                                { chosen -> scope.launch { kinds.to(chosen, open, keeper, opening.document.editor) } }
-                            } else {
-                                null
-                            },
-                        // 7.1: another document is another task. New is the request tapping the
-                        // icon again makes (7.4); Open hands its choice over as Files would.
-                        host =
-                            HostActions(
-                                newDocument = { startActivity(Intent(this, LauncherActivity::class.java)) },
-                                openDocument = { openFile.launch(openable) },
-                            ),
-                    )
-                }
+            null -> {
+                Notice(message = if (looked) nothingToShow(intent) else stringResource(Res.string.opening))
             }
 
-            DocumentOpening.Opening -> {
-                Notice(message = stringResource(Res.string.opening))
-            }
-
-            is DocumentOpening.Failed -> {
-                Notice(message = noticeFor(opening.reason), name = open.displayName)
+            else -> {
+                val title = titleOf(open.displayName)
+                DocumentSession(
+                    open = open,
+                    storage = storage,
+                    documents = documents,
+                    onMove = { moved -> record = moved },
+                    onClosing = { closing = it },
+                    onTitle = { describeTask(title) },
+                    projects = projectActions(intent),
+                )
+                OfferProject(open)
             }
         }
     }
@@ -286,25 +220,6 @@ class DocumentActivity : ComponentActivity() {
             else -> reopened(storage.sessions, storage.snapshots, session)
         }
 
-    /**
-     * A document chosen with Open, in a task of its own.
-     *
-     * Handed to a new `DocumentActivity` exactly as the Files app hands one over (9.2), so it is let
-     * in the same way: its grant persisted, its kind decided, and a file this application cannot
-     * read answered with a notice in that window rather than nothing at all. `ACTION_OPEN_DOCUMENT`'s
-     * grant is persistable and belongs to this application, so the new task can keep it.
-     */
-    private fun openInItsOwnWindow(uri: Uri) {
-        startActivity(
-            Intent(Intent.ACTION_VIEW, uri, this, DocumentActivity::class.java)
-                .addFlags(
-                    Intent.FLAG_ACTIVITY_NEW_DOCUMENT or
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-                ),
-        )
-    }
-
     /** A document from outside: its grant persisted (7.3), and its kind decided, as it is let in. */
     private suspend fun Storage.opening(uri: Uri): SessionRecord? {
         val kind = kindOf(uri) ?: return null
@@ -333,34 +248,6 @@ class DocumentActivity : ComponentActivity() {
         } else {
             intent.getParcelableExtra(Intent.EXTRA_STREAM)
         }
-
-    /**
-     * Where 7.4's first save has landed, in the terms the session list keeps.
-     *
-     * The name is the picker's, not the one that was suggested: the reader can type anything, and
-     * the Storage Access Framework may add an extension of its own. The kind follows that name
-     * (9.1), so saving an untitled document as `.fountain` makes it a screenplay.
-     *
-     * `androidIdentity` takes the persistable grant on the way past, which is what makes the
-     * document restorable on the next launch (7.3). If it cannot -- a provider that grants nothing
-     * persistable -- the save still happens and only the restore is lost, so the identity is built
-     * without a token rather than the save being refused.
-     */
-    private fun destinationFor(
-        uri: Uri,
-        record: SessionRecord,
-    ): SessionIdentity {
-        val name = displayNameOf(contentResolver, uri) ?: uri.lastPathSegment ?: record.displayName
-        val kind = DocumentKind.of(name)?.id ?: record.kind
-
-        return androidIdentity(this, uri, kind)
-            ?: SessionIdentity(
-                documentId = record.documentId,
-                uri = uri.toString(),
-                displayName = name,
-                kind = kind,
-            )
-    }
 
     /**
      * What Recents calls this task.
@@ -433,23 +320,77 @@ class DocumentActivity : ComponentActivity() {
             contentResolver.openInputStream(uri)?.use { stream -> stream.readNBytes(SNIFF_BYTES) }
         }.getOrNull()
 
-    private companion object {
+    /**
+     * What Recents calls a document opened from a project: its name, then the project and folder
+     * (`projects/project-windows`, "Document windows stay associated with their project").
+     */
+    @Composable
+    private fun titleOf(name: String): String {
+        val project = shown?.getStringExtra(EXTRA_PROJECT_NAME) ?: return name
+        val folder = shown?.getStringExtra(EXTRA_PROJECT_FOLDER)?.trim('/').orEmpty()
+        val place = if (folder.isEmpty()) project else stringResource(Res.string.breadcrumb, project, folder)
+        return stringResource(Res.string.document_in_project_title, name, place)
+    }
+
+    /** The ways to projects; and, for a document opened from one, the way back to it. */
+    private fun projectActions(intent: Intent): ProjectActions {
+        val project =
+            intent.getStringExtra(EXTRA_PROJECT)?.let {
+                ProjectLocation(DocumentRef(it), intent.getStringExtra(EXTRA_PROJECT_NAME).orEmpty())
+            }
+        return ProjectActions(
+            openFolder = {
+                startActivity(Intent(this, ProjectsActivity::class.java).putExtra(ProjectsActivity.EXTRA_CHOOSE, true))
+            },
+            recent = { startActivity(Intent(this, ProjectsActivity::class.java)) },
+            showProject = project?.let { location -> { startActivity(projectIntent(this, location)) } },
+        )
+    }
+
+    /**
+     * A document opened from outside that is in a project this device has opened, and not open now:
+     * the writer is offered that project too, and it is never opened unasked. Asked once per launch.
+     */
+    @Composable
+    private fun OfferProject(open: SessionRecord) {
+        val uri = open.uri?.takeIf { shown?.hasExtra(EXTRA_PROJECT) == false } ?: return
+        LaunchedEffect(uri) {
+            val project = enclosingProject(this@DocumentActivity, Uri.parse(uri)) ?: return@LaunchedEffect
+            if (AndroidProjects
+                    .list(
+                        this@DocumentActivity,
+                    ).open()
+                    .any { it.token == project.token }
+            ) {
+                return@LaunchedEffect
+            }
+            val message = getString(Res.string.document_in_project, open.displayName, project.name)
+            val yes = getString(Res.string.open_project)
+            val no = getString(Res.string.cancel)
+            AlertDialog
+                .Builder(this@DocumentActivity)
+                .setMessage(message)
+                .setPositiveButton(
+                    yes,
+                ) { _, _ ->
+                    startActivity(
+                        projectIntent(this@DocumentActivity, ProjectLocation(DocumentRef(project.token), project.name)),
+                    )
+                }.setNegativeButton(no, null)
+                .show()
+        }
+    }
+
+    internal companion object {
         /** Enough for a title page and the first scene, without pulling a novel over the wire. */
         const val SNIFF_BYTES = 8 * 1024
+
+        /**
+         * A document opened from a project's binder: which project, by its folder's token, its name,
+         * and the folder within it.
+         */
+        const val EXTRA_PROJECT = "com.appthere.drafts.PROJECT"
+        const val EXTRA_PROJECT_NAME = "com.appthere.drafts.DOCUMENT_PROJECT_NAME"
+        const val EXTRA_PROJECT_FOLDER = "com.appthere.drafts.PROJECT_FOLDER"
     }
 }
-
-/**
- * The type `ACTION_CREATE_DOCUMENT` is asked to make.
- *
- * Fountain has none -- 9.1: "MIME | `text/markdown` (RFC 7763) | none registered" -- and the picker
- * requires one, so a screenplay is created as plain text. Its extension is what says what it is,
- * which is the same thing 9.2 already relies on when one arrives from elsewhere.
- */
-private fun mimeFor(kind: String): String = kindOf(kind).mimeTypes.firstOrNull() ?: "text/plain"
-
-/**
- * What Open's picker offers. Text, and the type Fountain usually arrives as -- it has none of its
- * own, so providers call it `application/octet-stream` -- matching the manifest's own filters.
- */
-private val openable = arrayOf("text/*", "application/octet-stream")

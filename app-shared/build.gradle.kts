@@ -14,9 +14,12 @@ kotlin {
             api(project(":platform-files"))
             api(project(":platform-windows"))
             api(project(":platform-intents"))
+            // A project window's binder shows and changes a project (projects-core).
+            api(project(":project-model"))
 
             implementation(compose.runtime)
-            implementation(libs.kotlinx.coroutines.core)
+            // A project controller hands out StateFlows, so their runtime is part of the API.
+            api(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
             implementation(compose.foundation)
             // Android's Back gesture closes an open panel rather than the activity.

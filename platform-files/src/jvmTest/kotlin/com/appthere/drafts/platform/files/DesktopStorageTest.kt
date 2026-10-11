@@ -51,6 +51,16 @@ class DesktopStorageTest {
     }
 
     @Test
+    fun `per-project state has its own place in the app's data`() {
+        val projects = Path.of(desktopProjectRoot())
+
+        assertEquals(Path.of(desktopDataRoot()), projects.parent)
+        assertEquals("projects", projects.fileName.toString())
+        assertNotEquals(desktopSessionRoot(), desktopProjectRoot())
+        assertNotEquals(desktopSettingsRoot(), desktopProjectRoot())
+    }
+
+    @Test
     fun `the token of an existing file resolves`() {
         val file = directory.resolve("chapter.md")
         file.writeText("A chapter.\n")

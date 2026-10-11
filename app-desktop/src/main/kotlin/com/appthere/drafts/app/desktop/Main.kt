@@ -219,6 +219,8 @@ private fun ApplicationScope.DraftsApplication(
 ) {
     val stores = remember { Stores.desktop() }
     val sessions = stores.sessions
+    val projects = remember { DesktopProjects(stores) }
+    val scope = rememberCoroutineScope()
 
     val open = remember { mutableStateListOf<SessionRecord>() }
     var restored by remember { mutableStateOf(false) }
@@ -233,15 +235,17 @@ private fun ApplicationScope.DraftsApplication(
         // than thirty days ago has no snapshot worth reopening.
         stores.snapshots.prune(epochMillis())
 
-        open += sessionsAtLaunch(sessions, request, getString(Res.string.untitled), stores.settings.kindForNew())
+        open += atLaunch(request, stores, projects)
         request?.let { stores.rememberKindOf(it) }
         restored = true
+        (request as? LaunchRequest.Open)?.let { projects.offerFor(it.path) }
 
         // Requests handed over by later launches, and by macOS: a file in a window of its own (9.4),
         // or a new document (7.4).
         for (next in requests) {
             open.serve(next, sessions, getString(Res.string.untitled), stores.settings.kindForNew())
             stores.rememberKindOf(next)
+            (next as? LaunchRequest.Open)?.let { projects.offerFor(it.path) }
         }
     }
 
@@ -256,9 +260,15 @@ private fun ApplicationScope.DraftsApplication(
                 onMove = { moved -> open.replaceAll { if (it.documentId == moved.documentId) moved else it } },
                 onClose = { open.removeAll { it.documentId == record.documentId } },
                 windows = { requests.trySend(it) },
+                project = projects.actionsFor(record.uri, { null }) { work -> scope.launch { work() } },
             )
         }
     }
+
+    projects.open.forEach { entry ->
+        key(entry.token) { ProjectWindowFor(entry, stores, projects, windows = { requests.trySend(it) }) }
+    }
+    if (projects.home) ProjectsWindow(stores, projects)
 
     // An invisible window while the session list is being read.
     //
@@ -278,241 +288,26 @@ private fun ApplicationScope.DraftsApplication(
 }
 
 /**
- * One document, in one window, remembering where it was put.
- *
- * The geometry is written back through [SessionList] rather than held in memory, because 7.3 asks
- * for it to survive the process. It is debounced: dragging a window emits a position per frame, and
- * a write per frame would put the reader's own disk under the thing they are dragging.
+ * What this launch opens: projects first, so that a document in a project window's editor comes
+ * back there and not in a window of its own (`projects/project-windows`), then 7.3's sessions and
+ * whatever the launch asked for.
  */
-@Composable
-private fun ApplicationScope.DocumentWindow(
-    record: SessionRecord,
+private suspend fun atLaunch(
+    request: LaunchRequest?,
     stores: Stores,
-    onMove: (SessionRecord) -> Unit,
-    onClose: () -> Unit,
-    windows: (LaunchRequest) -> Unit,
-) {
-    val state =
-        rememberWindowState(
-            position = record.window?.let { WindowPosition(it.x.dp, it.y.dp) } ?: WindowPosition.PlatformDefault,
-            size = record.window?.let { DpSize(it.width.dp, it.height.dp) } ?: DpSize(defaultWidth, defaultHeight),
-            placement = placementOf(record.window?.placement),
-        )
-    var closing by remember { mutableStateOf<(suspend () -> Unit)?>(null) }
-    var closed by remember { mutableStateOf(false) }
-
-    // Read through `rememberUpdatedState` because the effects below outlive the recomposition that
-    // starts them, and a closing window must not call back into a frame that has already gone.
-    val forget by rememberUpdatedState(onClose)
-
-    Window(
-        onCloseRequest = { closed = true },
-        state = state,
-        title = record.displayName,
-        // 12: "**Full-screen** is a first-class mode on every platform that has one."
-        //
-        // Handled at the window rather than inside the document, because the placement belongs to
-        // the window and nothing below it can reach one. F11 is the convention on Linux and
-        // Windows; macOS uses Ctrl+Cmd+F, which arrives here as the same event with meta held.
-        onPreviewKeyEvent = { event ->
-            if (togglesFullScreen(event)) {
-                state.placement =
-                    if (state.placement == WindowPlacement.Fullscreen) {
-                        WindowPlacement.Floating
-                    } else {
-                        WindowPlacement.Fullscreen
-                    }
-                true
-            } else {
-                false
-            }
-        },
-    ) {
-        FileDocument(
-            record = record,
-            stores = stores,
-            parent = window,
-            onMove = onMove,
-            onReadyToClose = { closing = it },
-            windows = windows,
-        )
-    }
-
-    LaunchedEffect(state) {
-        // `collectLatest` plus a delay rather than `debounce`, which is still a preview API: a new
-        // geometry cancels the pending write, so dragging a window is one write when it stops
-        // rather than one per frame while it moves.
-        snapshotFlow { state.geometry() }
-            .distinctUntilChanged()
-            .collectLatest { geometry ->
-                delay(SETTLE_MILLIS)
-                stores.sessions.remember(record.documentId, geometry)
-            }
-    }
-
-    // Closing runs to completion before the window goes: 8.1 lists window close among its triggers
-    // and it is the one that gets no second chance. The composition is still alive here, which it
-    // would not be if this ran after the window had gone.
-    if (closed) {
-        LaunchedEffect(Unit) {
-            closing?.invoke()
-            stores.sessions.closed(record.documentId)
-            forget()
-        }
+    projects: DesktopProjects,
+): List<SessionRecord> {
+    val projectsRestored = projects.restore().isNotEmpty()
+    val held = projects.heldDocuments()
+    val untitled = getString(Res.string.untitled)
+    return sessionsAtLaunch(
+        stores.sessions,
+        request,
+        untitled,
+        stores.settings.kindForNew(),
+        projectsRestored,
+    ).filterNot {
+        it.documentId in
+            held
     }
 }
-
-/**
- * A document read from disk, and the two states before it is one.
- *
- * `Opening` is usually a single frame for a local file and is not always: the path may be on a
- * network share or a sync provider that has to fetch the contents first. `Failed` is ordinary too
- * -- 7.3 warns that a restored session's file may have vanished -- and a reader who was handed a
- * document that is not there should be told so rather than shown an empty one.
- */
-@Composable
-private fun FileDocument(
-    record: SessionRecord,
-    stores: Stores,
-    parent: Frame,
-    onMove: (SessionRecord) -> Unit,
-    onReadyToClose: (suspend () -> Unit) -> Unit,
-    windows: (LaunchRequest) -> Unit,
-) {
-    val identity = remember(record.documentId) { record.identity() }
-
-    // 5.5's settings for this document's type, read before the window is drawn so the reader never
-    // sees the defaults flash up and be replaced by their own typography.
-    val saved by produceState<ReaderSettings?>(null, stores.settings, record.kind) {
-        value = stores.settings.settingsFor(record.kind) ?: ReaderSettings()
-    }
-
-    // From the file, or -- untitled, or with a file that has vanished -- from its snapshot.
-    val opening = rememberSessionDocument(stores.files, stores.snapshots, record, stores.settings)
-    val moved by rememberUpdatedState(onMove)
-    val saving = remember(stores) { SaveAs(stores.sessions, stores.settings) { moved(it) } }
-    val kinds = remember(stores) { KindChange(stores.sessions, stores.settings) { moved(it) } }
-    val scope = rememberCoroutineScope()
-
-    when (opening) {
-        is DocumentOpening.Opened -> {
-            val keeper = remember(opening.document) { SnapshotKeeper(opening.document, stores.snapshots, identity) }
-
-            onReadyToClose { keeper.snapshotOn(SnapshotTrigger.Closing) }
-
-            saved?.let { initial ->
-                DraftsApp(
-                    document = opening.document,
-                    initialSettings = initial,
-                    keeper = keeper,
-                    settingsStore = stores.settings,
-                    kind = record.kind,
-                    // Full screen is listed with the rest, though the window answers it. New and Open
-                    // are requests like any other launch's: each a window of its own (7.1, 9.4).
-                    host =
-                        HostActions(
-                            shortcuts = listOf(fullScreen),
-                            newDocument = { windows(LaunchRequest.New()) },
-                            openDocument = {
-                                scope.launch {
-                                    val title = getString(Res.string.open_document_title)
-                                    chooseFileToOpen(parent, title, openable, near = record.accessToken)
-                                        ?.let { windows(LaunchRequest.Open(it)) }
-                                }
-                            },
-                        ),
-                    saveAs = {
-                        val suggested =
-                            opening.document.suggestedSaveName(
-                                record,
-                                untitled = getString(Res.string.untitled),
-                                myVersion = getString(Res.string.my_version),
-                            )
-
-                        chooseSaveLocation(parent, getString(Res.string.save_as), suggested, near = record.accessToken)
-                            ?.let { path -> saving.to(destinationOf(path, record), opening.document, record, keeper) }
-                    },
-                    // 7.4's kind, while there is no file whose extension already says.
-                    onKindChange =
-                        if (record.uri == null) {
-                            { chosen -> scope.launch { kinds.to(chosen, record, keeper, opening.document.editor) } }
-                        } else {
-                            null
-                        },
-                )
-            }
-        }
-
-        DocumentOpening.Opening -> {
-            Notice(message = stringResource(Res.string.opening))
-        }
-
-        is DocumentOpening.Failed -> {
-            Notice(message = noticeFor(opening.reason), name = record.displayName)
-        }
-    }
-}
-
-/**
- * The four places the desktop keeps things, made once and shared by every window: the reader's
- * files, 8.1's snapshots, 7.3's session list, and 5.5's settings.
- */
-private class Stores(
-    val files: PathDocumentStore,
-    val snapshots: SnapshotStore,
-    val sessions: SessionList,
-    val settings: SettingsStore,
-) {
-    /**
-     * A new document asked for by kind -- *New Fountain screenplay* -- is the reader creating that
-     * kind, which makes it "the kind the reader last created" (7.4).
-     */
-    suspend fun rememberKindOf(request: LaunchRequest) {
-        (request as? LaunchRequest.New)?.kind?.let { settings.rememberKindForNew(it) }
-    }
-
-    companion object {
-        fun desktop(): Stores {
-            val files = PathDocumentStore()
-            val snapshots = SnapshotStore(files, desktopSessionRoot())
-            return Stores(files, snapshots, SessionList(snapshots), SettingsStore(files, desktopSettingsRoot()))
-        }
-    }
-}
-
-/**
- * F11, or Ctrl+Cmd+F where that is the convention.
- *
- * Checked before the document sees it: full screen is a window operation, and a key the editor
- * might otherwise take is one the reader could not use to leave full screen again. The Mac's
- * chord is the one key in the application that needs Ctrl and ⌘ at once, which [Shortcut] does not
- * describe; the list says it in words instead.
- */
-private val fullScreen = Shortcut(Res.string.shortcut_full_screen, Key.F11, "F11")
-
-/** What Open offers: every extension 9.1 says is a document this application reads. */
-private val openable = DocumentKind.entries.flatMap { it.extensions }
-
-private fun togglesFullScreen(event: KeyEvent): Boolean =
-    fullScreen.matches(event) ||
-        (event.type == KeyEventType.KeyDown && event.isCtrlPressed && event.isMetaPressed && event.key == Key.F)
-
-/** 7.3's `window` record: "x, y, width, height, placement". */
-private fun WindowState.geometry() =
-    WindowRecord(
-        x = position.x.value.toInt(),
-        y = position.y.value.toInt(),
-        width = size.width.value.toInt(),
-        height = size.height.value.toInt(),
-        placement = placement.name,
-    )
-
-/** Unknown or unrecognised placements come back floating, which is what a new window would be. */
-private fun placementOf(name: String?): WindowPlacement =
-    WindowPlacement.entries.firstOrNull { it.name == name } ?: WindowPlacement.Floating
-
-private val defaultWidth = 900.dp
-private val defaultHeight = 1100.dp
-
-/** Long enough that dragging a window is one write rather than one per frame. */
-private const val SETTLE_MILLIS = 400L

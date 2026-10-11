@@ -7,7 +7,8 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":core-model"))
-            implementation(libs.kotlinx.coroutines.core)
+            // FolderWatching hands out a Flow, so its runtime is part of the API.
+            api(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
         }
         commonTest.dependencies {

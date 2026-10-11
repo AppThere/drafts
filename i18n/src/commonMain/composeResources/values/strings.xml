@@ -385,4 +385,115 @@
     -->
     <string name="my_version">my version</string>
     <string name="cancel">Cancel</string>
+
+    <!--
+      Projects (projects-core): the binder, the trash, templates, and the words for what reconciling
+      found. Written for the writer: "Unsorted" is what they see, "unplaced" is the code's word.
+    -->
+    <string name="binder">Binder</string>
+    <string name="binder_empty">This folder is empty.</string>
+    <string name="binder_reading">Reading the project…</string>
+    <string name="binder_kind_folder">Folder</string>
+    <string name="binder_kind_other">File</string>
+    <string name="binder_kind_missing">Missing</string>
+    <string name="binder_unsorted">Unsorted</string>
+    <string name="binder_new">New</string>
+    <string name="binder_loading">Reading</string>
+    <string name="binder_unreadable">Can’t be read</string>
+    <string name="binder_nested">A separate project</string>
+    <string name="binder_level">level %1$s</string>
+    <string name="binder_position">%1$s of %2$s</string>
+    <string name="binder_expanded">expanded</string>
+    <string name="binder_collapsed">collapsed</string>
+    <string name="binder_moved">Moved to %1$s of %2$s</string>
+
+    <string name="binder_open">Open</string>
+    <string name="binder_open_window">Open in New Window</string>
+    <string name="binder_rename">Rename…</string>
+    <string name="binder_move_up">Move Up</string>
+    <string name="binder_move_down">Move Down</string>
+    <string name="binder_move_to">Move To…</string>
+    <string name="binder_move_to_title">Move “%1$s” to</string>
+    <string name="binder_delete">Move to Trash</string>
+    <string name="binder_new_folder">New Folder</string>
+    <string name="binder_dismiss">Dismiss New</string>
+    <string name="binder_seen_folder">Mark Folder as Seen</string>
+    <string name="binder_locate">Locate File…</string>
+    <string name="binder_locate_title">Which file is “%1$s” now?</string>
+    <string name="binder_remove_from_order">Remove from Order</string>
+    <string name="binder_actions">Actions for %1$s</string>
+    <string name="binder_name">Name</string>
+    <string name="binder_untitled_folder">New folder</string>
+    <string name="binder_untitled_markdown">Untitled.md</string>
+    <string name="binder_untitled_fountain">Untitled.fountain</string>
+
+    <!-- %1$s is the missing file, %2$s the file that looks like it. -->
+    <string name="relink_offer">“%1$s” looks like it was renamed to “%2$s”. Link them?</string>
+    <string name="relink_folder_offer">The folder “%1$s” looks like it was renamed to “%2$s”. Link them?</string>
+    <string name="relink_accept">Link</string>
+    <string name="relink_decline">Keep Both</string>
+
+    <!-- What the writer is told when a change to the project could not be made. Nothing was changed. -->
+    <string name="outcome_taken">Something called “%1$s” is already there. Nothing was changed.</string>
+    <string name="outcome_conflict">The project changed while you were working on it. Nothing was changed — please try again.</string>
+    <string name="outcome_newer">This project was saved by a newer version of Drafts, so it can’t be changed here.</string>
+    <string name="outcome_not_writable">Drafts can’t change this project’s settings file safely, so nothing was changed.</string>
+    <string name="outcome_history">“%1$s” already has its own notes and versions, so it can’t be linked.</string>
+    <string name="outcome_inside">That folder is already part of a project, and projects can’t go inside each other.</string>
+    <string name="outcome_failed">That couldn’t be done. Nothing was changed.</string>
+
+    <string name="delete_unsaved">“%1$s” has changes that aren’t saved. Move it to the project’s trash anyway?</string>
+    <string name="move_to_trash">Move to Trash</string>
+
+    <string name="trash">Trash</string>
+    <string name="open_trash">Open Trash</string>
+    <string name="trash_empty">The trash is empty.</string>
+    <string name="trash_from">From %1$s</string>
+    <string name="trash_restore">Restore</string>
+    <string name="trash_restore_as">Something called “%1$s” is there now. Restore it as:</string>
+    <string name="trash_delete_forever">Delete Forever</string>
+    <string name="trash_empty_all">Empty Trash</string>
+    <string name="trash_confirm_one">Delete “%1$s” forever? This can’t be undone.</string>
+    <string name="trash_confirm_all">Delete everything in the trash forever? This can’t be undone.</string>
+    <string name="orphan_offer">Notes are still kept for “%1$s”, which was deleted outside Drafts. Remove them?</string>
+    <string name="remove">Remove</string>
+
+    <string name="new_project">New Project…</string>
+    <string name="new_project_title">New project</string>
+    <string name="new_project_create">Create</string>
+    <string name="template">Start from</string>
+    <string name="template_novel">Novel</string>
+    <string name="template_screenplay">Screenplay</string>
+    <string name="template_screenplay_treatment">Screenplay + Treatment</string>
+    <string name="template_research">Research Paper</string>
+    <string name="template_empty">Empty</string>
+    <!-- Folder names a template makes, in the writer's language. They become real folder names. -->
+    <string name="template_folder_manuscript">Manuscript</string>
+    <string name="template_folder_notes">Notes</string>
+    <string name="template_folder_characters">Characters</string>
+    <string name="template_folder_places">Places</string>
+    <string name="template_folder_screenplay">Screenplay</string>
+    <string name="template_folder_treatment">Treatment</string>
+    <string name="template_folder_beats">Beats</string>
+    <string name="template_folder_draft">Draft</string>
+    <string name="template_folder_sources">Sources</string>
+    <string name="template_folder_figures">Figures</string>
+
+    <string name="open_folder">Open Folder…</string>
+    <string name="open_folder_title">Open a folder as a project</string>
+    <string name="recent_projects">Recent Projects</string>
+    <string name="recent_pin">Pin</string>
+    <string name="recent_unpin">Unpin</string>
+    <string name="recent_pinned">Pinned</string>
+    <string name="recent_unavailable">Can’t be found</string>
+    <string name="recent_choose_again">Choose Folder…</string>
+    <string name="recent_remove">Remove from List</string>
+    <string name="open_project">Open Project</string>
+    <string name="show_project">Show Project</string>
+    <!-- A document's place in its project, in its window's chrome: "The Salt Road › Characters". -->
+    <string name="breadcrumb">%1$s › %2$s</string>
+    <!-- A document window's title when the document is in a project: its name, then the project and folder. -->
+    <string name="document_in_project_title">%1$s — %2$s</string>
+    <string name="document_in_project">“%1$s” is part of the project “%2$s”. Open the project too?</string>
+    <string name="folder_in_project">“%1$s” is part of the project “%2$s”. Open “%2$s” instead?</string>
 </resources>

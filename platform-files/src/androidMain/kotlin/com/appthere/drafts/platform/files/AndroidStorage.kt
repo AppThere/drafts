@@ -25,6 +25,13 @@ fun androidSessionRoot(context: Context): String = File(androidDataRoot(context)
 fun androidSettingsRoot(context: Context): String = File(androidDataRoot(context), SETTINGS).path
 
 /**
+ * What the app keeps per project on this device (`projects/reconciliation`): what the folder looked
+ * like, and the marks the reader has not answered yet. Here and not in the project's `.drafts/`,
+ * which a sync client would share with every other device.
+ */
+fun androidProjectRoot(context: Context): String = File(androidDataRoot(context), PROJECTS).path
+
+/**
  * A session identity for a document the reader picked through the Storage Access Framework.
  *
  * 7.3: "**Android:** `takePersistableUriPermission` on the content URI at open time. Without this,
@@ -84,10 +91,28 @@ fun resolveAndroidToken(
     token: String,
 ): DocumentRef? {
     val uri = runCatching { Uri.parse(token) }.getOrNull() ?: return null
-    val held = context.contentResolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }
+    val held =
+        context.contentResolver.persistedUriPermissions
+            .filter { it.isReadPermission }
+            .map { it.uri }
 
-    return if (held) DocumentRef(token) else null
+    return if (isCoveredBy(uri, held)) DocumentRef(token) else null
 }
+
+/**
+ * Whether a grant on one of [held] reaches [uri]: a grant on the document itself, or on the tree a
+ * document was reached through (`projects-core` design D10). A document opened from a project's
+ * binder has no grant of its own -- the reader granted the folder -- and without the second case
+ * its window could never be restored.
+ */
+internal fun isCoveredBy(
+    uri: Uri,
+    held: List<Uri>,
+): Boolean =
+    uri in held ||
+        runCatching {
+            DocumentsContract.buildTreeDocumentUri(uri.authority, DocumentsContract.getTreeDocumentId(uri)) in held
+        }.getOrDefault(false)
 
 fun displayNameOf(
     resolver: ContentResolver,
@@ -106,3 +131,4 @@ internal fun isDocumentUri(uri: Uri): Boolean =
 private const val DATA = "drafts"
 private const val SESSIONS = "sessions"
 private const val SETTINGS = "settings"
+private const val PROJECTS = "projects"

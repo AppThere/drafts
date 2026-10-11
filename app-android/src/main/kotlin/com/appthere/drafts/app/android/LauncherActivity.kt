@@ -7,9 +7,11 @@ import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.untitled
+import com.appthere.drafts.platform.files.DocumentRef
 import com.appthere.drafts.platform.files.SessionRecord
 import com.appthere.drafts.platform.files.androidDocumentId
 import com.appthere.drafts.platform.intents.DocumentKind
+import com.appthere.drafts.project.ProjectLocation
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
 
@@ -34,7 +36,17 @@ class LauncherActivity : ComponentActivity() {
         val storage = Storage(this)
 
         lifecycleScope.launch {
-            forgetClosedWindows(storage.sessions, documentsWithTasks())
+            // Open projects first, each in its own task, with the documents in their editors.
+            val projects =
+                if (showing) {
+                    emptyList()
+                } else {
+                    AndroidProjects.list(this@LauncherActivity).open().filter {
+                        AndroidProjects.isAvailable(this@LauncherActivity, it)
+                    }
+                }
+            val held = projects.mapNotNull { it.document }.toSet()
+            forgetClosedWindows(storage.sessions, documentsWithTasks()?.plus(held))
 
             val open =
                 documentsAtLaunch(
@@ -43,7 +55,11 @@ class LauncherActivity : ComponentActivity() {
                     showing = showing,
                     untitledName = getString(Res.string.untitled),
                     lastKind = storage.settings.kindForNew(),
+                    projects = ProjectsAtLaunch(restored = projects.isNotEmpty(), held = held),
                 )
+            projects.forEach {
+                startActivity(projectIntent(this@LauncherActivity, ProjectLocation(DocumentRef(it.token), it.name)))
+            }
 
             // The kind a shortcut asked for becomes the kind the next new document starts as (7.4).
             requested?.let { storage.settings.rememberKindForNew(it) }

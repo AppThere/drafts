@@ -1,8 +1,8 @@
 package com.appthere.drafts.project
 
 import com.appthere.drafts.platform.files.DocumentRef
+import com.appthere.drafts.platform.files.FolderOutcome
 import com.appthere.drafts.platform.files.FolderRenaming
-import com.appthere.drafts.platform.files.RenameOutcome
 
 /**
  * A reorder in `prefix` mode (`projects.md` 3): "Reordering renames files `01-`, `02-`; order is
@@ -28,14 +28,29 @@ class PrefixReorder(
      * renames made, by old name, for whatever else follows a file: its open window, its sidecar.
      */
     suspend fun reorder(entries: List<ProjectNode>): PrefixOutcome {
-        val width = maxOf(MINIMUM_WIDTH, entries.size.toString().length)
-        val planned =
-            entries.mapIndexedNotNull { index, node ->
-                prefixed(node.name, index + 1, width).takeIf { it != node.name }?.let { Step(node.ref, it, node.name) }
-            }
-
-        val taken = entries.map { it.name }.toSet()
+        val planned = stepsFor(entries)
+        val taken = entries.filter { it.ref != null }.map { it.name }.toSet()
         return if (planned.any { it.name in taken }) viaTemporaryNames(planned) else directly(planned)
+    }
+
+    /**
+     * The renames [reorder] would make, by old name, without making them: for what has to be
+     * written before any file moves, such as `project.toml` (`projects-core` design D6).
+     */
+    fun planned(entries: List<ProjectNode>): Map<String, String> =
+        stepsFor(entries).associate { it.original to it.name }
+
+    private fun stepsFor(entries: List<ProjectNode>): List<Step> {
+        // A missing entry has no file to rename; the others are numbered as if it were not there.
+        val present = entries.filter { it.ref != null }
+        val width = maxOf(MINIMUM_WIDTH, present.size.toString().length)
+        return present.mapIndexedNotNull { index, node ->
+            prefixed(
+                node.name,
+                index + 1,
+                width,
+            ).takeIf { it != node.name }?.let { Step(checkNotNull(node.ref), it, node.name) }
+        }
     }
 
     private suspend fun directly(planned: List<Step>): PrefixOutcome {
@@ -61,7 +76,7 @@ class PrefixReorder(
         val done = mutableListOf<Done>()
         for (step in steps) {
             val outcome = renaming.rename(step.ref, step.name)
-            if (outcome !is RenameOutcome.Renamed) return Pass(done, outcome)
+            if (outcome !is FolderOutcome.Done) return Pass(done, outcome)
             done += Done(step.original, step.name, outcome.ref)
         }
         return Pass(done, failure = null)
@@ -73,9 +88,9 @@ class PrefixReorder(
     /** Takes back [steps], in the order given, and says why the reorder did not happen. */
     private suspend fun undo(
         steps: List<Done>,
-        why: RenameOutcome,
+        why: FolderOutcome,
     ): PrefixOutcome {
-        val stranded = steps.filter { step -> renaming.rename(step.ref, step.original()) !is RenameOutcome.Renamed }
+        val stranded = steps.filter { step -> renaming.rename(step.ref, step.original()) !is FolderOutcome.Done }
         return PrefixOutcome.NotReordered(reason = why, stranded = stranded.map { it.to })
     }
 
@@ -89,7 +104,7 @@ class PrefixReorder(
     /** The renames one pass made, and the failure that stopped it if one did. */
     private class Pass(
         val done: List<Done>,
-        val failure: RenameOutcome?,
+        val failure: FolderOutcome?,
     )
 
     /** One rename made: [from] the name it had, [to] the name it has, at [ref]. */
@@ -126,7 +141,7 @@ sealed interface PrefixOutcome {
      * about by name.
      */
     data class NotReordered(
-        val reason: RenameOutcome,
+        val reason: FolderOutcome,
         val stranded: List<String>,
     ) : PrefixOutcome
 }

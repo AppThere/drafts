@@ -1,5 +1,6 @@
 package com.appthere.drafts.platform.files
 
+import android.provider.DocumentsContract
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.test.runTest
 import java.io.File
@@ -41,6 +42,36 @@ class AndroidStorageTest {
             androidDataRoot(context).startsWith(context.filesDir.path),
             "Data root is ${androidDataRoot(context)}, outside ${context.filesDir}",
         )
+    }
+
+    @Test
+    fun perProjectStateHasItsOwnPlaceInTheAppsData() {
+        val projects = File(androidProjectRoot(context))
+
+        assertEquals(File(androidDataRoot(context)), projects.parentFile)
+        assertEquals("projects", projects.name)
+        assertFalse(projects.path == androidSessionRoot(context) || projects.path == androidSettingsRoot(context))
+    }
+
+    @Test
+    fun aDocumentReachedThroughAGrantedTreeIsCoveredByTheTreesGrant() {
+        val tree = DocumentsContract.buildTreeDocumentUri(PROVIDER, "primary:The Salt Road")
+        val scene = DocumentsContract.buildDocumentUriUsingTree(tree, "primary:The Salt Road/Screenplay/dock.fountain")
+
+        assertTrue(isCoveredBy(scene, listOf(tree)))
+        assertTrue(isCoveredBy(tree, listOf(tree)))
+    }
+
+    @Test
+    fun aDocumentIsNotCoveredByAnotherTreesGrant() {
+        val granted = DocumentsContract.buildTreeDocumentUri(PROVIDER, "primary:Other")
+        val tree = DocumentsContract.buildTreeDocumentUri(PROVIDER, "primary:The Salt Road")
+        val scene = DocumentsContract.buildDocumentUriUsingTree(tree, "primary:The Salt Road/dock.fountain")
+        val single = DocumentsContract.buildDocumentUri(PROVIDER, "primary:loose.md")
+
+        assertFalse(isCoveredBy(scene, listOf(granted)))
+        assertFalse(isCoveredBy(single, listOf(granted)))
+        assertTrue(isCoveredBy(single, listOf(single)))
     }
 
     @Test
@@ -121,6 +152,8 @@ class AndroidStorageTest {
         )
 
     private companion object {
+        const val PROVIDER = "com.android.externalstorage.documents"
+
         const val ID = "chapter"
         const val TEXT = "# Chapter\n\nUnsaved work.\n"
         const val ORIGINAL = "As opened.\n"

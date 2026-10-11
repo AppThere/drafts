@@ -146,16 +146,36 @@ class LaunchingTest {
             assertEquals(listOf("Shared"), atLaunch().map { it.displayName })
         }
 
+    @Test
+    fun `a project coming back is something restored, and no untitled document joins it`() =
+        runBlocking {
+            assertEquals(emptyList(), atLaunch(projectsRestored = true))
+        }
+
+    @Test
+    fun `a document in a restored project's editor comes back there, not in a task of its own`() =
+        runBlocking {
+            val held = sessions.opened(SessionIdentity.untitled(kind = "markdown", displayName = "In the project"))
+            val own = sessions.opened(SessionIdentity.untitled(kind = "markdown", displayName = "On its own"))
+
+            val opened = atLaunch(projectsRestored = true, held = setOf(held.documentId))
+
+            assertEquals(listOf(own.documentId), opened.map { it.documentId })
+        }
+
     private suspend fun atLaunch(
         requested: DocumentKind? = null,
         showing: Boolean = false,
         lastKind: DocumentKind = DocumentKind.Markdown,
+        projectsRestored: Boolean = false,
+        held: Set<String> = emptySet(),
     ) = documentsAtLaunch(
         sessions = sessions,
         requested = requested,
         showing = showing,
         untitledName = UNTITLED,
         lastKind = lastKind,
+        projects = ProjectsAtLaunch(projectsRestored, held),
     )
 
     private companion object {

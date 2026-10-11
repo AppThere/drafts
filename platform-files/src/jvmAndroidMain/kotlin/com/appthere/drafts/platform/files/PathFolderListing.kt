@@ -35,10 +35,25 @@ class PathFolderListing(
             }
         }
 
-    override fun childOf(
-        folder: DocumentRef,
-        name: String,
-    ): DocumentRef = DocumentRef(Paths.get(folder.token).resolve(name).toString())
+    override suspend fun modifiedOf(folder: DocumentRef): Long =
+        withContext(io) {
+            try {
+                Files.getLastModifiedTime(Paths.get(folder.token)).toMillis()
+            } catch (_: IOException) {
+                0L
+            } catch (_: SecurityException) {
+                0L
+            }
+        }
+
+    override suspend fun parentOf(folder: DocumentRef): FolderEntry? =
+        withContext(io) {
+            val parent = Paths.get(folder.token).toAbsolutePath().parent ?: return@withContext null
+            // The top of the filesystem has no name of its own; it is called what it is.
+            val name = parent.fileName?.toString() ?: parent.toString()
+            val modified = runCatching { Files.getLastModifiedTime(parent).toMillis() }.getOrDefault(0L)
+            FolderEntry(name, DocumentRef(parent.toString()), isFolder = true, modifiedEpochMillis = modified)
+        }
 
     /** One entry, or null for one that vanished between being listed and being looked at. */
     private fun entryFor(path: Path): FolderEntry? =

@@ -20,17 +20,21 @@ import com.appthere.drafts.platform.windows.SessionList
  *
  * A new document is [newKind] unless the request named one: "the kind the reader last created --
  * Markdown on first launch".
+ *
+ * [projectsRestored] is a project window coming back: that is something restored too, and the
+ * reader is picking up where they left off, so no untitled document joins it.
  */
 internal suspend fun sessionsAtLaunch(
     sessions: SessionList,
     request: LaunchRequest?,
     untitledName: String,
     newKind: DocumentKind = DocumentKind.Markdown,
+    projectsRestored: Boolean = false,
 ): List<SessionRecord> {
     val open = sessions.restorable().toMutableList()
     request?.let { open.serve(it, sessions, untitledName, newKind) }
 
-    if (open.isEmpty()) open.serve(LaunchRequest.New(), sessions, untitledName, newKind)
+    if (open.isEmpty() && !projectsRestored) open.serve(LaunchRequest.New(), sessions, untitledName, newKind)
     return open
 }
 

@@ -21,6 +21,7 @@ class HostActions(
     val shortcuts: List<Shortcut> = emptyList(),
     val newDocument: (() -> Unit)? = null,
     val openDocument: (() -> Unit)? = null,
+    val projects: ProjectActions? = null,
 ) {
     /** What the shortcut list shows for this host, after the window's own. */
     internal val listed: List<Shortcut>
@@ -43,3 +44,13 @@ class HostActions(
         return true
     }
 }
+
+/**
+ * The ways from a document window to projects (`projects/project-windows`): a folder opened as one,
+ * the writer's recent projects, and -- for a document opened from a project -- that project's window.
+ */
+class ProjectActions(
+    val openFolder: () -> Unit,
+    val recent: () -> Unit,
+    val showProject: (() -> Unit)? = null,
+)

@@ -79,6 +79,13 @@ fun desktopSessionRoot(): String = Path.of(desktopDataRoot(), SESSIONS).toString
 fun desktopSettingsRoot(): String = Path.of(desktopDataRoot(), SETTINGS).toString()
 
 /**
+ * What the app keeps per project on this device (`projects/reconciliation`): what the folder looked
+ * like, and the marks the reader has not answered yet. Here and not in the project's `.drafts/`,
+ * which a sync client would share with every other device.
+ */
+fun desktopProjectRoot(): String = Path.of(desktopDataRoot(), PROJECTS).toString()
+
+/**
  * A desktop document's session identity.
  *
  * Lives here because working out a display name, a URI and a file kind means handling a path, and
@@ -128,6 +135,7 @@ private const val VENDOR = "AppThere"
 private const val APPLICATION = "Drafts"
 private const val SESSIONS = "sessions"
 private const val SETTINGS = "settings"
+private const val PROJECTS = "projects"
 
 // Named for the application, because a runtime directory is shared by everything the user runs.
 private const val INSTANCE_SOCKET = "appthere-drafts.sock"

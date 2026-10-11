@@ -6,7 +6,9 @@ import com.akuleshov7.ktoml.exceptions.TomlDecodingException
 import com.appthere.drafts.platform.files.Digest
 import com.appthere.drafts.platform.files.DocumentRef
 import com.appthere.drafts.platform.files.DocumentStore
+import com.appthere.drafts.platform.files.FolderEditing
 import com.appthere.drafts.platform.files.FolderListing
+import com.appthere.drafts.platform.files.FolderOutcome
 import com.appthere.drafts.platform.files.WriteOutcome
 
 /**
@@ -27,10 +29,12 @@ import com.appthere.drafts.platform.files.WriteOutcome
  * than something lost. Comments are not kept when the application writes the file.
  *
  * The sidecar is made by the first write (13.1: created "only when the reader does something that
- * needs it"); reading never creates anything.
+ * needs it"); reading never creates anything. It is made through [FolderEditing] and found by
+ * listing, never by building a reference from its name, which Android's storage framework cannot do.
  */
 class ProjectManifest(
     private val listing: FolderListing,
+    private val editing: FolderEditing,
     private val store: DocumentStore,
 ) {
     /** What `project.toml` in the project at [root] says, and whether it can be written. */
@@ -57,39 +61,53 @@ class ProjectManifest(
     ): ManifestWrite {
         val text = Toml.encodeToString(ProjectFile.serializer(), file)
 
-        val outcome =
-            when (read) {
-                is ManifestState.Read -> store.writeIfUnchanged(read.ref, text, read.digest)
-                ManifestState.Absent -> create(fileIn(root), text)
-                else -> return ManifestWrite.Refused(read)
-            }
-
-        return when (outcome) {
-            is WriteOutcome.Written -> {
-                ManifestWrite.Written(
-                    ManifestState.Read(file, fileIn(root), outcome.facts.digest),
-                )
-            }
-
-            is WriteOutcome.Conflict -> {
-                ManifestWrite.Conflict
-            }
-
-            is WriteOutcome.Unavailable -> {
-                ManifestWrite.Failed(outcome.reason)
-            }
+        return when (read) {
+            is ManifestState.Read -> written(file, read.ref, store.writeIfUnchanged(read.ref, text, read.digest))
+            ManifestState.Absent -> create(root, file, text)
+            else -> ManifestWrite.Refused(read)
         }
     }
 
-    /** The first `project.toml`, unless one has appeared since the project was read. */
+    /**
+     * The first `project.toml`, and `.drafts/` if that is not there either -- unless a
+     * `project.toml` has appeared since the project was read, which is the same as one that changed.
+     */
     private suspend fun create(
-        ref: DocumentRef,
+        root: DocumentRef,
+        file: ProjectFile,
         text: String,
-    ): WriteOutcome =
-        store.facts(ref)?.let { WriteOutcome.Conflict(expected = it.digest, found = it.digest) }
-            ?: store.writeAtomically(ref, text)
+    ): ManifestWrite {
+        val sidecar = sidecarIn(root) ?: return ManifestWrite.Failed(WriteOutcome.Reason.Failed)
 
-    private fun fileIn(root: DocumentRef): DocumentRef = listing.childOf(listing.childOf(root, SIDECAR), FILE)
+        return when (val made = editing.createFile(sidecar, FILE)) {
+            is FolderOutcome.Done -> written(file, made.ref, store.writeAtomically(made.ref, text))
+            FolderOutcome.Taken -> ManifestWrite.Conflict
+            is FolderOutcome.Failed -> ManifestWrite.Failed(WriteOutcome.Reason.Failed)
+        }
+    }
+
+    /** The project's `.drafts/`, made if it is not there. Null if it can be neither found nor made. */
+    private suspend fun sidecarIn(root: DocumentRef): DocumentRef? =
+        sidecarListedIn(root)
+            ?: when (val made = editing.createFolder(root, SIDECAR)) {
+                is FolderOutcome.Done -> made.ref
+                FolderOutcome.Taken -> sidecarListedIn(root)
+                is FolderOutcome.Failed -> null
+            }
+
+    private suspend fun sidecarListedIn(root: DocumentRef): DocumentRef? =
+        listing.entriesOf(root)?.firstOrNull { it.isFolder && it.name == SIDECAR }?.ref
+
+    private fun written(
+        file: ProjectFile,
+        ref: DocumentRef,
+        outcome: WriteOutcome,
+    ): ManifestWrite =
+        when (outcome) {
+            is WriteOutcome.Written -> ManifestWrite.Written(ManifestState.Read(file, ref, outcome.facts.digest))
+            is WriteOutcome.Conflict -> ManifestWrite.Conflict
+            is WriteOutcome.Unavailable -> ManifestWrite.Failed(outcome.reason)
+        }
 
     /**
      * Strictly first. If that fails and a lenient read does not, what failed was a name this version
@@ -102,10 +120,28 @@ class ProjectManifest(
         digest: Digest,
     ): ManifestState =
         try {
-            ManifestState.Read(strict.decodeFromString(ProjectFile.serializer(), text), ref, digest)
+            val file = strict.decodeFromString(ProjectFile.serializer(), text)
+            // A later layout may give a known key a new meaning, so knowing every key is not enough
+            // (`projects/manifest`, "A project from a later version is read-only").
+            if (file.project.schema > ProjectSettings.SCHEMA) {
+                ManifestState.NotWritable(
+                    file,
+                    "Schema ${file.project.schema} is later than ${ProjectSettings.SCHEMA}",
+                    newer = true,
+                )
+            } else {
+                ManifestState.Read(file, ref, digest)
+            }
         } catch (strictly: TomlDecodingException) {
             runCatching { lenient.decodeFromString(ProjectFile.serializer(), text) }.fold(
-                onSuccess = { ManifestState.NotWritable(it, strictly.message.orEmpty()) },
+                onSuccess = {
+                    ManifestState.NotWritable(
+                        it,
+                        strictly.message.orEmpty(),
+                        newer =
+                            it.project.schema > ProjectSettings.SCHEMA,
+                    )
+                },
                 onFailure = { ManifestState.Invalid(strictly.message.orEmpty()) },
             )
         }
@@ -136,10 +172,14 @@ sealed interface ManifestState {
         val digest: Digest,
     ) : ManifestState
 
-    /** Read for what this version understands; the rest is why it is not written over. */
+    /**
+     * Read for what this version understands; the rest is why it is not written over. [newer] is a
+     * file saved by a later version of the app, which is what the writer is told.
+     */
     data class NotWritable(
         override val file: ProjectFile,
         val reason: String,
+        val newer: Boolean = false,
     ) : ManifestState
 
     /** Not TOML this version can read at all. The project opens with defaults; the file is kept. */

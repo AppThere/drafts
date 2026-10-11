@@ -44,6 +44,14 @@ class LaunchTest {
         }
 
     @Test
+    fun `a project window coming back is something restored, and no untitled document joins it`() =
+        runBlocking {
+            val opened = sessionsAtLaunch(sessions, request = null, untitledName = UNTITLED, projectsRestored = true)
+
+            assertEquals(emptyList(), opened)
+        }
+
+    @Test
     fun `the untitled document is the kind the reader last created`() =
         runBlocking {
             val opened =

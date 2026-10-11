@@ -36,6 +36,16 @@ value class ProjectPath(
 ) {
     fun child(name: String): ProjectPath = ProjectPath(if (value == ROOT) "/$name" else "$value/$name")
 
+    /** The folder this is in; the root is its own. */
+    val parent: ProjectPath get() = ProjectPath(value.substringBeforeLast('/').ifEmpty { ROOT })
+
+    /** The last part of the path: a file's or folder's own name. Empty for the root. */
+    val name: String get() = value.substringAfterLast('/')
+
+    /** Whether this is [folder] or somewhere inside it. */
+    fun isWithin(folder: ProjectPath): Boolean =
+        folder == Root || this == folder || value.startsWith(folder.value + "/")
+
     override fun toString(): String = value
 
     companion object {
@@ -48,7 +58,9 @@ value class ProjectPath(
 sealed interface ProjectNode {
     val name: String
     val path: ProjectPath
-    val ref: DocumentRef
+
+    /** Where it is on disk; null only for [Missing], which is not anywhere. */
+    val ref: DocumentRef?
 
     /**
      * In a folder the writer has ordered, and not placed in that order: `projects.md` 3's "new"
@@ -62,6 +74,9 @@ sealed interface ProjectNode {
      * [unreadable] is a folder the listing could not open -- not permitted, or gone mid-walk. It is
      * shown, with nothing in it and that said, rather than dropped: a folder that vanished from the
      * binder would read as its contents having been deleted.
+     *
+     * [loading] is a folder the walk has found and not listed yet (`projects/folder-as-project`, "A
+     * project is shown while it is still being walked").
      */
     data class Folder(
         override val name: String,
@@ -71,6 +86,7 @@ sealed interface ProjectNode {
         val nestedProject: Boolean = false,
         val unreadable: Boolean = false,
         override val unplaced: Boolean = false,
+        val loading: Boolean = false,
     ) : ProjectNode
 
     /** A Markdown or Fountain file: something Drafts opens and edits (`projects.md` 5). */
@@ -80,6 +96,8 @@ sealed interface ProjectNode {
         override val ref: DocumentRef,
         val kind: DocumentKind,
         override val unplaced: Boolean = false,
+        /** When the listing last saw it change, which is what tells reconciliation to look again. */
+        val modifiedEpochMillis: Long = 0,
     ) : ProjectNode
 
     /**
@@ -91,7 +109,22 @@ sealed interface ProjectNode {
         override val path: ProjectPath,
         override val ref: DocumentRef,
         override val unplaced: Boolean = false,
+        val modifiedEpochMillis: Long = 0,
     ) : ProjectNode
+
+    /**
+     * Gone from disk and still remembered: `projects.md` 9's "missing" state, "shown greyed in the
+     * binder". Placed where the order had it, and never dropped from the order by the application
+     * -- "keep the entry, mark missing, never silently drop it" -- since the file may only be away:
+     * a sync not finished, a drive not mounted, a rename to be relinked.
+     */
+    data class Missing(
+        override val name: String,
+        override val path: ProjectPath,
+    ) : ProjectNode {
+        override val ref: DocumentRef? = null
+        override val unplaced: Boolean = false
+    }
 }
 
 /** Every folder at or below this one, this one first. */
@@ -104,6 +137,41 @@ fun ProjectNode.Folder.documents(): List<ProjectNode.Document> =
         when (child) {
             is ProjectNode.Document -> listOf(child)
             is ProjectNode.Folder -> child.documents()
-            is ProjectNode.Attachment -> emptyList()
+            is ProjectNode.Attachment, is ProjectNode.Missing -> emptyList()
         }
     }
+
+/** Every file at or below this folder, documents and attachments, in the order the tree holds them. */
+fun ProjectNode.Folder.files(): List<ProjectNode> =
+    children.flatMap { child ->
+        when (child) {
+            is ProjectNode.Folder -> child.files()
+            is ProjectNode.Document, is ProjectNode.Attachment -> listOf(child)
+            is ProjectNode.Missing -> emptyList()
+        }
+    }
+
+/** The folder at [path], if the tree has one there. */
+fun ProjectNode.Folder.folderAt(path: ProjectPath): ProjectNode.Folder? = folders().firstOrNull { it.path == path }
+
+/** The node at [path], if the tree has one there. */
+fun ProjectNode.Folder.nodeAt(path: ProjectPath): ProjectNode? =
+    folderAt(path) ?: folderAt(path.parent)?.children?.firstOrNull { it.path == path }
+
+/**
+ * The project with each of [missing] shown where it was (`projects/reconciliation`, "shown in its
+ * place in the binder as missing"): in its folder, among the names as the walk sorts them, for the
+ * ordering to place like any other entry. One whose folder has gone too is not shown; its folder is.
+ */
+internal fun Project.withMissing(missing: List<ProjectPath>): Project =
+    if (missing.isEmpty()) this else copy(root = root.withMissing(missing))
+
+private fun ProjectNode.Folder.withMissing(missing: List<ProjectPath>): ProjectNode.Folder {
+    val here = missing.filter { it.parent == path && children.none { child -> child.name == it.name } }
+    val children = children.map { if (it is ProjectNode.Folder) it.withMissing(missing) else it }
+    return copy(
+        children =
+            (children + here.map { ProjectNode.Missing(it.name, it) })
+                .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name }),
+    )
+}

@@ -21,8 +21,11 @@ import com.appthere.drafts.i18n.resources.keyboard_shortcuts
 import com.appthere.drafts.i18n.resources.licences
 import com.appthere.drafts.i18n.resources.new_document
 import com.appthere.drafts.i18n.resources.open_document
+import com.appthere.drafts.i18n.resources.open_folder
 import com.appthere.drafts.i18n.resources.open_outline
+import com.appthere.drafts.i18n.resources.recent_projects
 import com.appthere.drafts.i18n.resources.scene_headings
+import com.appthere.drafts.i18n.resources.show_project
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -117,6 +120,7 @@ internal fun BoxScope.WindowPanels(
                         },
                 )
             }
+            host.projects?.let { projects -> ProjectLinks(projects, panels, refocused) }
             headings?.let { PanelLink(stringResource(Res.string.scene_headings), onClick = panels::openHeadings) }
             PanelLink(stringResource(Res.string.keyboard_shortcuts), onClick = panels::openShortcuts)
             PanelLink(stringResource(Res.string.licences), onClick = panels::openLicences)
@@ -169,3 +173,21 @@ internal fun BoxScope.panelPlacement(roomy: Alignment): Modifier =
 
 /** Between the outline button and the reader controls button. */
 private val buttonGap = 8.dp
+
+/** The ways to projects, in the controls beside New and Open; each closes the panel first, like those. */
+@Composable
+private fun ProjectLinks(
+    projects: ProjectActions,
+    panels: Panels,
+    refocused: (() -> Unit) -> () -> Unit,
+) {
+    val going = { go: () -> Unit ->
+        refocused {
+            panels.closeControls()
+            go()
+        }
+    }
+    projects.showProject?.let { PanelLink(stringResource(Res.string.show_project), onClick = going(it)) }
+    PanelLink(stringResource(Res.string.open_folder), onClick = going(projects.openFolder))
+    PanelLink(stringResource(Res.string.recent_projects), onClick = going(projects.recent))
+}
