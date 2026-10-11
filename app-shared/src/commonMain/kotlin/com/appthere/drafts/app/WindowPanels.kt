@@ -1,16 +1,12 @@
 package com.appthere.drafts.app
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.appthere.drafts.core.fountain.FountainKeywords
 import com.appthere.drafts.design.LocalWindowSize
 import com.appthere.drafts.design.Lucide
@@ -35,7 +31,6 @@ import org.jetbrains.compose.resources.stringResource
  * Icons, so that with 7.4's kind switch the whole bar fits one line on a phone. They still wrap
  * rather than overflow, for a phone at 200% text.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun PanelButtons(
     panels: Panels,
@@ -44,17 +39,16 @@ internal fun PanelButtons(
 ) {
     if (panels.controls) return
 
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(buttonGap, Alignment.End),
-        verticalArrangement = Arrangement.spacedBy(buttonGap),
-    ) {
+    ChromeButtons {
         // 10.1 calls the outline an accessibility feature rather than a convenience, so it gets a
-        // way in that needs no keyboard, beside the one the controls have.
+        // way in that needs no keyboard, beside the one the controls have. Shown pressed while the
+        // outline is open, since the button also closes it.
         PanelIconButton(
             icon = Lucide.ListTree,
             description = stringResource(Res.string.open_outline),
             onClick = refocused(panels::toggleOutline),
             enabled = !hidden,
+            selected = panels.outline,
         )
         ReaderControlsButton(enabled = !hidden, onClick = refocused(panels::openControls))
     }
@@ -166,6 +160,3 @@ internal fun BoxScope.panelPlacement(roomy: Alignment): Modifier =
     } else {
         Modifier.align(roomy).padding(controlsInset)
     }
-
-/** Between the outline button and the reader controls button. */
-private val buttonGap = 8.dp

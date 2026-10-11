@@ -4,8 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.CircleShape
@@ -13,11 +15,13 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.appthere.drafts.design.Corners
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.interfaceTextStyle
 import com.appthere.drafts.i18n.resources.Res
@@ -47,6 +51,10 @@ import org.jetbrains.compose.resources.stringResource
  *
  * `clean` shows no label. A document that matches its file has nothing to say, and a permanent
  * "Saved" is the kind of chrome that stops being read after a day.
+ *
+ * A label is set on a pill, so it reads as the status of the page rather than as a line of it: the
+ * control tone for a state that is information, the attention tone for one where something has
+ * happened to the file.
  */
 @Composable
 fun DocumentStateBadge(
@@ -56,7 +64,10 @@ fun DocumentStateBadge(
 ) {
     val palette = LocalPalette.current
     val label = labelOf(state)
-    val tint = if (needsAttention(state)) palette.accent else palette.muted
+    val labelled = state != DocumentState.Clean
+    val alarm = needsAttention(state)
+    val tint = if (alarm) palette.onAttention else palette.muted
+    val fill = if (alarm) palette.attention else palette.control
 
     // Read here rather than inside `semantics`, which is not a composition.
     val described = stringResource(Res.string.said_after, stringResource(Res.string.document_state), label)
@@ -70,7 +81,7 @@ fun DocumentStateBadge(
     // worse than no control.
     val save = onSave.takeIf { state != DocumentState.Clean }
 
-    Row(
+    Box(
         modifier
             // 10.2: "Touch targets >= 48dp." A dot is four.
             .then(if (save == null) Modifier else Modifier.sizeIn(minWidth = target, minHeight = target))
@@ -91,13 +102,25 @@ fun DocumentStateBadge(
             // it, and `clickable` is outside. Checked by removing the action and watching a screen
             // reader still activate it, rather than assumed either way.
             .clearAndSetSemantics { contentDescription = described },
-        horizontalArrangement = Arrangement.spacedBy(dotGap),
-        verticalAlignment = Alignment.CenterVertically,
+        contentAlignment = Alignment.Center,
     ) {
-        Dot(filled = state != DocumentState.Clean, tint = tint)
+        Row(
+            if (labelled) {
+                Modifier
+                    .clip(Corners.Pill)
+                    .background(fill)
+                    .padding(horizontal = pillAcross, vertical = pillDown)
+            } else {
+                Modifier
+            },
+            horizontalArrangement = Arrangement.spacedBy(dotGap),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Dot(filled = labelled, tint = tint)
 
-        if (state != DocumentState.Clean) {
-            BasicText(text = label, style = interfaceTextStyle(color = tint, fontSize = labelSize))
+            if (labelled) {
+                BasicText(text = label, style = interfaceTextStyle(color = tint, fontSize = labelSize))
+            }
         }
     }
 }
@@ -142,7 +165,7 @@ private fun labelOf(state: DocumentState): String =
     }
 
 /**
- * Worth the accent colour: something has happened to the file, rather than to the text.
+ * Worth the attention tone: something has happened to the file, rather than to the text.
  *
  * Not `untitled`. Nothing has happened to a file that does not exist yet; the label says the words
  * are not in one, and that is information rather than an alarm.
@@ -152,6 +175,8 @@ private fun needsAttention(state: DocumentState): Boolean =
 
 private val dotSize = 8.dp
 private val dotGap = 6.dp
+private val pillAcross = 10.dp
+private val pillDown = 4.dp
 private val hairline = 1.dp
 private val labelSize = 12.sp
 

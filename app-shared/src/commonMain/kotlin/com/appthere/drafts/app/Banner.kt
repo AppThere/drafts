@@ -1,15 +1,10 @@
 package com.appthere.drafts.app
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -18,11 +13,13 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.appthere.drafts.design.Corners
+import com.appthere.drafts.design.Elevation
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.interfaceTextStyle
+import com.appthere.drafts.design.raised
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.close
 import com.appthere.drafts.i18n.resources.could_not_save
@@ -64,8 +61,7 @@ private fun Banner(
     FlowRow(
         modifier
             .widthIn(max = maxWidth)
-            .background(palette.background)
-            .border(hairline, palette.muted, RoundedCornerShape(corner))
+            .raised(palette.panel, Corners.Container, Elevation.Floating)
             .padding(bannerPadding)
             .semantics {
                 contentDescription = message
@@ -81,7 +77,8 @@ private fun Banner(
             modifier = Modifier.widthIn(max = messageWidth),
         )
 
-        choices.forEach { (label, onChoose) -> Choice(label = label, onChoose = onChoose) }
+        // Drawn alike, so none is presented as the one to press.
+        choices.forEach { (label, onChoose) -> PanelButton(text = label, description = label, onClick = onChoose) }
     }
 }
 
@@ -193,34 +190,8 @@ internal fun WordsNotKeptBanner(
     )
 }
 
-/** One of the answers. Drawn alike, so none is presented as the one to press. */
-@Composable
-private fun Choice(
-    label: String,
-    onChoose: () -> Unit,
-) {
-    val palette = LocalPalette.current
-
-    BasicText(
-        text = label,
-        style = interfaceTextStyle(color = palette.ink, fontSize = labelSize, textAlign = TextAlign.Center),
-        modifier =
-            Modifier
-                .sizeIn(minWidth = target, minHeight = target)
-                .border(hairline, palette.muted, RoundedCornerShape(corner))
-                .clickable { onChoose() }
-                .padding(buttonPadding)
-                .semantics { contentDescription = label },
-    )
-}
-
 private val maxWidth = 620.dp
 private val messageWidth = 360.dp
-private val bannerPadding = 12.dp
-private val buttonPadding = 12.dp
+private val bannerPadding = 16.dp
 private val gap = 12.dp
-private val corner = 6.dp
-private val hairline = 1.dp
-private val target = 48.dp
-private val labelSize = 14.sp
 private val messageSize = 14.sp

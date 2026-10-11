@@ -1,7 +1,5 @@
 package com.appthere.drafts.app
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -29,6 +26,7 @@ import com.appthere.drafts.design.BundledLicences
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.Prose
 import com.appthere.drafts.design.interfaceTextStyle
+import com.appthere.drafts.design.panelSurface
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.licences
 import org.jetbrains.compose.resources.stringResource
@@ -58,8 +56,7 @@ fun Licences(
         modifier
             .width(panelWidth)
             .sizeIn(maxHeight = panelHeight)
-            .background(palette.background)
-            .border(hairline, palette.muted, RoundedCornerShape(corner))
+            .panelSurface()
             .padding(panelPadding),
         verticalArrangement = Arrangement.spacedBy(rowGap),
     ) {
@@ -105,10 +102,8 @@ private fun LicenceText(licence: BundledLicence) {
 
 private val panelWidth = 560.dp
 private val panelHeight = 600.dp
-private val panelPadding = 16.dp
+private val panelPadding = 20.dp
 private val rowGap = 12.dp
 private val lineGap = 4.dp
-private val corner = 6.dp
-private val hairline = 1.dp
 private val labelSize = 14.sp
 private val licenceSize = 11.sp

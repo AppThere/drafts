@@ -1,7 +1,5 @@
 package com.appthere.drafts.app
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -23,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.Prose
 import com.appthere.drafts.design.interfaceTextStyle
+import com.appthere.drafts.design.panelSurface
 import com.appthere.drafts.editor.ui.EditorShortcuts
 import com.appthere.drafts.editor.ui.Shortcut
 import com.appthere.drafts.i18n.resources.Res
@@ -58,8 +56,7 @@ internal fun ShortcutList(
             // phone, and a fixed width would hang off it.
             .widthIn(max = panelWidth)
             .fillMaxWidth()
-            .background(palette.background)
-            .border(hairline, palette.muted, RoundedCornerShape(corner))
+            .panelSurface()
             .padding(panelPadding)
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(rowGap),
@@ -116,10 +113,8 @@ private fun ShortcutSection(
 }
 
 private val panelWidth = 480.dp
-private val panelPadding = 16.dp
+private val panelPadding = 20.dp
 private val rowGap = 12.dp
 private val lineGap = 6.dp
-private val corner = 6.dp
-private val hairline = 1.dp
 private val keysWidth = 120.dp
 private val labelSize = 14.sp
