@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -26,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -49,6 +49,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.appthere.drafts.design.Corners
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.Palette
 import com.appthere.drafts.design.Prose
@@ -82,7 +83,6 @@ fun Binder(
     Column(
         modifier
             .semantics { paneTitle = title }
-            .background(palette.background)
             .padding(panelPadding),
         verticalArrangement = Arrangement.spacedBy(rowGap),
     ) {
@@ -179,16 +179,18 @@ private fun BinderItem(
 }
 
 /**
- * A row under a drag is outlined, so the writer can see where it will go; the chosen row sits on the
- * one ground every text colour is guaranteed to read on.
+ * A row is a pill, like the outline's entries. One under a drag is outlined in the accent, so the
+ * writer can see where it will go; the chosen row takes the control fill, which every text colour
+ * is guaranteed to read on.
  */
 private fun Modifier.marked(
     underDrag: Boolean,
     selected: Boolean,
     palette: Palette,
 ): Modifier =
-    then(if (underDrag) Modifier.border(hairline, palette.accent, RoundedCornerShape(corner)) else Modifier)
-        .then(if (selected) Modifier.background(palette.editing, RoundedCornerShape(corner)) else Modifier)
+    then(if (underDrag) Modifier.border(dragOutline, palette.accent, Corners.Pill) else Modifier)
+        .then(if (selected) Modifier.background(palette.control, Corners.Pill) else Modifier)
+        .clip(Corners.Pill)
 
 /** The keys a focused row answers. True if [key] was one of them. */
 private fun rowKey(
@@ -356,8 +358,9 @@ private val minimumTarget = 48.dp
 private val panelPadding = 12.dp
 private val rowGap = 4.dp
 private val markGap = 8.dp
-private val hairline = 1.dp
-private val corner = 6.dp
+
+/** The outline round a row a drag would drop beside or into. */
+private val dragOutline = 2.dp
 private val indent = 16.dp
 private val labelSize = 14.sp
 private val headingSize = 18.sp

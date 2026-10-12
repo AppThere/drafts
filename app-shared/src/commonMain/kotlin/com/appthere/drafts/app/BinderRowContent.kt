@@ -1,13 +1,11 @@
 package com.appthere.drafts.app
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -24,9 +22,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
+import com.appthere.drafts.design.Corners
+import com.appthere.drafts.design.Elevation
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.Lucide
 import com.appthere.drafts.design.interfaceTextStyle
+import com.appthere.drafts.design.raised
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.binder_actions
 import com.appthere.drafts.i18n.resources.binder_collapsed
@@ -143,7 +144,7 @@ internal fun rowActions(
 
 /**
  * What a row shows: whether a folder is open, its name, what it is in words, its marks, and a
- * button for its actions. Marks are words, in the ink colour, with a border -- never colour alone.
+ * button for its actions. Marks are words in the ink colour on a filled pill -- never colour alone.
  */
 @Composable
 internal fun RowScope.RowContent(
@@ -192,7 +193,11 @@ private fun Mark(
         maxLines = 1,
         modifier =
             if (bordered) {
-                Modifier.border(hairline, palette.muted, RoundedCornerShape(corner)).padding(horizontal = markPadding)
+                Modifier
+                    .background(
+                        palette.control,
+                        Corners.Pill,
+                    ).padding(horizontal = markPadding, vertical = markPaddingDown)
             } else {
                 Modifier
             },
@@ -219,8 +224,7 @@ private fun ActionsButton(
             }, properties = PopupProperties(focusable = true)) {
                 Column(
                     Modifier
-                        .background(palette.background)
-                        .border(hairline, palette.muted, RoundedCornerShape(corner))
+                        .raised(palette.panel, Corners.Container, Elevation.Floating)
                         .padding(menuPadding),
                     verticalArrangement = Arrangement.spacedBy(menuGap),
                 ) {
@@ -256,9 +260,8 @@ private fun condition(node: ProjectNode): StringResource? =
         }
     }
 
-private val hairline = 1.dp
-private val corner = 4.dp
-private val markPadding = 6.dp
+private val markPadding = 8.dp
+private val markPaddingDown = 2.dp
 private val menuPadding = 8.dp
 private val menuGap = 4.dp
 private val nameSize = 15.sp

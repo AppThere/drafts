@@ -1,7 +1,6 @@
 package com.appthere.drafts.app
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -15,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -34,11 +32,14 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.appthere.drafts.design.Corners
+import com.appthere.drafts.design.Elevation
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.Lucide
 import com.appthere.drafts.design.WidthClass
 import com.appthere.drafts.design.WindowSize
 import com.appthere.drafts.design.interfaceTextStyle
+import com.appthere.drafts.design.raised
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.binder
 import com.appthere.drafts.i18n.resources.close
@@ -94,19 +95,33 @@ fun ProjectWindow(
         BackHandler(enabled = compact && drawer) { drawer = false }
 
         if (compact) {
-            Column(Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize().background(LocalPalette.current.background)) {
                 Row(Modifier.padding(edge)) {
-                    PanelIconButton(icon = Lucide.ListTree, description = stringResource(Res.string.binder), onClick = {
-                        drawer =
-                            true
-                    })
+                    PanelIconButton(
+                        icon = Lucide.ListTree,
+                        description = stringResource(Res.string.binder),
+                        onClick = { drawer = true },
+                        toggled = drawer,
+                    )
                 }
                 Notices(controller, Modifier.padding(horizontal = edge))
                 pane(Modifier.weight(1f))
             }
-            if (drawer) Binder(controller, Modifier.fillMaxHeight().widthIn(max = drawerWidth))
+            // A drawer floats over the page, raised like every panel.
+            if (drawer) {
+                Binder(
+                    controller,
+                    Modifier
+                        .fillMaxHeight()
+                        .widthIn(
+                            max = drawerWidth,
+                        ).raised(LocalPalette.current.panel, Corners.Container, Elevation.Floating),
+                )
+            }
         } else {
-            Row(Modifier.fillMaxSize()) {
+            // The binder lies on the desk beside the page, like the outline beside the text: a raised
+            // frame here would be a second page competing with the real one.
+            Row(Modifier.fillMaxSize().background(LocalPalette.current.desk)) {
                 Binder(controller, Modifier.width(binderWidth).fillMaxHeight())
                 Column(Modifier.weight(1f).fillMaxHeight()) {
                     Notices(controller, Modifier.padding(edge))
@@ -235,8 +250,7 @@ private fun NoticeCard(
     Column(
         Modifier
             .fillMaxWidth()
-            .background(palette.background)
-            .border(hairline, palette.muted, RoundedCornerShape(corner))
+            .raised(palette.panel, Corners.Container, Elevation.Floating)
             .padding(cardPadding),
         verticalArrangement = Arrangement.spacedBy(gap),
     ) {
@@ -256,6 +270,4 @@ private val drawerWidth = 360.dp
 private val edge = 8.dp
 private val gap = 8.dp
 private val cardPadding = 12.dp
-private val corner = 6.dp
-private val hairline = 1.dp
 private val bodySize = 14.sp

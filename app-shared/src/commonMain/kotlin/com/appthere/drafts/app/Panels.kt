@@ -28,6 +28,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -316,8 +318,14 @@ internal fun PanelButton(
  * the button is found by. The icon takes the ink colour, so it follows the reader's theme (5.6).
  *
  * No fill of its own: these sit together in the chrome bar's raised pill, and a fill on each would
- * be a row of buttons in a box. [selected] is for a button that stands for a panel which is open --
- * the outline beside the text -- and fills it with the accent, and says so to a screen reader.
+ * be a row of buttons in a box.
+ *
+ * [toggled] is for a button that stands for a panel, which it opens and closes -- the outline beside
+ * the text, the binder's drawer -- and is null for every other button. While the panel is open it
+ * is filled with the accent and says so to a screen reader as a toggle that is on. A toggle, not
+ * only `selected`: Compose on Android reports `selected` for tabs and options and drops it for a
+ * button, so TalkBack heard nothing about the outline being open (found on a Chromebook, 2026-10-11).
+ * Null rather than false for the rest, so an ordinary button is not announced as a switch that is off.
  */
 @Composable
 internal fun PanelIconButton(
@@ -326,9 +334,10 @@ internal fun PanelIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    selected: Boolean = false,
+    toggled: Boolean? = null,
 ) {
     val palette = LocalPalette.current
+    val on = toggled == true
 
     Box(
         contentAlignment = Alignment.Center,
@@ -336,18 +345,21 @@ internal fun PanelIconButton(
             modifier
                 .sizeIn(minWidth = target, minHeight = target)
                 .clip(Corners.Pill)
-                .background(if (selected) palette.accent else Color.Transparent)
+                .background(if (on) palette.accent else Color.Transparent)
                 .clickable(enabled = enabled, onClick = onClick)
                 .semantics {
                     contentDescription = description
                     role = Role.Button
-                    this.selected = selected
+                    toggled?.let {
+                        selected = it
+                        toggleableState = ToggleableState(it)
+                    }
                 },
     ) {
         Image(
             painter = rememberVectorPainter(icon),
             contentDescription = null,
-            colorFilter = ColorFilter.tint(if (selected) palette.background else palette.ink),
+            colorFilter = ColorFilter.tint(if (on) palette.background else palette.ink),
             modifier = Modifier.size(iconSize),
         )
     }

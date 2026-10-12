@@ -31,9 +31,12 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.appthere.drafts.design.Corners
+import com.appthere.drafts.design.Elevation
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.Prose
 import com.appthere.drafts.design.interfaceTextStyle
+import com.appthere.drafts.design.raised
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.apply
 import com.appthere.drafts.i18n.resources.binder_locate_title
@@ -370,7 +373,10 @@ private fun TrashedItem(
     }
 }
 
-/** The shape every question takes: a bordered card, named as a pane so its arrival is announced. */
+/**
+ * The shape every question takes: a raised panel, like the conflict dialog, named as a pane so its
+ * arrival is announced.
+ */
 @Composable
 private fun PromptCard(
     title: String,
@@ -381,8 +387,7 @@ private fun PromptCard(
     Column(
         modifier
             .widthIn(max = maxWidth)
-            .background(palette.background)
-            .border(hairline, palette.accent, RoundedCornerShape(corner))
+            .raised(palette.panel, Corners.Container, Elevation.Floating)
             .padding(cardPadding)
             .semantics { paneTitle = title },
         verticalArrangement = Arrangement.spacedBy(rowGap),

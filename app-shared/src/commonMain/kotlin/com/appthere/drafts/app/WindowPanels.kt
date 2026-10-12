@@ -51,7 +51,7 @@ internal fun PanelButtons(
             description = stringResource(Res.string.open_outline),
             onClick = refocused(panels::toggleOutline),
             enabled = !hidden,
-            selected = panels.outline,
+            toggled = panels.outline,
         )
         ReaderControlsButton(enabled = !hidden, onClick = refocused(panels::openControls))
     }

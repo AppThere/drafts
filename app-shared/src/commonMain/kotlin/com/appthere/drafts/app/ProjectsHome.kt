@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
@@ -23,16 +24,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.paneTitle
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.appthere.drafts.design.Corners
+import com.appthere.drafts.design.Elevation
 import com.appthere.drafts.design.LocalPalette
 import com.appthere.drafts.design.Prose
 import com.appthere.drafts.design.interfaceTextStyle
+import com.appthere.drafts.design.raised
 import com.appthere.drafts.i18n.resources.Res
 import com.appthere.drafts.i18n.resources.binder_name
 import com.appthere.drafts.i18n.resources.cancel
@@ -123,7 +129,8 @@ private fun Entry(
         )
 
     Column(
-        Modifier.fillMaxWidth().border(hairline, palette.muted, RoundedCornerShape(corner)).padding(entryPadding),
+        // Each project on the panel tone, set apart from the page by tone rather than a ruled line.
+        Modifier.fillMaxWidth().background(palette.panel, Corners.Container).padding(entryPadding),
         verticalArrangement = Arrangement.spacedBy(gap),
     ) {
         val described = marks.fold(entry.name) { said, mark -> stringResource(Res.string.said_after, said, mark) }
@@ -139,11 +146,10 @@ private fun Entry(
                     style = interfaceTextStyle(color = palette.ink, fontSize = smallSize),
                     modifier =
                         Modifier
-                            .border(
-                                hairline,
-                                palette.muted,
-                                RoundedCornerShape(corner),
-                            ).padding(horizontal = gap),
+                            .background(
+                                palette.control,
+                                Corners.Pill,
+                            ).padding(horizontal = gap, vertical = markPadding),
                 )
             }
         }
@@ -215,8 +221,7 @@ fun NewProjectPrompt(
     Column(
         modifier
             .semantics { paneTitle = title }
-            .background(palette.background)
-            .border(hairline, palette.accent, RoundedCornerShape(corner))
+            .raised(palette.panel, Corners.Container, Elevation.Floating)
             .padding(padding),
         verticalArrangement = Arrangement.spacedBy(gap),
     ) {
@@ -245,13 +250,7 @@ fun NewProjectPrompt(
         )
         Buttons {
             ProjectTemplate.entries.forEach { choice ->
-                val word = stringResource(templateWord(choice))
-                Button(
-                    word,
-                    onClick = { template = choice },
-                    modifier = Modifier.semantics { selected = choice == template },
-                    chosen = choice == template,
-                )
+                TemplateOption(stringResource(templateWord(choice)), chosen = choice == template) { template = choice }
             }
         }
         Buttons {
@@ -311,22 +310,40 @@ private fun Button(
     modifier: Modifier = Modifier,
     described: String? = null,
     enabled: Boolean = true,
-    chosen: Boolean = false,
+) {
+    val description = described?.let { stringResource(Res.string.said_after, text, it) } ?: text
+    PanelButton(text = text, description = description, enabled = enabled, onClick = onClick, modifier = modifier)
+}
+
+/**
+ * One template to choose, drawn as the reader controls draw an option: chosen is said three ways,
+ * the accent fill, the weight of the word, and to a screen reader as a selected radio button.
+ */
+@Composable
+private fun TemplateOption(
+    word: String,
+    chosen: Boolean,
+    onChoose: () -> Unit,
 ) {
     val palette = LocalPalette.current
-    val description = described?.let { stringResource(Res.string.said_after, text, it) } ?: text
-    PanelButton(
-        text = text,
-        description = description,
-        enabled = enabled,
-        onClick = onClick,
-        modifier = if (chosen) modifier.border(hairline * 2, palette.ink, RoundedCornerShape(corner)) else modifier,
+    val style = interfaceTextStyle(color = if (chosen) palette.background else palette.ink, fontSize = bodySize)
+    BasicText(
+        text = word,
+        style = if (chosen) style.copy(fontWeight = FontWeight.SemiBold) else style,
+        modifier =
+            Modifier
+                .sizeIn(minWidth = target, minHeight = target)
+                .clip(Corners.Pill)
+                .background(if (chosen) palette.accent else palette.control)
+                .selectable(selected = chosen, role = Role.RadioButton, onClick = onChoose)
+                .padding(entryPadding),
     )
 }
 
 private val padding = 16.dp
 private val entryPadding = 12.dp
 private val gap = 8.dp
+private val markPadding = 2.dp
 private val corner = 6.dp
 private val hairline = 1.dp
 private val target = 48.dp

@@ -7,6 +7,8 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SkikoComposeUiTest
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithText
@@ -73,13 +75,15 @@ class OutlinePanelTest {
             waitForIdle()
             val button = onNodeWithContentDescription(words(Res.string.open_outline))
 
-            button.assertIsNotSelected()
+            // Selected for the desktop's accessibility bridge; on and off as a toggle for Android's,
+            // which drops `selected` on a button.
+            button.assertIsNotSelected().assertIsOff()
             button.performClick()
             waitForIdle()
-            button.assertIsSelected()
+            button.assertIsSelected().assertIsOn()
             button.performClick()
             waitForIdle()
-            button.assertIsNotSelected()
+            button.assertIsNotSelected().assertIsOff()
         }
     }
 
